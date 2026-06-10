@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 // This route creates a new user with email + password using the Supabase Admin API.
 // Only sa_admin and me_admin can call this.
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check caller's role
-    const { data: callerProfile } = await supabaseAdmin
+    const { data: callerProfile } = await getSupabaseAdmin()
       .from("profiles")
       .select("role")
       .eq("id", caller.id)
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
 
     // Create the auth user (no email confirmation)
     const { data: newUser, error: createError } =
-      await supabaseAdmin.auth.admin.createUser({
+      await getSupabaseAdmin().auth.admin.createUser({
         email,
         password,
         email_confirm: true, // skip email verification
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
 
     // The trigger auto-creates the profile, but update role & shakha
     if (newUser.user) {
-      await supabaseAdmin
+      await getSupabaseAdmin()
         .from("profiles")
         .update({
           full_name: full_name || "",
