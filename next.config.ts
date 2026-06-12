@@ -34,13 +34,6 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Cache immutable static assets aggressively
-        source: "/_next/static/:path*",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
-        ],
-      },
-      {
         // Cache public images for a week
         source: "/:path*.(png|jpg|jpeg|gif|webp|svg|ico)",
         headers: [
