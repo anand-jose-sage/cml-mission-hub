@@ -16,12 +16,15 @@ import { AboutScreen } from "@/components/home/about-screen";
 import { NoticeBoard } from "@/components/notices/notice-board";
 import { MediaCenter } from "@/components/media/media-center";
 import { ActivitiesScreen } from "@/components/activities/activities-screen";
+import { FeastPortalCard } from "@/components/feast/feast-portal-card";
+import { FeastModule } from "@/components/feast/feast-module";
 
 export default function HomePage() {
   const theme = buildTheme("aurora-glass", "dusk", 28);
   const [tab, setTab] = useState("home");
   const [sel, setSel] = useState<number | null>(null); // null = all week
   const [noticeDetailOpen, setNoticeDetailOpen] = useState(false);
+  const [inFeast, setInFeast] = useState(false);
   const scrollRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -49,6 +52,14 @@ export default function HomePage() {
       return d;
     });
   }, []);
+
+  if (inFeast) {
+    return (
+      <div className="relative h-dvh w-full overflow-hidden max-w-md mx-auto" style={{ background: theme.pageBg }}>
+        <FeastModule onExit={() => setInFeast(false)} parentTheme={theme} />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -121,6 +132,8 @@ export default function HomePage() {
                 sel={sel}
                 onViewAll={() => setTab("activities")}
               />
+
+              <FeastPortalCard onEnter={() => setInFeast(true)} />
             </>
           ) : (
             <OtherScreen tab={tab} theme={theme} />

@@ -120,6 +120,118 @@ export interface MediaFile {
   created_at: string;
 }
 
+// ============================================================
+// FEAST PORTAL
+// ============================================================
+export type FeastStatus = "draft" | "registration_open" | "ongoing" | "completed";
+export type CompetitionType = "individual" | "group";
+export type MedalType = "gold" | "silver" | "bronze";
+
+export interface FeastDB {
+  id: string;
+  name: string;
+  slug: string;
+  type: string;
+  year: string;
+  status: FeastStatus;
+  description: string | null;
+  venue: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Competition {
+  id: string;
+  name: string;
+  type: CompetitionType;
+  category: string | null;          // art | music | writing | dance | drama | speech | quiz
+  gender: string | null;            // boys | girls | open
+  competition_category_id: string | null;
+  description: string | null;
+  created_at: string;
+  competition_category?: CompetitionCategory;
+}
+
+export interface FeastCompetition {
+  id: string;
+  feast_id: string;
+  competition_id: string;
+  display_order: number;
+  time_slot: string | null;
+  venue: string | null;
+  max_slots: number | null;
+  created_at: string;
+  competition?: Competition;
+}
+
+export interface CompetitionCategory {
+  id: string;
+  slug: string;
+  name: string;
+  min_dob: string | null;
+  max_dob: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface Participant {
+  id: string;
+  feast_id: string;
+  shakha_id: string | null;
+  name: string;
+  house_name: string | null;
+  date_of_birth: string | null;
+  gender: string | null;
+  category: string | null;
+  competition_category_id: string | null;
+  phone: string | null;
+  registration_number: string | null;
+  created_at: string;
+  updated_at: string;
+  shakha?: Shakha;
+  competition_category?: CompetitionCategory;
+}
+
+export interface ParticipantRegistration {
+  id: string;
+  participant_id: string;
+  feast_competition_id: string;
+  created_at: string;
+  feast_competition?: FeastCompetition;
+}
+
+export interface Score {
+  id: string;
+  participant_registration_id: string;
+  score: number;
+  remarks: string | null;
+  entered_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Result {
+  id: string;
+  participant_registration_id: string;
+  position: number;
+  medal_type: MedalType | null;
+  total_score: number | null;
+  published: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GroupTeam {
+  id: string;
+  feast_id: string;
+  shakha_id: string | null;
+  feast_competition_id: string;
+  team_name: string;
+  created_at: string;
+}
+
 export interface Database {
   public: {
     Tables: {

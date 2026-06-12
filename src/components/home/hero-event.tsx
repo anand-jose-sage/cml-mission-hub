@@ -109,7 +109,7 @@ export function HeroEvent({ theme, onOpen }: HeroEventProps) {
         </div>
 
         {/* Title */}
-        <h2 className="relative font-[family-name:var(--font-anek-malayalam)] font-bold text-[27px] text-white mt-3.5 mb-0 leading-tight tracking-tight">
+        <h2 className="relative font-[family-name:var(--font-anek)] font-bold text-[27px] text-white mt-3.5 mb-0 leading-tight tracking-tight">
           {event.title}
         </h2>
 

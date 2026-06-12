@@ -9,6 +9,11 @@ import {
   Bell,
   CalendarDays,
   Users,
+  Trophy,
+  UserCheck,
+  ClipboardList,
+  Layers,
+  Medal,
   LogOut,
   Loader2,
   ChevronRight,
@@ -21,6 +26,13 @@ const NAV_ITEMS = [
   { href: "/admin/notices", label: "Notices", icon: Bell },
   { href: "/admin/activities", label: "Activities", icon: CalendarDays },
   { href: "/admin/users", label: "Users", icon: Users },
+  // Feast section
+  { href: "/admin/feasts", label: "Feasts", icon: Trophy },
+  { href: "/admin/participants", label: "Participants", icon: UserCheck },
+  { href: "/admin/entries", label: "Entries", icon: ClipboardList },
+  { href: "/admin/competitions", label: "Competitions", icon: Layers },
+  { href: "/admin/results", label: "Results", icon: Medal },
+  { href: "/admin/standings", label: "Standings", icon: Trophy },
 ];
 
 function AdminShell({ children }: { children: React.ReactNode }) {

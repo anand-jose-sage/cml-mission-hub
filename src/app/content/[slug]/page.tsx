@@ -1,9 +1,59 @@
+import type { Metadata } from "next";
 import { ArrowLeft, Clock, Calendar, Play, Volume2, Paperclip } from "lucide-react";
 import Link from "next/link";
 import { COLORS } from "@/lib/theme";
+import { SITE_NAME, SITE_URL, OG_IMAGE } from "@/lib/site-config";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 interface ContentPageProps {
   params: Promise<{ slug: string }>;
+}
+
+function toTitleCase(slug: string) {
+  return slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export async function generateMetadata({ params }: ContentPageProps): Promise<Metadata> {
+  const { slug } = await params;
+
+  try {
+    const admin = getSupabaseAdmin();
+    const { data: item } = await admin
+      .from("content_items")
+      .select("title, summary, cover_image_url, published_at")
+      .eq("slug", slug)
+      .eq("status", "published")
+      .single();
+
+    if (item) {
+      const title = (item.title as string) || toTitleCase(slug);
+      const description = (item.summary as string) || `${title} — ${SITE_NAME}`;
+      const image = (item.cover_image_url as string) || OG_IMAGE;
+      const publishedAt = item.published_at ? new Date(item.published_at as string).toISOString() : undefined;
+
+      return {
+        title,
+        description,
+        alternates: { canonical: `/content/${slug}` },
+        openGraph: {
+          title,
+          description,
+          url: `${SITE_URL}/content/${slug}`,
+          type: "article",
+          publishedTime: publishedAt,
+          images: [{ url: image, width: 1200, height: 630, alt: title }],
+        },
+        twitter: { card: "summary_large_image", title, description, images: [image] },
+      };
+    }
+  } catch { /* fall through to default */ }
+
+  const title = toTitleCase(slug);
+  return {
+    title,
+    description: `${title} — ${SITE_NAME}`,
+    alternates: { canonical: `/content/${slug}` },
+  };
 }
 
 export default async function ContentPage({ params }: ContentPageProps) {
