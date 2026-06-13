@@ -126,6 +126,14 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${balooChettan2.variable} ${anekMalayalam.variable} ${gayathri.variable}`}>
       <head>
+        {/* Kill any stale/ghost service worker that may be serving outdated
+            chunks ("module factory is not available"). Runs before app code so
+            it heals even pages that would otherwise crash during hydration. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{if('serviceWorker'in navigator){navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister();});});}if(window.caches&&caches.keys){caches.keys().then(function(ks){ks.forEach(function(k){caches.delete(k);});});}}catch(e){}})();`,
+          }}
+        />
         {/* JSON-LD structured data */}
         <script
           type="application/ld+json"

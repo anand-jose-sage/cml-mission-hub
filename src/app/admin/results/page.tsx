@@ -27,56 +27,57 @@ interface EntryRow {
   registrationId: string;
   regNo: string;
   name: string;
+  houseName: string | null;
   shakhaName: string;
   savedScore: number | null;
 }
 
 // ─── Grade cell ───────────────────────────────────────────────────────────────
 
-const GRADE_SOLID: Record<string, { bg: string; text: string }> = {
-  A: { bg: "#16A34A", text: "#fff" },
-  B: { bg: "#D97706", text: "#fff" },
-  C: { bg: "#6B46FF", text: "#fff" },
+const GRADE_SOLID: Record<string, { bg: string; pts: string }> = {
+  A: { bg: "#15803D", pts: "#14532D" },
+  B: { bg: "#B45309", pts: "#78350F" },
+  C: { bg: "#5B21B6", pts: "#3B0764" },
 };
 
 function GradeCell({ grade, pts }: { grade: Grade; pts: number }) {
-  if (!grade) return <span className="text-gray-300 text-sm font-medium">—</span>;
-  const { bg, text } = GRADE_SOLID[grade];
+  if (!grade) return <span className="text-sm font-bold" style={{ color: "#6B7280" }}>—</span>;
+  const { bg, pts: ptsColor } = GRADE_SOLID[grade];
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex flex-col items-center gap-0.5">
       <span
-        className="inline-block text-[13px] font-bold px-3 py-1 rounded-lg leading-none"
-        style={{ background: bg, color: text }}
+        className="inline-flex items-center justify-center text-[13px] font-black px-3 py-1 rounded-lg leading-none w-full text-white"
+        style={{ background: bg }}
       >
         Grade {grade}
       </span>
-      <span className="text-[10px] text-gray-400 pl-0.5">+{pts} pts</span>
+      <span className="text-[12px] font-black" style={{ color: ptsColor }}>+{pts} pts</span>
     </div>
   );
 }
 
 // ─── Position cell ────────────────────────────────────────────────────────────
 
-const POS_COLORS: Record<number, { bg: string; border: string; text: string }> = {
-  1: { bg: "#FEF9C3", border: "#F5C542", text: "#92400E" },
-  2: { bg: "#F3F4F6", border: "#9CA3AF", text: "#374151" },
-  3: { bg: "#FEF3E2", border: "#E0936A", text: "#7C2D12" },
+const POS_COLORS: Record<number, { bg: string; pts: string }> = {
+  1: { bg: "#92400E", pts: "#78350F" },
+  2: { bg: "#374151", pts: "#1F2937" },
+  3: { bg: "#7C2D12", pts: "#6B2510" },
 };
 const POS_EMOJI: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
 
 function PosCell({ pos, pts }: { pos: number | null; pts: number }) {
-  if (!pos) return <span className="text-gray-300 text-sm font-medium">—</span>;
-  const style = POS_COLORS[pos] ?? { bg: "#F3F4F6", border: "#E5E7EB", text: "#6B7280" };
+  if (!pos) return <span className="text-sm font-bold" style={{ color: "#6B7280" }}>—</span>;
+  const style = POS_COLORS[pos] ?? { bg: "#374151", pts: "#1F2937" };
   const emoji = POS_EMOJI[pos] ?? "";
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex flex-col items-center gap-0.5">
       <span
-        className="inline-flex items-center gap-1.5 text-[13px] font-bold px-3 py-1 rounded-lg leading-none border"
-        style={{ background: style.bg, borderColor: style.border, color: style.text }}
+        className="inline-flex items-center justify-center gap-1.5 text-[13px] font-black px-3 py-1 rounded-lg leading-none w-full text-white"
+        style={{ background: style.bg }}
       >
         {emoji} {positionLabel(pos)}
       </span>
-      {pts > 0 && <span className="text-[10px] text-gray-400 pl-0.5">+{pts} pts</span>}
+      {pts > 0 && <span className="text-[12px] font-black" style={{ color: style.pts }}> +{pts} pts</span>}
     </div>
   );
 }
@@ -209,7 +210,7 @@ export default function ResultsAdminPage() {
     const [{ data: regData }, scoresResult] = await Promise.all([
       supabase
         .from("participant_registrations")
-        .select("id, participant:participants(name, registration_number, shakha:shakhas(name))")
+        .select("id, participant:participants(name, registration_number, house_name, shakha:shakhas(name))")
         .eq("feast_competition_id", compId),
       getCompetitionScores(compId),
     ]);
@@ -228,6 +229,7 @@ export default function ResultsAdminPage() {
         registrationId: regId,
         regNo: rawRegNo ?? regId.slice(0, 8).toUpperCase(),
         name: (p?.name as string) ?? "—",
+        houseName: (p?.house_name as string | null) ?? null,
         shakhaName: (sh?.name as string) ?? "—",
         savedScore: savedMap[regId] ?? null,
       };
@@ -320,7 +322,7 @@ export default function ResultsAdminPage() {
     await loadEntries();
   };
 
-  const selectCls = "border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-purple-200 bg-white";
+  const selectCls = "border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-purple-200 bg-white";
   const maxScoreReady = maxScore != null && maxScore > 0;
 
   return (
@@ -345,31 +347,33 @@ export default function ResultsAdminPage() {
       </div>
 
       {/* Selectors */}
-      <div className="flex gap-3 mb-4 flex-wrap items-end">
+      <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-3 mb-4 items-end">
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Feast</label>
-          <select value={feastId} onChange={(e) => setFeastId(e.target.value)} className={selectCls}>
+          <select value={feastId} onChange={(e) => setFeastId(e.target.value)} className={`${selectCls} w-full`}>
             {feasts.map((f) => <option key={f.id} value={f.id}>{f.name} {f.year}</option>)}
           </select>
         </div>
-        <div className="flex-1 min-w-[240px]">
+        <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Competition</label>
-          <div className="relative">
-            <select
-              value={compId}
-              onChange={(e) => setCompId(e.target.value)}
-              className={`${selectCls} w-full pr-8 appearance-none`}
-            >
-              {compOptions.map((c) => <option key={c.fcId} value={c.fcId}>{c.label}</option>)}
-            </select>
-            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <select
+                value={compId}
+                onChange={(e) => setCompId(e.target.value)}
+                className={`${selectCls} w-full pr-8 appearance-none`}
+              >
+                {compOptions.map((c) => <option key={c.fcId} value={c.fcId}>{c.label}</option>)}
+              </select>
+              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+            {resultStatus === "published" && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-50 text-green-700 text-xs font-semibold border border-green-100 shrink-0">
+                <Check size={12} /> Published
+              </span>
+            )}
           </div>
         </div>
-        {resultStatus === "published" && (
-          <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-50 text-green-700 text-xs font-semibold border border-green-100">
-            <Check size={12} /> Published
-          </span>
-        )}
       </div>
 
       {/* Max Score gate */}
@@ -432,60 +436,140 @@ export default function ResultsAdminPage() {
         </div>
       ) : (
         <>
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto mb-4">
+          {/* ── Desktop table ── */}
+          <div className="hidden sm:block bg-white rounded-xl overflow-hidden border border-[#1e1b4b] shadow-md mb-4">
             <table className="w-full text-sm min-w-[700px]">
-              <thead className="bg-gray-50 border-b border-gray-100">
-                <tr>
-                  {["#", "Reg No", "Participant", "Shakha", `Score / ${maxScore}`, "Grade", "Position", "Total"].map((h) => (
-                    <th key={h} className="px-3 py-2.5 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+              <thead style={{ background: "linear-gradient(90deg,#ede9fe,#f5f3ff)" }}>
+                <tr className="border-b-2" style={{ borderColor: "#c4b5fd" }}>
+                  {["#", "Reg No", `Score / ${maxScore}`, "Participant", "Shakha", "Grade", "Position", "Total"].map((h) => (
+                    <th key={h} className="px-3 py-3 text-left text-[11px] font-black uppercase tracking-wider whitespace-nowrap" style={{ color: "#1e1b4b" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {entries.map((e, i) => {
                   const p = previewMap[e.registrationId];
+                  const isEven = i % 2 === 0;
                   return (
-                    <tr key={e.registrationId} className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors">
-                      <td className="px-3 py-3 text-xs text-gray-400">{i + 1}</td>
+                    <tr
+                      key={e.registrationId}
+                      className="border-b transition-colors"
+                      style={{
+                        borderColor: "#e5e7eb",
+                        background: isEven ? "#fff" : "#f8f7ff",
+                      }}
+                      onMouseEnter={(ev) => (ev.currentTarget.style.background = "#ede9fe")}
+                      onMouseLeave={(ev) => (ev.currentTarget.style.background = isEven ? "#fff" : "#f8f7ff")}
+                    >
+                      <td className="px-3 py-3 text-xs font-black" style={{ color: "#4C1D95" }}>{i + 1}</td>
                       <td className="px-3 py-3">
-                        <span className="inline-block font-mono text-[11px] font-semibold px-2 py-0.5 rounded-md" style={{ background: "#6B46FF12", color: "#6B46FF" }}>
+                        <span className="inline-block font-mono text-[13px] font-black px-2.5 py-1 rounded-lg tracking-wide text-white" style={{ background: "#4C1D95" }}>
                           {e.regNo}
                         </span>
                       </td>
-                      <td className="px-3 py-3 font-medium text-gray-900 whitespace-nowrap">{e.name}</td>
-                      <td className="px-3 py-3 text-gray-500 whitespace-nowrap">{e.shakhaName}</td>
                       <td className="px-3 py-3">
                         <input
-                          type="number"
-                          min="0"
-                          max={maxScore}
-                          step="0.5"
+                          type="number" min="0" max={maxScore} step="0.5"
                           value={scores[e.registrationId] ?? ""}
                           onChange={(ev) => setScores((s) => ({ ...s, [e.registrationId]: ev.target.value }))}
                           placeholder="—"
                           disabled={resultStatus === "published"}
-                          className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm text-center outline-none focus:ring-2 focus:ring-purple-200 disabled:bg-gray-50 disabled:text-gray-400"
+                          className="w-20 border-2 rounded-lg px-2 py-1.5 text-[15px] font-black text-center outline-none transition-colors disabled:opacity-50"
+                          style={{ borderColor: "#ddd6fe", color: "#1e1b4b" }}
+                          onFocus={(ev) => (ev.currentTarget.style.borderColor = "#6B46FF")}
+                          onBlur={(ev) => (ev.currentTarget.style.borderColor = "#ddd6fe")}
                         />
                       </td>
-                      <td className="px-3 py-3"><GradeCell grade={p?.grade ?? null} pts={p?.gradePoints ?? 0} /></td>
-                      <td className="px-3 py-3"><PosCell pos={p?.position ?? null} pts={p?.positionPoints ?? 0} /></td>
+                      <td className="px-3 py-3">
+                        <p className="font-bold text-[14px] leading-tight" style={{ color: "#1e1b4b" }}>{e.name}</p>
+                        {e.houseName && (
+                          <p className="text-[12px] font-semibold mt-0.5" style={{ color: "#7C3AED" }}>{e.houseName}</p>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <span className="text-[13px] font-semibold" style={{ color: "#4B5563" }}>{e.shakhaName}</span>
+                      </td>
+                      <td className="px-3 py-3 text-center"><GradeCell grade={p?.grade ?? null} pts={p?.gradePoints ?? 0} /></td>
+                      <td className="px-3 py-3 text-center"><PosCell pos={p?.position ?? null} pts={p?.positionPoints ?? 0} /></td>
                       <td className="px-3 py-3">
                         {p ? (
-                          <div className="flex flex-col gap-0.5">
-                            <span className="font-black text-[18px] leading-none" style={{ color: p.totalPoints > 0 ? "#6B46FF" : "#D1D5DB" }}>
-                              {p.totalPoints}
-                            </span>
-                            <span className="text-[10px] text-gray-400">pts</span>
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span className="font-black text-[20px] leading-none" style={{ color: p.totalPoints > 0 ? "#6B46FF" : "#D1D5DB" }}>{p.totalPoints}</span>
+                            <span className="text-[10px] font-semibold" style={{ color: "#A78BFA" }}>pts</span>
                           </div>
-                        ) : (
-                          <span className="text-gray-300 text-sm font-medium">—</span>
-                        )}
+                        ) : <span className="text-gray-300 text-sm font-medium">—</span>}
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* ── Mobile cards ── */}
+          <div className="sm:hidden space-y-2.5 mb-4">
+            {entries.map((e, i) => {
+              const p = previewMap[e.registrationId];
+              return (
+                <div key={e.registrationId} className="rounded-xl overflow-hidden" style={{ border: "1.5px solid #ddd6fe", boxShadow: "0 2px 8px rgba(107,70,255,0.08)" }}>
+                  {/* Card header */}
+                  <div className="flex items-center gap-2.5 px-3.5 pt-3 pb-2.5 bg-white">
+                    <span className="text-[13px] font-black font-mono w-5 shrink-0" style={{ color: "#4C1D95" }}>{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[15px] font-black leading-tight truncate" style={{ color: "#1e1b4b" }}>{e.name}</p>
+                      {e.houseName && (
+                        <p className="text-[12px] font-black mt-0.5" style={{ color: "#5B21B6" }}>{e.houseName}</p>
+                      )}
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="font-mono text-[12px] font-black px-2 py-0.5 rounded-md tracking-wide text-white" style={{ background: "#4C1D95" }}>
+                          {e.regNo}
+                        </span>
+                        <span className="text-[12px] font-bold" style={{ color: "#374151" }}>{e.shakhaName}</span>
+                      </div>
+                    </div>
+                    {/* Total points */}
+                    <div className="shrink-0 text-right">
+                      {p ? (
+                        <>
+                          <span className="font-black text-[24px] leading-none" style={{ color: p.totalPoints > 0 ? "#4C1D95" : "#9CA3AF" }}>{p.totalPoints}</span>
+                          <p className="text-[10px] font-black" style={{ color: "#5B21B6" }}>pts</p>
+                        </>
+                      ) : (
+                        <span className="text-[20px] font-black" style={{ color: "#9CA3AF" }}>—</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Score row — dark background */}
+                  <div className="flex items-center gap-3 px-3.5 py-3 border-t" style={{ background: "#ede9fe", borderColor: "#ddd6fe" }}>
+                    <span className="text-[11px] font-black uppercase tracking-widest shrink-0" style={{ color: "#4C1D95" }}>Score</span>
+                    <input
+                      type="number" min="0" max={maxScore} step="0.5"
+                      inputMode="decimal"
+                      value={scores[e.registrationId] ?? ""}
+                      onChange={(ev) => setScores((s) => ({ ...s, [e.registrationId]: ev.target.value }))}
+                      placeholder="—"
+                      disabled={resultStatus === "published"}
+                      className="w-20 border-2 rounded-lg px-3 py-2 text-[16px] font-black text-center outline-none transition-colors bg-white disabled:opacity-40"
+                      style={{ borderColor: "#c4b5fd", color: "#1e1b4b" }}
+                      onFocus={(ev) => (ev.currentTarget.style.borderColor = "#7C3AED")}
+                      onBlur={(ev) => (ev.currentTarget.style.borderColor = "#c4b5fd")}
+                    />
+                    <span className="text-[13px] font-black shrink-0" style={{ color: "#4C1D95" }}>/ {maxScore}</span>
+
+                    {/* Live grade + position */}
+                    {p ? (
+                      <div className="flex items-center gap-1.5 ml-auto flex-wrap justify-end">
+                        <GradeCell grade={p.grade ?? null} pts={p.gradePoints} />
+                        <PosCell pos={p.position ?? null} pts={p.positionPoints} />
+                      </div>
+                    ) : (
+                      <span className="ml-auto text-[12px] font-bold" style={{ color: "#6D28D9" }}>enter score</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Grade summary chips */}
@@ -495,9 +579,7 @@ export default function ResultsAdminPage() {
               const { bg, text } = GRADE_SOLID[g];
               return (
                 <div key={g} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-gray-100 shadow-sm">
-                  <span className="text-[12px] font-bold px-2.5 py-0.5 rounded-md" style={{ background: bg, color: text }}>
-                    Grade {g}
-                  </span>
+                  <span className="text-[12px] font-bold px-2.5 py-0.5 rounded-md" style={{ background: bg, color: text }}>Grade {g}</span>
                   <span className="font-bold text-[15px] text-gray-800">{count}</span>
                   <span className="text-gray-400 text-xs">participants</span>
                 </div>
@@ -509,13 +591,13 @@ export default function ResultsAdminPage() {
             </div>
           </div>
 
-          {/* Action buttons */}
+          {/* Action buttons — full-width stacked on mobile */}
           {resultStatus === "draft" ? (
-            <div className="flex gap-2 justify-end">
+            <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
               <button
                 onClick={handleSaveDraft}
                 disabled={saving}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700 bg-white cursor-pointer disabled:opacity-50"
+                className="flex items-center justify-center gap-1.5 px-4 py-3 sm:py-2.5 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700 bg-white cursor-pointer disabled:opacity-50"
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                 Save Draft
@@ -523,7 +605,7 @@ export default function ResultsAdminPage() {
               <button
                 onClick={() => setShowConfirm(true)}
                 disabled={publishing}
-                className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer disabled:opacity-50"
+                className="flex items-center justify-center gap-1.5 px-5 py-3 sm:py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer disabled:opacity-50"
                 style={{ background: "linear-gradient(135deg,#6B46FF,#A855F7)" }}
               >
                 {publishing ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
@@ -531,11 +613,11 @@ export default function ResultsAdminPage() {
               </button>
             </div>
           ) : (
-            <div className="flex justify-end">
+            <div className="flex sm:justify-end">
               <button
                 onClick={handleUnpublish}
                 disabled={publishing}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold border border-red-200 text-red-600 bg-white cursor-pointer disabled:opacity-50"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-3 sm:py-2.5 rounded-xl text-sm font-semibold border border-red-200 text-red-600 bg-white cursor-pointer disabled:opacity-50"
               >
                 {publishing ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
                 Unpublish (revert to draft)

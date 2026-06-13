@@ -48,6 +48,15 @@ function useCountUp(target: number, duration = 900, active = true) {
 
 // ─── Animated bar ─────────────────────────────────────────────────────────────
 
+// Darken a #rrggbb hex by `amt` (0–1): each channel × (1 - amt).
+function darken(hex: string, amt: number) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.max(0, Math.round(((n >> 16) & 255) * (1 - amt)));
+  const g = Math.max(0, Math.round(((n >> 8) & 255) * (1 - amt)));
+  const b = Math.max(0, Math.round((n & 255) * (1 - amt)));
+  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
+}
+
 function AnimBar({ pct, color, track, delay = 0, animated }: {
   pct: number; color: string; track: string; delay?: number; animated: boolean;
 }) {
@@ -60,7 +69,12 @@ function AnimBar({ pct, color, track, delay = 0, animated }: {
   return (
     <div className="h-2 rounded-full overflow-hidden" style={{ background: track }}>
       <div className="h-full rounded-full"
-        style={{ width: `${w}%`, background: color, boxShadow: `0 0 8px ${color}88`, transition: "width 0.8s cubic-bezier(.2,.8,.2,1)" }} />
+        style={{
+          width: `${w}%`,
+          background: `linear-gradient(90deg, ${color}, ${darken(color, 0.42)})`,
+          boxShadow: `0 0 8px ${darken(color, 0.3)}88`,
+          transition: "width 0.8s cubic-bezier(.2,.8,.2,1)",
+        }} />
     </div>
   );
 }

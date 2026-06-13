@@ -1,12 +1,1 @@
-{
-  "version": "0.0.1",
-  "configurations": [
-    {
-      "name": "dev",
-      "cwd": "C:\\Users\\anand.jose\\Projects\\cml_news_arts_management\\cml-mission-hub",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "C:\\Users\\anand.jose\\Projects\\cml_news_arts_management\\cml-mission-hub", "run", "dev"],
-      "port": 3001
-    }
-  ]
-}
+{"version":"0.0.1","configurations":[{"name":"dev","runtimeExecutable":"npm","runtimeArgs":["run","dev"],"port":3000}]}

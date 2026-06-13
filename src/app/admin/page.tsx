@@ -9,6 +9,9 @@ import {
   Users,
   FolderOpen,
   Loader2,
+  Medal,
+  UserCheck,
+  ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
@@ -19,6 +22,14 @@ interface SectionInfo {
   href: string;
   icon: React.ComponentType<{ size?: number; color?: string }>;
   count: number;
+  color: string;
+}
+
+interface LinkCard {
+  title: string;
+  description: string;
+  href: string;
+  icon: React.ComponentType<{ size?: number; color?: string }>;
   color: string;
 }
 
@@ -81,6 +92,23 @@ export default function AdminPage() {
     },
   ];
 
+  const feastLinks: LinkCard[] = [
+    {
+      title: "Results",
+      description: "Publish & manage competition results",
+      href: "/admin/results",
+      icon: Medal,
+      color: "#D97706",
+    },
+    {
+      title: "Participants",
+      description: "View registered participants",
+      href: "/admin/participants",
+      icon: UserCheck,
+      color: "#0891B2",
+    },
+  ];
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-5 sm:py-8">
       {/* Header */}
@@ -98,7 +126,8 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Section cards */}
+      {/* M HUB section */}
+      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">M Hub</p>
       <div className="grid gap-3 sm:gap-4 grid-cols-2">
         {sections.map((section) => {
           const Icon = section.icon;
@@ -127,6 +156,33 @@ export default function AdminPage() {
                 {section.title}
               </h2>
               <p className="text-xs sm:text-sm text-gray-500 hidden sm:block">{section.description}</p>
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Feast section */}
+      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mt-6 mb-2">Feast</p>
+      <div className="grid gap-3 sm:gap-4 grid-cols-2">
+        {feastLinks.map((card) => {
+          const Icon = card.icon;
+          return (
+            <Link
+              key={card.href}
+              href={card.href}
+              className="flex items-center gap-3 p-4 sm:p-5 bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow"
+            >
+              <div
+                className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: `${card.color}15` }}
+              >
+                <Icon size={18} color={card.color} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-sm sm:text-base font-semibold text-gray-900">{card.title}</h2>
+                <p className="text-xs text-gray-500 hidden sm:block truncate">{card.description}</p>
+              </div>
+              <ChevronRight size={15} className="text-gray-300 shrink-0" />
             </Link>
           );
         })}
