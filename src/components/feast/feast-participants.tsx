@@ -31,21 +31,6 @@ const KIND_COLOR: Record<FeastKind, string> = {
   arts: "#C026D3",
 };
 
-// ─── Shakha pill ──────────────────────────────────────────────────────────────
-
-function ShakhaPill({ name }: { name: string }) {
-  const c = SHAKHA_COLOR_MAP[name] ?? "#A78BFA";
-  return (
-    <span
-      className="inline-flex items-center gap-1 text-[12px] font-bold px-2 py-0.5 rounded-lg"
-      style={{ background: `${c}18`, color: c, border: `1px solid ${c}30` }}
-    >
-      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c, boxShadow: `0 0 5px ${c}` }} />
-      {name}
-    </span>
-  );
-}
-
 // ─── Grade / position helpers ─────────────────────────────────────────────────
 
 const POS_STYLE: Record<number, { bg: string; border: string; text: string; emoji: string }> = {
@@ -112,12 +97,25 @@ function ParticipantCard({ row }: { row: ParticipantSearchRow }) {
           </div>
 
           <div className="flex-1 min-w-0">
-            <p className="text-[16px] leading-tight" style={{ color: "#1E1B4B", ...anek }}>{row.name}</p>
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <ShakhaPill name={row.shakha} />
+            {/* Line 1 — name | house name */}
+            <div className="flex items-baseline gap-2 min-w-0 flex-wrap">
+              <p className="text-[16px] leading-tight" style={{ color: "#1E1B4B", ...anek }}>{row.name}</p>
+              {row.houseName && (
+                <span className="inline-flex items-baseline gap-2 text-[13px] font-semibold leading-tight" style={{ color: "#7C3AED" }}>
+                  <span style={{ color: "#DDD6FE" }}>|</span>
+                  {row.houseName}
+                </span>
+              )}
+            </div>
+            {/* Line 2 — shakha (strong text) + category */}
+            <div className="flex items-center gap-2.5 mt-1 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 text-[12.5px] font-bold" style={{ color: sc }}>
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: sc, boxShadow: `0 0 5px ${sc}` }} />
+                {row.shakha}
+              </span>
               {row.category && (
-                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-lg"
-                  style={{ background: "rgba(107,70,255,0.1)", color: "#7C3AED" }}>
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg"
+                  style={{ background: "rgba(124,58,237,0.1)", color: "#7C3AED" }}>
                   {CAT_LABEL[row.category] ?? row.category}
                 </span>
               )}

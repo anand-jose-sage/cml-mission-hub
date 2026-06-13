@@ -93,23 +93,38 @@ function ResultRow({ row, catColor }: { row: PublicResultRow; catColor: string }
   const isTop = row.position !== null && row.position <= 3;
   return (
     <div
-      className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl mb-1.5"
+      className="grid items-center gap-2.5 px-3 py-2.5 rounded-xl mb-1.5"
       style={{
+        gridTemplateColumns: "2.5rem minmax(0,1fr) auto 4.75rem",
         background: isTop ? POS_STYLE[row.position!]?.bg ?? "#fff" : "rgba(255,255,255,0.65)",
         border: isTop ? `1px solid ${POS_STYLE[row.position!]?.border ?? catColor}55` : "1px solid rgba(255,255,255,0.75)",
       }}
     >
-      <div className="w-10 shrink-0 flex justify-center">
+      {/* Col 1 — position */}
+      <div className="flex justify-center">
         {row.position !== null && row.position <= 3
           ? <PosBadge pos={row.position} />
-          : <span className="text-[11px] text-gray-300 font-mono">—</span>}
+          : <span className="text-[12px] text-gray-300 font-mono">—</span>}
       </div>
-      <div className="flex-1 min-w-0">
+
+      {/* Col 2 — name + house */}
+      <div className="min-w-0">
         <p className="text-[15px] leading-tight truncate" style={{ color: "#1E1B4B", ...anek }}>{row.name}</p>
-        <div className="mt-1"><ShakhaPill name={row.shakha} /></div>
+        {row.houseName && (
+          <p className="text-[12px] font-semibold leading-tight truncate mt-0.5" style={{ color: "#7C3AED" }}>
+            {row.houseName}
+          </p>
+        )}
       </div>
-      <div className="shrink-0">
-        {row.grade ? <GradeBadge grade={row.grade} /> : <span className="text-[11px] text-gray-300">—</span>}
+
+      {/* Col 3 — shakha pill */}
+      <div className="flex justify-end">
+        <ShakhaPill name={row.shakha} />
+      </div>
+
+      {/* Col 4 — grade chip */}
+      <div className="flex justify-center">
+        {row.grade ? <GradeBadge grade={row.grade} /> : <span className="text-[12px] text-gray-300">—</span>}
       </div>
     </div>
   );

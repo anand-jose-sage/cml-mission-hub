@@ -108,6 +108,7 @@ export interface ParticipantResultItem {
 export interface ParticipantSearchRow {
   participantId: string;
   name: string;
+  houseName: string | null;
   shakha: string;
   regNo: string;
   category: string | null;
@@ -128,7 +129,7 @@ export async function searchParticipantResults(
   const { data: participants, error: pErr } = await admin
     .from("participants")
     .select(`
-      id, name, registration_number,
+      id, name, house_name, registration_number,
       shakha:shakhas(name),
       competition_category:competition_categories(slug)
     `)
@@ -196,6 +197,7 @@ export async function searchParticipantResults(
     return {
       participantId: p.id,
       name: p.name as string,
+      houseName: (p.house_name as string | null) ?? null,
       shakha: shakhaObj?.name ?? "—",
       regNo: (p.registration_number as string) ?? "",
       category: catObj?.slug ?? null,
@@ -245,6 +247,7 @@ export async function getCompetitionScores(
 export interface PublicResultRow {
   registrationId: string;
   name: string;
+  houseName: string | null;
   shakha: string;
   grade: "A" | "B" | "C" | null;
   gradePoints: number;
@@ -273,7 +276,7 @@ export async function getPublishedResults(
       participant_registration_id, grade, grade_points,
       position, position_points, total_points,
       registration:participant_registrations(
-        participant:participants(name, shakha:shakhas(name))
+        participant:participants(name, house_name, shakha:shakhas(name))
       )
     `)
     .eq("feast_competition_id", feastCompetitionId)
@@ -288,6 +291,7 @@ export async function getPublishedResults(
     return {
       registrationId: r.participant_registration_id as string,
       name: (participant?.name as string) ?? "—",
+      houseName: (participant?.house_name as string | null) ?? null,
       shakha: (shakha?.name as string) ?? "—",
       grade: (r.grade as "A" | "B" | "C" | null) ?? null,
       gradePoints: (r.grade_points as number) ?? 0,

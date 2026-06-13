@@ -10,11 +10,11 @@ import { FeastTopBar, FeastTabs, type FeastTheme } from "./feast-shared";
 // ─── Category breakdown config ────────────────────────────────────────────────
 
 const CATS: { key: keyof LeaderboardRow; label: string; color: string; track: string }[] = [
-  { key: "subJunior",   label: "Sub Junior",  color: "#0EA5E9", track: "#E0F2FE" },
+  { key: "subJunior",   label: "Sub Junior",  color: "#0369A1", track: "#E0F2FE" },
   { key: "junior",      label: "Junior",       color: "#22C55E", track: "#DCFCE7" },
   { key: "senior",      label: "Senior",       color: "#8B5CF6", track: "#EDE9FE" },
   { key: "superSenior", label: "Super Senior", color: "#F59E0B", track: "#FEF3C7" },
-  { key: "elder",       label: "Elder",        color: "#9D99BC", track: "#F1F0F8" },
+  { key: "elder",       label: "Elder",        color: "#BE185D", track: "#FCE7F3" },
 ];
 
 const MEDAL_EMOJI = ["🥇", "🥈", "🥉"] as const;
@@ -109,7 +109,8 @@ function PodiumCard({ row, rankIdx, animated }: { row: LeaderboardRow; rankIdx: 
 // ─── Drill-down panel ─────────────────────────────────────────────────────────
 
 function DrillDown({ row, animated }: { row: LeaderboardRow; animated: boolean }) {
-  const catMax = Math.max(row.subJunior, row.junior, row.senior, row.superSenior, row.elder, 1);
+  // Each category bar = that category's share of the shakha's TOTAL points.
+  const total = row.points;
   const hasAchievements = row.firstCount + row.secondCount + row.thirdCount + row.aGrade + row.bGrade + row.cGrade > 0;
 
   return (
@@ -118,6 +119,7 @@ function DrillDown({ row, animated }: { row: LeaderboardRow; animated: boolean }
       <div className="space-y-2.5">
         {CATS.map((cat, i) => {
           const pts = row[cat.key] as number;
+          const pct = total > 0 ? (pts / total) * 100 : 0;
           return (
             <div key={cat.key}>
               <div className="flex items-center justify-between mb-1">
@@ -126,7 +128,7 @@ function DrillDown({ row, animated }: { row: LeaderboardRow; animated: boolean }
                   {pts > 0 ? `${pts} pts` : "—"}
                 </span>
               </div>
-              <AnimBar pct={catMax > 0 ? (pts / catMax) * 100 : 0} color={cat.color} track={cat.track} delay={i * 60} animated={animated} />
+              <AnimBar pct={pct} color={cat.color} track={cat.track} delay={i * 60} animated={animated} />
             </div>
           );
         })}
@@ -162,12 +164,11 @@ function DrillDown({ row, animated }: { row: LeaderboardRow; animated: boolean }
 
 // ─── Shakha row ───────────────────────────────────────────────────────────────
 
-function ShakhaRow({ row, max, animated, defaultOpen }: {
-  row: LeaderboardRow; max: number; animated: boolean; defaultOpen?: boolean;
+function ShakhaRow({ row, animated, defaultOpen }: {
+  row: LeaderboardRow; animated: boolean; defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen ?? false);
   const val = useCountUp(row.points, 900, animated);
-  const pct = max > 0 ? (row.points / max) * 100 : 0;
   const rankIdx = row.rank - 1;
   const isTop3 = rankIdx >= 0 && rankIdx < 3;
   const mc = isTop3 ? MEDAL_COLOR[rankIdx] : "#8B5CF6";
@@ -210,11 +211,15 @@ function ShakhaRow({ row, max, animated, defaultOpen }: {
             <ChevronDown size={13} color="#8B5CF6" />
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: "rgba(107,70,255,0.07)" }}>
-            <AnimBar pct={pct} color={isTop3 ? MEDAL_COLOR[rankIdx] : color} track="transparent" delay={rankIdx * 40} animated={animated} />
-          </div>
-          <span className="text-[10px] font-bold tabular-nums w-9 text-right shrink-0" style={{ color: "#A78BFA" }}>{Math.round(pct)}%</span>
+        <div className="flex items-center gap-1.5">
+          {([["🥇", row.firstCount, 0], ["🥈", row.secondCount, 1], ["🥉", row.thirdCount, 2]] as const).map(([emoji, count, mi]) => (
+            <div key={emoji} className="flex items-center gap-1 px-2 py-1 rounded-full"
+              style={{ background: MEDAL_BG[mi], border: `1px solid ${MEDAL_BORDER[mi]}` }}>
+              <span className="text-[12px] leading-none">{emoji}</span>
+              <span className="text-[12px] font-black tabular-nums leading-none"
+                style={{ color: count > 0 ? MEDAL_TEXT[mi] : "#C4B5FD" }}>{count}</span>
+            </div>
+          ))}
         </div>
       </button>
       <div className="overflow-hidden transition-all"
@@ -278,7 +283,6 @@ export function FeastLeaderboard({ slug, theme, onBack, onExit, setFeastSlug }: 
     setFeastSlug(s);
   };
 
-  const max = rows[0]?.points ?? 1;
   const top3 = rows.slice(0, 3);
   const podiumSlots: [LeaderboardRow | undefined, number][] = [
     [top3[1], 1], [top3[0], 0], [top3[2], 2],
@@ -336,7 +340,7 @@ export function FeastLeaderboard({ slug, theme, onBack, onExit, setFeastSlug }: 
           </div>
 
           {rows.map((row, i) => (
-            <ShakhaRow key={row.shakhaId} row={row} max={max} animated={animated} defaultOpen={i === 0} />
+            <ShakhaRow key={row.shakhaId} row={row} animated={animated} defaultOpen={i === 0} />
           ))}
         </>
       )}
