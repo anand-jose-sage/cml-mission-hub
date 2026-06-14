@@ -576,10 +576,10 @@ export default function ResultsAdminPage() {
           <div className="flex gap-2 mb-5 flex-wrap">
             {(["A", "B", "C"] as const).map((g) => {
               const count = preview.filter((p) => p.grade === g).length;
-              const { bg, text } = GRADE_SOLID[g];
+              const { bg } = GRADE_SOLID[g];
               return (
                 <div key={g} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-gray-100 shadow-sm">
-                  <span className="text-[12px] font-bold px-2.5 py-0.5 rounded-md" style={{ background: bg, color: text }}>Grade {g}</span>
+                  <span className="text-[12px] font-bold px-2.5 py-0.5 rounded-md text-white" style={{ background: bg }}>Grade {g}</span>
                   <span className="font-bold text-[15px] text-gray-800">{count}</span>
                   <span className="text-gray-400 text-xs">participants</span>
                 </div>

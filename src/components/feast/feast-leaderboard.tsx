@@ -129,7 +129,7 @@ function DrillDown({ row, animated }: { row: LeaderboardRow; animated: boolean }
 
   return (
     <div className="pt-1 pb-3 px-3">
-      <p className="text-[9px] font-bold uppercase tracking-widest mb-2.5" style={{ color: "#A78BFA" }}>Category Breakdown</p>
+      <p className="text-[12px] font-black uppercase tracking-widest mb-2.5" style={{ color: "#5B21B6" }}>Category Breakdown</p>
       <div className="space-y-2.5">
         {CATS.map((cat, i) => {
           const pts = row[cat.key] as number;
@@ -137,8 +137,8 @@ function DrillDown({ row, animated }: { row: LeaderboardRow; animated: boolean }
           return (
             <div key={cat.key}>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] font-bold" style={{ color: cat.color }}>{cat.label}</span>
-                <span className="text-[11px] font-black tabular-nums" style={{ color: pts > 0 ? cat.color : "#D1D5DB" }}>
+                <span className="text-[14px] font-black" style={{ color: cat.color }}>{cat.label}</span>
+                <span className="text-[14px] font-black tabular-nums" style={{ color: pts > 0 ? cat.color : "#D1D5DB" }}>
                   {pts > 0 ? `${pts} pts` : "—"}
                 </span>
               </div>
@@ -150,13 +150,13 @@ function DrillDown({ row, animated }: { row: LeaderboardRow; animated: boolean }
 
       {hasAchievements && (
         <>
-          <p className="text-[9px] font-bold uppercase tracking-widest mt-4 mb-2" style={{ color: "#A78BFA" }}>Achievements</p>
+          <p className="text-[12px] font-black uppercase tracking-widest mt-4 mb-2" style={{ color: "#5B21B6" }}>Achievements</p>
           <div className="flex rounded-xl overflow-hidden" style={{ border: "1px solid rgba(107,70,255,0.1)" }}>
             <div className="flex-1 flex items-center justify-around py-2.5 px-2" style={{ background: "rgba(255,255,255,0.7)" }}>
               {([["🥇", row.firstCount, "#92400E"], ["🥈", row.secondCount, "#374151"], ["🥉", row.thirdCount, "#7C2D12"]] as const).map(([e, c, t]) => (
                 <div key={String(e)} className="text-center">
                   <p className="text-[14px]">{e}</p>
-                  <p className="text-[11px] font-black" style={{ color: t }}>{c}</p>
+                  <p className="text-[14px] font-black" style={{ color: t }}>{c}</p>
                 </div>
               ))}
             </div>
@@ -165,7 +165,7 @@ function DrillDown({ row, animated }: { row: LeaderboardRow; animated: boolean }
               {([["A", row.aGrade, "#16A34A"], ["B", row.bGrade, "#D97706"], ["C", row.cGrade, "#7C3AED"]] as const).map(([g, c, t]) => (
                 <div key={g} className="text-center">
                   <p className="text-[11px] font-black px-1.5 py-0.5 rounded-md mb-0.5" style={{ background: t, color: "#fff" }}>{g}</p>
-                  <p className="text-[11px] font-black" style={{ color: t }}>{c}</p>
+                  <p className="text-[14px] font-black" style={{ color: t }}>{c}</p>
                 </div>
               ))}
             </div>
@@ -258,7 +258,7 @@ export function FeastLeaderboard({ slug, theme, onBack, onExit, setFeastSlug }: 
   const { feasts, loading: feastsLoading } = useFeasts();
   const [activeSlug, setActiveSlug] = useState(slug);
   const [rows, setRows] = useState<LeaderboardRow[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [animated, setAnimated] = useState(false);
   const animTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -269,9 +269,16 @@ export function FeastLeaderboard({ slug, theme, onBack, onExit, setFeastSlug }: 
     }
   }, [feasts]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load leaderboard whenever active feast changes
+  // Load leaderboard once feasts are loaded AND activeSlug is a confirmed feast.
+  // Fetching before the slug is validated would briefly return an empty result
+  // (feast-not-found) and flash the "No standings" state before the real data.
   useEffect(() => {
-    if (!activeSlug) return;
+    if (feastsLoading) return;                       // wait for the feast list
+    if (!feasts.some(f => f.slug === activeSlug)) {   // slug not (yet) valid
+      if (feasts.length === 0) setLoading(false);     // truly no feasts → stop spinner
+      return;                                         // else auto-select will fix it
+    }
+
     setLoading(true);
     setRows([]);
     setAnimated(false);
@@ -290,13 +297,16 @@ export function FeastLeaderboard({ slug, theme, onBack, onExit, setFeastSlug }: 
       });
 
     return () => { if (animTimer.current) clearTimeout(animTimer.current); };
-  }, [activeSlug]);
+  }, [activeSlug, feastsLoading, feasts]);
 
   const handlePick = (s: string) => {
     setActiveSlug(s);
     setFeastSlug(s);
   };
 
+  // getLeaderboard returns every shakha (0 pts when nothing is published yet),
+  // so "empty" means no points anywhere — not an empty array.
+  const hasResults = rows.some((r) => r.points > 0);
   const top3 = rows.slice(0, 3);
   const podiumSlots: [LeaderboardRow | undefined, number][] = [
     [top3[1], 1], [top3[0], 0], [top3[2], 2],
@@ -309,16 +319,33 @@ export function FeastLeaderboard({ slug, theme, onBack, onExit, setFeastSlug }: 
       {/* Feast selector from DB */}
       <FeastTabs feasts={feasts} active={activeSlug} onPick={handlePick} loading={feastsLoading} />
 
-      {loading ? (
+      {loading || feastsLoading ? (
         <div className="flex justify-center py-16">
           <Loader2 size={22} className="animate-spin" style={{ color: theme.lavender }} />
         </div>
-      ) : rows.length === 0 ? (
-        <div className="flex flex-col items-center py-16 gap-3">
-          <Trophy size={32} color={theme.faint} />
-          <p className="text-[14px] text-center max-w-[220px]" style={{ color: theme.sub }}>
-            No standings yet. Publish competition results to see rankings.
-          </p>
+      ) : !hasResults ? (
+        <div className="flex justify-center py-10">
+          <div
+            className="relative overflow-hidden rounded-[24px] px-7 pt-9 pb-8 flex flex-col items-center text-center w-full max-w-[320px]"
+            style={{ background: "linear-gradient(145deg,#ede9fe,#f5f3ff,#fdf4ff)", border: "1px solid rgba(107,70,255,0.12)" }}
+          >
+            {/* Decorative glow */}
+            <div className="absolute -top-10 right-0 w-40 h-40 pointer-events-none rounded-full"
+              style={{ background: "radial-gradient(circle,rgba(167,139,250,0.28) 0%,transparent 70%)", filter: "blur(22px)" }} />
+            <div className="absolute -bottom-8 -left-6 w-32 h-32 pointer-events-none rounded-full"
+              style={{ background: "radial-gradient(circle,rgba(245,197,66,0.18) 0%,transparent 70%)", filter: "blur(20px)" }} />
+
+            <div className="relative w-16 h-16 rounded-full flex items-center justify-center mb-4"
+              style={{ background: "linear-gradient(135deg,#6B46FF,#A78BFA)", boxShadow: "0 8px 22px rgba(107,70,255,0.35)" }}>
+              <Trophy size={28} color="#fff" />
+            </div>
+            <p className="relative text-[18px] font-black mb-1.5" style={{ color: "#1E1B4B", fontFamily: "var(--font-anek),sans-serif" }}>
+              No standings yet
+            </p>
+            <p className="relative text-[13.5px] leading-relaxed" style={{ color: "#6D5BA6" }}>
+              Rankings will appear here once competition results are published for this feast.
+            </p>
+          </div>
         </div>
       ) : (
         <>
@@ -327,7 +354,7 @@ export function FeastLeaderboard({ slug, theme, onBack, onExit, setFeastSlug }: 
             <div className="mb-5">
               <div className="flex items-center gap-2 mb-3">
                 <Trophy size={13} color="#F5C542" />
-                <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: "#A78BFA" }}>Top Shakhas</p>
+                <p className="text-[14px] font-black uppercase tracking-widest" style={{ color: "#5B21B6" }}>Top Shakhas</p>
               </div>
               <div className="rounded-[22px] p-3 relative overflow-hidden"
                 style={{ background: "linear-gradient(145deg,#ede9fe,#f5f3ff,#fdf4ff)", border: "1px solid rgba(107,70,255,0.1)" }}>
@@ -348,9 +375,9 @@ export function FeastLeaderboard({ slug, theme, onBack, onExit, setFeastSlug }: 
 
           {/* Full list */}
           <div className="flex items-center gap-2 mb-3">
-            <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: "#A78BFA" }}>All Shakhas</p>
+            <p className="text-[14px] font-black uppercase tracking-widest" style={{ color: "#5B21B6" }}>All Shakhas</p>
             <div className="flex-1 h-px" style={{ background: "rgba(107,70,255,0.1)" }} />
-            <p className="text-[10px]" style={{ color: "#C4B5FD" }}>{rows.length} shakhas</p>
+            <p className="text-[12px] font-bold" style={{ color: "#6D28D9" }}>{rows.length} shakhas</p>
           </div>
 
           {rows.map((row, i) => (

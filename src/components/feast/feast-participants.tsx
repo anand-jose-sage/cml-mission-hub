@@ -101,7 +101,7 @@ function ParticipantCard({ row }: { row: ParticipantSearchRow }) {
             <div className="flex items-baseline gap-2 min-w-0 flex-wrap">
               <p className="text-[16px] leading-tight" style={{ color: "#1E1B4B", ...anek }}>{row.name}</p>
               {row.houseName && (
-                <span className="inline-flex items-baseline gap-2 text-[13px] font-semibold leading-tight" style={{ color: "#7C3AED" }}>
+                <span className="inline-flex items-baseline gap-2 text-[13.5px] font-semibold leading-tight" style={{ color: "#7C3AED" }}>
                   <span style={{ color: "#DDD6FE" }}>|</span>
                   {row.houseName}
                 </span>
@@ -109,8 +109,8 @@ function ParticipantCard({ row }: { row: ParticipantSearchRow }) {
             </div>
             {/* Line 2 — shakha (strong text) + category */}
             <div className="flex items-center gap-2.5 mt-1 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 text-[12.5px] font-bold" style={{ color: sc }}>
-                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: sc, boxShadow: `0 0 5px ${sc}` }} />
+              <span className="inline-flex items-center gap-1.5 text-[13px] font-bold" style={{ color: sc }}>
+                <span className="text-[13px] leading-none" aria-hidden="true">⛪</span>
                 {row.shakha}
               </span>
               {row.category && (

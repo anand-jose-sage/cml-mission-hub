@@ -120,85 +120,129 @@ function genderLabel(g: string | null | undefined) {
 
 // ─── Inline result sub-components ───────────────────────────────────────────
 
-function ShakhaPill({ name }: { name: string }) {
-  const c = SHAKHA_COLOR_MAP[name] ?? "#A78BFA";
+const POS_STYLE: Record<number, {
+  bg: string; border: string; text: string;
+  disc: string; numBg: string; numText: string;
+}> = {
+  1: { bg: "#FFFBEB", border: "#F5C542", text: "#92400E", disc: "#F5C542", numBg: "#6B5200", numText: "#FFF6C8" },
+  2: { bg: "#F9FAFB", border: "#9CA3AF", text: "#374151", disc: "#B9C2CC", numBg: "#475260", numText: "#FFFFFF" },
+  3: { bg: "#FFF7ED", border: "#E0936A", text: "#7C2D12", disc: "#D98E5F", numBg: "#5A2C14", numText: "#FDE3C9" },
+};
+
+function MedalBadge({ pos }: { pos: number }) {
+  const m = POS_STYLE[pos];
+  if (!m) return null;
+  return (
+    <div
+      className="shrink-0 rounded-full flex items-center justify-center font-black"
+      style={{
+        width: 30, height: 30, background: m.disc, color: m.numBg,
+        fontSize: 14, lineHeight: 1, boxShadow: `0 2px 6px ${m.disc}66`,
+        border: `1.5px solid ${m.numBg}33`,
+      }}
+    >
+      {pos}
+    </div>
+  );
+}
+
+const GRADE_STYLE: Record<string, { bg: string }> = {
+  A: { bg: "#16A34A" }, B: { bg: "#D97706" }, C: { bg: "#6B46FF" },
+};
+
+function GradeChip({ grade }: { grade: "A" | "B" | "C" }) {
+  const bg = GRADE_STYLE[grade]?.bg ?? "#9CA3AF";
   return (
     <span
-      className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg shrink-0"
-      style={{ background: `${c}18`, color: c, border: `1px solid ${c}30` }}
+      className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[15px] font-black text-white shrink-0"
+      style={{ background: bg, boxShadow: `0 2px 6px ${bg}55` }}
     >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: c }} />
-      {name}
+      {grade}
     </span>
   );
 }
 
-const POS_STYLE: Record<number, { bg: string; border: string; text: string; emoji: string }> = {
-  1: { bg: "#FFFBEB", border: "#F5C542", text: "#92400E", emoji: "🥇" },
-  2: { bg: "#F9FAFB", border: "#9CA3AF", text: "#374151", emoji: "🥈" },
-  3: { bg: "#FFF7ED", border: "#E0936A", text: "#7C2D12", emoji: "🥉" },
-};
-
-const GRADE_COLOR: Record<string, string> = { A: "#15803D", B: "#B45309", C: "#5B21B6" };
-
-function InlineResultRow({ row }: { row: PublicResultRow }) {
+function ResultRow({ row, index, last, showMedal }: {
+  row: PublicResultRow; index: number; last: boolean; showMedal: boolean;
+}) {
   const anek: React.CSSProperties = { fontFamily: "var(--font-anek), sans-serif", fontWeight: 700 };
-  const isTop = row.position !== null && row.position <= 3;
-  const pos = row.position;
+  const pos = row.position !== null && row.position <= 3 ? POS_STYLE[row.position] : null;
+  const sc = SHAKHA_COLOR_MAP[row.shakha] ?? "#A78BFA";
+  const zebra = index % 2 === 1;
   return (
     <div
-      className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-1.5"
+      className="flex items-center gap-3 px-3.5 py-3"
       style={{
-        background: isTop && pos ? (POS_STYLE[pos]?.bg ?? "rgba(255,255,255,0.7)") : "rgba(255,255,255,0.7)",
-        border: isTop && pos ? `1px solid ${POS_STYLE[pos]?.border ?? "#e5e7eb"}55` : "1px solid rgba(255,255,255,0.8)",
+        background: pos ? `${pos.border}1A` : zebra ? "rgba(255,255,255,0.4)" : "transparent",
+        borderBottom: last ? "none" : "1px solid rgba(107,70,255,0.07)",
       }}
     >
-      {/* Position */}
-      <div className="w-9 shrink-0 flex justify-center">
-        {isTop && pos && POS_STYLE[pos] ? (
-          <span
-            className="inline-flex items-center gap-1 text-[11px] font-black px-1.5 py-0.5 rounded-full border"
-            style={{ background: POS_STYLE[pos].bg, borderColor: POS_STYLE[pos].border, color: POS_STYLE[pos].text }}
-          >
-            {POS_STYLE[pos].emoji}
-          </span>
-        ) : (
-          <span className="text-[11px] font-bold" style={{ color: "#9CA3AF" }}>
-            {row.position ? `#${row.position}` : "—"}
-          </span>
-        )}
-      </div>
+      {/* Medal badge (podium only) */}
+      {showMedal && (
+        <div className="shrink-0 w-8 flex justify-center">
+          {pos ? <MedalBadge pos={row.position!} /> : null}
+        </div>
+      )}
 
-      {/* Name + house name + shakha + grade */}
+      {/* Participant — name | house (line 1) · shakha (line 2) */}
       <div className="flex-1 min-w-0">
-        <p className="text-[14px] leading-tight truncate" style={{ color: "#1E1B4B", ...anek }}>{row.name}</p>
-        {row.houseName && (
-          <p className="text-[12px] font-semibold leading-tight truncate" style={{ color: "#5B21B6" }}>{row.houseName}</p>
-        )}
-        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-          <ShakhaPill name={row.shakha} />
-          {row.grade && (
-            <span
-              className="inline-block text-[11px] font-black px-2 py-0.5 rounded-lg text-white"
-              style={{ background: GRADE_COLOR[row.grade] ?? "#6B46FF" }}
-            >
-              Grade {row.grade}
+        <div className="flex items-baseline gap-1.5 min-w-0">
+          <p className="text-[15px] leading-tight truncate" style={{ color: "#1E1B4B", ...anek }}>{row.name}</p>
+          {row.houseName && (
+            <span className="inline-flex items-baseline gap-1.5 text-[13.5px] font-semibold truncate" style={{ color: "#7C3AED" }}>
+              <span style={{ color: "#DDD6FE" }}>|</span>
+              {row.houseName}
             </span>
           )}
         </div>
+        <div className="flex items-center gap-1.5 mt-1 min-w-0">
+          <span className="text-[13px] shrink-0 leading-none" aria-hidden="true">⛪</span>
+          <span className="text-[13px] font-bold truncate" style={{ color: sc }}>{row.shakha}</span>
+        </div>
       </div>
 
+      {/* Grade (right) */}
+      <div className="shrink-0">
+        {row.grade
+          ? <GradeChip grade={row.grade} />
+          : <span className="w-8 h-8 flex items-center justify-center text-[14px] text-gray-300">—</span>}
+      </div>
+    </div>
+  );
+}
+
+function ResultTable({ title, accent, rows }: { title: string; accent: string; rows: PublicResultRow[] }) {
+  if (rows.length === 0) return null;
+  const showMedal = rows.some((r) => r.position !== null && r.position <= 3);
+  return (
+    <div
+      className="mb-2.5 rounded-xl overflow-hidden"
+      style={{ border: "1px solid rgba(107,70,255,0.13)", background: "rgba(255,255,255,0.55)", boxShadow: "0 1px 8px rgba(107,70,255,0.05)" }}
+    >
+      {/* Section title bar */}
+      <div className="flex items-center gap-1.5 px-3 py-2" style={{ background: `${accent}14` }}>
+        <span className="w-1.5 h-1.5 rounded-full" style={{ background: accent }} />
+        <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: accent }}>{title}</span>
+      </div>
+
+      {/* Rows */}
+      {rows.map((r, i) => (
+        <ResultRow key={r.registrationId} row={r} index={i} last={i === rows.length - 1} showMedal={showMedal} />
+      ))}
     </div>
   );
 }
 
 function sortResults(rows: PublicResultRow[]): PublicResultRow[] {
+  const go: Record<string, number> = { A: 0, B: 1, C: 2 };
   return [...rows].sort((a, b) => {
     if (a.position !== null && b.position !== null) return a.position - b.position;
     if (a.position !== null) return -1;
     if (b.position !== null) return 1;
-    const go: Record<string, number> = { A: 0, B: 1, C: 2 };
-    return (go[a.grade ?? ""] ?? 9) - (go[b.grade ?? ""] ?? 9);
+    const ga = go[a.grade ?? ""] ?? 9;
+    const gb = go[b.grade ?? ""] ?? 9;
+    if (ga !== gb) return ga - gb;
+    return a.name.localeCompare(b.name);
   });
 }
 
@@ -341,9 +385,10 @@ function CompetitionCard({ comp, catColor }: {
             ) : results !== null && results.length === 0 ? (
               <p className="text-center text-[13px] py-5" style={{ color: "#9CA3AF" }}>No published results yet.</p>
             ) : (
-              results?.map((row) => (
-                <InlineResultRow key={row.registrationId} row={row} />
-              ))
+              <>
+                <ResultTable title="Positions" accent={catColor} rows={(results ?? []).filter(r => r.position !== null)} />
+                <ResultTable title="Grades" accent={catColor} rows={(results ?? []).filter(r => r.position === null && r.grade !== null)} />
+              </>
             )}
           </div>
         </div>
@@ -452,7 +497,7 @@ export function FeastDetails({ slug, theme, onBack, onExit, go }: {
   const [showLogin, setShowLogin] = useState(false);
   const isAuthorized = !!session;
 
-  if (loading && !feast) {
+  if (loading && !feast?.competitions.length) {
     return (
       <div className="flex items-center justify-center pt-24">
         <Loader2 size={28} className="animate-spin" style={{ color: theme.lavender }} />

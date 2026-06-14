@@ -88,20 +88,35 @@ export const FEASTS: Record<string, Feast> = {
   },
 };
 
+// Each shakha is a "house" — a distinct dark shade so its name/dot/pill reads
+// strongly on light backgrounds. 14 hand-picked, visually distinct dark hues.
+export const SHAKHA_COLOR_MAP: Record<string, string> = {
+  Charity:      "#6D28D9", // violet
+  Chooralmala:  "#0F766E", // teal
+  Edapetti:     "#B45309", // amber
+  Kalathuvayal: "#BE185D", // rose
+  Kalpetta:     "#1D4ED8", // blue
+  Kolavayal:    "#0E7490", // cyan
+  Lakkidi:      "#15803D", // green
+  Nedumbala:    "#B91C1C", // red
+  Olivumala:    "#4D7C0F", // lime
+  Puzhamudi:    "#4338CA", // indigo
+  Rippon:       "#C2410C", // orange
+  Theneri:      "#A21CAF", // fuchsia
+  Vazhavatta:   "#475569", // slate
+  Vythiri:      "#0369A1", // sky
+};
+
 // Real shakha names — replaces the old placeholder houses
 export const SHAKHAS: House[] = [
-  { name: "Charity",       color: "#A78BFA", points: 428 },
-  { name: "Edapetti",      color: "#F5C542", points: 391 },
-  { name: "Kalathuvayal",  color: "#EC4899", points: 357 },
-  { name: "Kolavayal",     color: "#34D3EE", points: 312 },
+  { name: "Charity",       color: SHAKHA_COLOR_MAP.Charity,      points: 428 },
+  { name: "Edapetti",      color: SHAKHA_COLOR_MAP.Edapetti,     points: 391 },
+  { name: "Kalathuvayal",  color: SHAKHA_COLOR_MAP.Kalathuvayal, points: 357 },
+  { name: "Kolavayal",     color: SHAKHA_COLOR_MAP.Kolavayal,    points: 312 },
 ];
 
 // Backward-compat alias
 export const HOUSES = SHAKHAS;
-
-export const SHAKHA_COLOR_MAP: Record<string, string> = Object.fromEntries(
-  SHAKHAS.map((s) => [s.name, s.color])
-);
 
 export const HOUSE_NAMES = SHAKHAS.map((h) => h.name);
 
