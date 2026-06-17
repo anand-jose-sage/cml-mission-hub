@@ -24,6 +24,10 @@ interface RegRow {
   participant: ParticipantRow | null;
 }
 
+// Edit registrations locked after June 19 2026 4:00 PM IST (10:30 AM UTC)
+const EDIT_DEADLINE = new Date("2026-06-19T10:30:00Z");
+const isEditLocked = () => new Date() >= EDIT_DEADLINE;
+
 // ---------- helpers ----------
 
 function normGender(g: string | null | undefined) {
@@ -197,13 +201,15 @@ function AccordionRow({
                         {p.registration_number}
                       </span>
                     )}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onEdit(p.id); }}
-                      className="w-7 h-7 rounded-full flex items-center justify-center border-none cursor-pointer active:scale-95 transition-transform"
-                      style={{ background: theme.fillStrong }}
-                    >
-                      <Pencil size={13} color={theme.purple} />
-                    </button>
+                    {!isEditLocked() && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onEdit(p.id); }}
+                        className="w-7 h-7 rounded-full flex items-center justify-center border-none cursor-pointer active:scale-95 transition-transform"
+                        style={{ background: theme.fillStrong }}
+                      >
+                        <Pencil size={13} color={theme.purple} />
+                      </button>
+                    )}
                   </div>
                 </div>
               );

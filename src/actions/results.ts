@@ -208,6 +208,140 @@ export async function searchParticipantResults(
   return { data: rows };
 }
 
+// ── Screen data: per-competition results for Screen 2 ─────────────────────
+
+export interface CompetitionResult {
+  competitionId: string;
+  competitionName: string;
+  categoryName: string;
+  categorySlug: string;
+  positions: { place: 1 | 2 | 3; name: string; houseName: string | null; shakha: string; photoUrl: string | null }[];
+  grades: {
+    A: { name: string; houseName: string | null; shakha: string }[];
+    B: { name: string; houseName: string | null; shakha: string }[];
+    C: { name: string; houseName: string | null; shakha: string }[];
+  };
+}
+
+export interface ScreenData {
+  competitions: CompetitionResult[];
+}
+
+export async function getScreenData(
+  feastSlug: string
+): Promise<{ data?: ScreenData; error?: string }> {
+  const admin = getSupabaseAdmin();
+
+  const { data: feastRow } = await admin.from("feasts").select("id").eq("slug", feastSlug).single();
+  if (!feastRow) return { data: { competitions: [] } };
+
+  const feastId = feastRow.id as string;
+
+  // Step 1: get all published feast_competitions with competition name + category
+  const { data: fcs, error: fcsErr } = await admin
+    .from("feast_competitions")
+    .select(`
+      id,
+      competition:competitions(
+        name,
+        competition_category:competition_categories(name, slug)
+      )
+    `)
+    .eq("feast_id", feastId)
+    .eq("result_status", "published");
+
+  if (fcsErr || !fcs?.length) {
+    return { data: { competitions: [] } };
+  }
+
+  interface CompInfo { name: string; categoryName: string; categorySlug: string }
+  const compInfoMap = new Map<string, CompInfo>();
+
+  for (const fc of fcs) {
+    const id = fc.id as string;
+    const compObj = (Array.isArray(fc.competition) ? fc.competition[0] : fc.competition) as Record<string, unknown> | null;
+    const catObj = compObj
+      ? (Array.isArray(compObj.competition_category) ? (compObj.competition_category as unknown[])[0] : compObj.competition_category) as Record<string, unknown> | null
+      : null;
+    compInfoMap.set(id, {
+      name: (compObj?.name as string) ?? "Competition",
+      categoryName: (catObj?.name as string) ?? "",
+      categorySlug: (catObj?.slug as string) ?? "",
+    });
+  }
+
+  const fcIds = fcs.map((fc) => fc.id as string);
+
+  // Step 2: get all published results
+  const { data: results, error: rErr } = await admin
+    .from("competition_results")
+    .select(`
+      position, grade, feast_competition_id,
+      registration:participant_registrations(
+        participant:participants(name, house_name, shakha:shakhas(name))
+      )
+    `)
+    .in("feast_competition_id", fcIds)
+    .not("published_at", "is", null);
+
+  if (rErr) return { data: { competitions: [] } };
+
+  // Group rows by feast_competition_id
+  const rowsByFc = new Map<string, Array<{ position: number | null; grade: string | null; name: string; houseName: string | null; shakha: string }>>();
+  for (const fcId of fcIds) rowsByFc.set(fcId, []);
+
+  for (const r of (results ?? [])) {
+    const rec = r as Record<string, unknown>;
+    const fcId = rec.feast_competition_id as string;
+    if (!rowsByFc.has(fcId)) continue;
+    const reg = (Array.isArray(rec.registration) ? rec.registration[0] : rec.registration) as Record<string, unknown> | null;
+    const p = reg ? (Array.isArray(reg.participant) ? (reg.participant as unknown[])[0] : reg.participant) as Record<string, unknown> | null : null;
+    const sh = p ? (Array.isArray(p.shakha) ? (p.shakha as unknown[])[0] : p.shakha) as Record<string, unknown> | null : null;
+    rowsByFc.get(fcId)!.push({
+      position: (rec.position as number | null) ?? null,
+      grade: (rec.grade as string | null) ?? null,
+      name: (p?.name as string) ?? "—",
+      houseName: (p?.house_name as string | null) ?? null,
+      shakha: (sh?.name as string) ?? "—",
+    });
+  }
+
+  // Build one CompetitionResult per feast_competition
+  const competitions: CompetitionResult[] = [];
+
+  for (const [fcId, rows] of rowsByFc) {
+    const info = compInfoMap.get(fcId)!;
+
+    const posMap = new Map<number, { place: 1 | 2 | 3; name: string; houseName: string | null; shakha: string; photoUrl: string | null }>();
+    const grades: CompetitionResult["grades"] = { A: [], B: [], C: [] };
+
+    for (const row of rows) {
+      if (row.position && row.position >= 1 && row.position <= 3 && !posMap.has(row.position)) {
+        posMap.set(row.position, { place: row.position as 1 | 2 | 3, name: row.name, houseName: row.houseName, shakha: row.shakha, photoUrl: null });
+      }
+      if (row.grade === "A") grades.A.push({ name: row.name, houseName: row.houseName, shakha: row.shakha });
+      else if (row.grade === "B") grades.B.push({ name: row.name, houseName: row.houseName, shakha: row.shakha });
+      else if (row.grade === "C") grades.C.push({ name: row.name, houseName: row.houseName, shakha: row.shakha });
+    }
+
+    const hasAny = posMap.size > 0 || grades.A.length > 0 || grades.B.length > 0 || grades.C.length > 0;
+    if (!hasAny) continue;
+
+    competitions.push({
+      competitionId: fcId,
+      competitionName: info.name,
+      categoryName: info.categoryName,
+      categorySlug: info.categorySlug,
+      positions: ([1, 2, 3] as const)
+        .map((p) => posMap.get(p))
+        .filter(Boolean) as { place: 1 | 2 | 3; name: string; houseName: string | null; shakha: string; photoUrl: string | null }[],
+      grades,
+    });
+  }
+
+  return { data: { competitions } };
+}
+
 // ── Set max score ──────────────────────────────────────────────────────────
 
 export async function setMaxScore(

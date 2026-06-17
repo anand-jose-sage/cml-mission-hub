@@ -71,7 +71,7 @@ function GenderPicker({ value, onChange, theme }: { value: string; onChange: (v:
     <div className="mb-3">
       <label className="block text-[11.5px] font-semibold mb-1.5 tracking-wider" style={{ fontFamily: "var(--font-poppins),sans-serif", color: theme.sub }}>Gender</label>
       <div className="flex gap-2">
-        {[{ value: "male", label: "Male" }, { value: "female", label: "Female" }, { value: "other", label: "Other" }].map((o) => {
+        {[{ value: "boy", label: "Boy" }, { value: "girl", label: "Girl" }, { value: "other", label: "Other" }].map((o) => {
           const on = value === o.value;
           return (
             <button key={o.value} onClick={() => onChange(o.value)}
@@ -132,7 +132,9 @@ export function FeastEditRegister({ slug, participantId, theme, onBack, onDone, 
     setForm((f) => ({ ...f, [k]: v }));
     if (k === "dob" || k === "gender") setPicked([]);
   };
-  const toggle = (id: string) => setPicked((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
+  const toggle = (id: string) => setPicked((p) =>
+    p.includes(id) ? p.filter((x) => x !== id) : p.length >= 2 ? p : [...p, id]
+  );
 
   // Load existing participant data
   useEffect(() => {
@@ -142,11 +144,15 @@ export function FeastEditRegister({ slug, participantId, theme, onBack, onDone, 
       supabase.from("participant_registrations").select("feast_competition_id").eq("participant_id", participantId),
     ]).then(([{ data: p }, { data: regs }]) => {
       if (p) {
+        const rawGender = (p.gender ?? "").toLowerCase();
+        const gender = rawGender === "boy" || rawGender === "boys" || rawGender === "male" ? "boy"
+          : rawGender === "girl" || rawGender === "girls" || rawGender === "female" ? "girl"
+          : rawGender;
         setForm({
           name: p.name ?? "",
           houseName: p.house_name ?? "",
           dob: p.date_of_birth ?? "",
-          gender: p.gender ?? "",
+          gender,
           phone: p.phone ?? "",
         });
       }
@@ -257,9 +263,20 @@ export function FeastEditRegister({ slug, participantId, theme, onBack, onDone, 
         });
         return (
           <div>
-            <p className="text-[13px] mb-3 leading-relaxed" style={{ color: theme.sub }}>
-              Update the competitions. Saving will replace all current selections.
-            </p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[13px] leading-relaxed" style={{ color: theme.sub }}>
+                Update competitions. Saving replaces all selections.
+              </p>
+              <span className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ml-2"
+                style={{ background: picked.length >= 2 ? "#fef3c7" : theme.purple + "1a", color: picked.length >= 2 ? "#b45309" : theme.purple }}>
+                {picked.length} / 2
+              </span>
+            </div>
+            {picked.length >= 2 && (
+              <div className="mb-3 px-3.5 py-2.5 rounded-[14px] text-[12.5px]" style={{ background: "#fef3c7", color: "#b45309", border: "1px solid #fde68a" }}>
+                Maximum 2 competitions allowed. Deselect one to change.
+              </div>
+            )}
             {eligibleComps.length === 0 ? (
               <div className="text-center py-10 rounded-2xl" style={{ background: theme.fill }}>
                 <p className="text-[14px] font-semibold mb-1" style={{ color: theme.sub }}>No competitions available</p>

@@ -109,6 +109,8 @@ export default function HomePage() {
               <TopHeader theme={theme} />
               <HeroEvent theme={theme} />
 
+              <FeastPortalCard onEnter={() => setInFeast(true)} />
+
               {/* Today's Mission timeline */}
               <SectionHead title="Today's Mission" action="More" onAction={() => setTab("media")} />
               <TodayMission theme={theme} onNoticeClick={() => setTab("notices")} />
@@ -132,8 +134,6 @@ export default function HomePage() {
                 sel={sel}
                 onViewAll={() => setTab("activities")}
               />
-
-              <FeastPortalCard onEnter={() => setInFeast(true)} />
             </>
           ) : (
             <OtherScreen tab={tab} theme={theme} />

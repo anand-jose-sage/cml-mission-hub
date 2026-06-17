@@ -93,7 +93,7 @@ function CategoryPill({ dob, theme }: { dob: string; theme: FeastTheme }) {
 }
 
 function GenderPicker({ value, onChange, theme }: { value: string; onChange: (v: string) => void; theme: FeastTheme }) {
-  const options = [{ value: "male", label: "Male" }, { value: "female", label: "Female" }, { value: "other", label: "Other" }];
+  const options = [{ value: "boy", label: "Boy" }, { value: "girl", label: "Girl" }, { value: "other", label: "Other" }];
   return (
     <div className="mb-3">
       <label className="block text-[11.5px] font-semibold mb-1.5 tracking-wider" style={{ fontFamily: "var(--font-poppins), sans-serif", color: theme.sub }}>Gender</label>

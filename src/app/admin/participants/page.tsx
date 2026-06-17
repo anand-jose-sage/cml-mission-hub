@@ -111,7 +111,9 @@ function ParticipantPanel({
   };
 
   const toggleComp = (id: string) =>
-    setSelectedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : prev.length >= 2 ? prev : [...prev, id]
+    );
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.dob || !form.gender || !form.shakhaId) {
@@ -236,7 +238,17 @@ function ParticipantPanel({
 
           {/* Competitions */}
           <div>
-            <label className={labelCls}>Competitions</label>
+            <div className="flex items-center justify-between mb-1.5">
+            <label className={labelCls} style={{ marginBottom: 0 }}>Competitions</label>
+            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${selectedIds.length >= 2 ? "bg-amber-50 text-amber-600" : "bg-purple-50 text-purple-600"}`}>
+              {selectedIds.length} / 2 selected
+            </span>
+          </div>
+          {selectedIds.length >= 2 && (
+            <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 px-2.5 py-1.5 rounded-lg mb-2">
+              Maximum 2 competitions allowed. Deselect one to change.
+            </p>
+          )}
             {!form.dob || !form.gender ? (
               <p className="text-xs text-gray-400 py-4 text-center border border-dashed border-gray-200 rounded-xl">
                 Enter DOB and gender to see available competitions
@@ -420,12 +432,14 @@ export default function ParticipantsAdminPage() {
   const openEdit = async (row: ParticipantRow) => {
     setEditRow(row);
     setEditRegIds([]);
-    setPanelMode("edit");
+    // Fetch existing registrations BEFORE opening the panel so the initial
+    // useState in ParticipantPanel receives the correct pre-selected IDs.
     const { data } = await supabase
       .from("participant_registrations")
       .select("feast_competition_id")
       .eq("participant_id", row.id);
     setEditRegIds((data ?? []).map((d) => d.feast_competition_id));
+    setPanelMode("edit");
   };
 
   const exportCsv = () => {
