@@ -126,12 +126,19 @@ export async function searchParticipantResults(
   const { data: feast } = await admin.from("feasts").select("id").eq("slug", feastSlug).single();
   if (!feast) return { data: [] };
 
+  // Single nested query: participant → registrations → (feast_competition + result).
+  // Replaces the previous 3-round-trip waterfall (participants → regs → results).
   const { data: participants, error: pErr } = await admin
     .from("participants")
     .select(`
       id, name, house_name, registration_number,
       shakha:shakhas(name),
-      competition_category:competition_categories(slug)
+      competition_category:competition_categories(slug),
+      registrations:participant_registrations(
+        id,
+        feast_competition:feast_competitions(id, result_status, competition:competitions(name)),
+        results:competition_results(grade, position, total_points, published_at)
+      )
     `)
     .eq("feast_id", feast.id)
     .ilike("name", `%${query.trim()}%`)
@@ -140,56 +147,24 @@ export async function searchParticipantResults(
   if (pErr) return { error: pErr.message };
   if (!participants?.length) return { data: [] };
 
-  const pIds = participants.map((p) => p.id);
-
-  const { data: regs } = await admin
-    .from("participant_registrations")
-    .select(`
-      id, participant_id,
-      feast_competition:feast_competitions(id, result_status,
-        competition:competitions(name))
-    `)
-    .in("participant_id", pIds);
-
-  const regIds = (regs ?? []).map((r) => r.id as string);
-
-  let resultMap: Record<string, { grade: string | null; position: number | null; total_points: number }> = {};
-  if (regIds.length) {
-    const { data: resRows } = await admin
-      .from("competition_results")
-      .select("participant_registration_id, grade, position, total_points")
-      .in("participant_registration_id", regIds)
-      .not("published_at", "is", null);
-    for (const r of resRows ?? []) {
-      resultMap[r.participant_registration_id as string] = {
-        grade: r.grade as string | null,
-        position: r.position as number | null,
-        total_points: (r.total_points as number) ?? 0,
-      };
-    }
-  }
-
-  const regsByP: Record<string, typeof regs> = {};
-  for (const reg of regs ?? []) {
-    const pid = reg.participant_id as string;
-    if (!regsByP[pid]) regsByP[pid] = [];
-    regsByP[pid]!.push(reg);
-  }
-
   const rows: ParticipantSearchRow[] = participants.map((p) => {
     const shakhaObj = (Array.isArray(p.shakha) ? p.shakha[0] : p.shakha) as { name: string } | null;
     const catObj = (Array.isArray(p.competition_category) ? p.competition_category[0] : p.competition_category) as { slug: string } | null;
+    const regs = (Array.isArray(p.registrations) ? p.registrations : []) as Record<string, unknown>[];
 
-    const items: ParticipantResultItem[] = (regsByP[p.id] ?? []).map((reg) => {
+    const items: ParticipantResultItem[] = regs.map((reg) => {
       const fc = (Array.isArray(reg.feast_competition) ? reg.feast_competition[0] : reg.feast_competition) as Record<string, unknown> | null;
       const comp = fc ? (Array.isArray(fc.competition) ? (fc.competition as unknown[])[0] : fc.competition) as Record<string, unknown> | null : null;
-      const res = resultMap[reg.id as string];
+      // competition_results has at most one row per registration; only treat it
+      // as a real result if it has actually been published.
+      const resRow = (Array.isArray(reg.results) ? reg.results[0] : reg.results) as Record<string, unknown> | null;
+      const res = resRow?.published_at ? resRow : null;
       return {
         competitionId: (fc?.id as string) ?? "",
         competitionName: (comp?.name as string) ?? "—",
         grade: (res?.grade as "A" | "B" | "C" | null) ?? null,
-        position: res?.position ?? null,
-        totalPoints: res?.total_points ?? 0,
+        position: (res?.position as number | null) ?? null,
+        totalPoints: (res?.total_points as number) ?? 0,
         isPublished: fc?.result_status === "published",
       };
     });
@@ -395,15 +370,9 @@ export async function getPublishedResults(
 ): Promise<{ data?: PublicResultRow[]; error?: string }> {
   const admin = getSupabaseAdmin();
 
-  // Check result_status first
-  const { data: fc } = await admin
-    .from("feast_competitions")
-    .select("result_status")
-    .eq("id", feastCompetitionId)
-    .single();
-
-  if (!fc || fc.result_status !== "published") return { data: [] };
-
+  // The `published_at IS NOT NULL` filter already guarantees only published
+  // rows come back (unpublish clears published_at), so no separate status
+  // pre-check is needed — one round trip instead of two.
   const { data, error } = await admin
     .from("competition_results")
     .select(`

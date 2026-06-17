@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Search, Users, Loader2, X, Download, Plus, Pencil, Trash2, Save,
 } from "lucide-react";
@@ -409,8 +409,7 @@ export default function ParticipantsAdminPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Client-side filtering
-  const filtered = rows.filter((r) => {
+  const filtered = useMemo(() => rows.filter((r) => {
     if (shakhaFilter && r.shakha?.id !== shakhaFilter) return false;
     if (genderFilter) {
       const g = r.gender?.toLowerCase() ?? "";
@@ -427,9 +426,9 @@ export default function ParticipantsAdminPage() {
       ) return false;
     }
     return true;
-  });
+  }), [rows, shakhaFilter, genderFilter, catFilter, q]);
 
-  const openEdit = async (row: ParticipantRow) => {
+  const openEdit = useCallback(async (row: ParticipantRow) => {
     setEditRow(row);
     setEditRegIds([]);
     // Fetch existing registrations BEFORE opening the panel so the initial
@@ -440,7 +439,7 @@ export default function ParticipantsAdminPage() {
       .eq("participant_id", row.id);
     setEditRegIds((data ?? []).map((d) => d.feast_competition_id));
     setPanelMode("edit");
-  };
+  }, []);
 
   const exportCsv = () => {
     const header = ["Reg No", "Name", "House Name", "Shakha", "Gender", "Category", "Events", "Phone", "Registered"].join(",");

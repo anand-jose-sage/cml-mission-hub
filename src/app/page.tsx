@@ -20,7 +20,7 @@ import { FeastPortalCard } from "@/components/feast/feast-portal-card";
 import { FeastModule } from "@/components/feast/feast-module";
 
 export default function HomePage() {
-  const theme = buildTheme("aurora-glass", "dusk", 28);
+  const theme = useMemo(() => buildTheme("aurora-glass", "dusk", 28), []);
   const [tab, setTab] = useState("home");
   const [sel, setSel] = useState<number | null>(null); // null = all week
   const [noticeDetailOpen, setNoticeDetailOpen] = useState(false);

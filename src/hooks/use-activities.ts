@@ -116,10 +116,16 @@ export function useActivities() {
     let cancelled = false;
 
     async function fetch() {
+      const now = new Date();
+      const from = new Date(now.getFullYear(), now.getMonth() - 2, 1).toISOString().split("T")[0];
+      const to   = new Date(now.getFullYear(), now.getMonth() + 4, 0).toISOString().split("T")[0];
       const { data, error } = await supabase
         .from("activities")
-        .select("*")
-        .order("start_date", { ascending: true });
+        .select("id, title, category, all_day, location, start_date, end_date, featured")
+        .gte("start_date", from)
+        .lte("start_date", to)
+        .order("start_date", { ascending: true })
+        .limit(200);
 
       if (cancelled) return;
 
@@ -128,7 +134,7 @@ export function useActivities() {
       }
 
       if (data) {
-        setItems(data.map(activityToItem));
+        setItems((data as unknown as Activity[]).map(activityToItem));
       }
       setLoading(false);
     }

@@ -92,8 +92,9 @@ export function useNotices() {
     async function fetchNotices() {
       const { data, error } = await supabase
         .from("notices")
-        .select("*")
-        .order("published_at", { ascending: false });
+        .select("id, title, category, summary, body, priority, published_at")
+        .order("published_at", { ascending: false })
+        .limit(100);
 
       if (cancelled) return;
 
@@ -103,7 +104,7 @@ export function useNotices() {
 
       if (data) {
         console.log("[useNotices] Fetched", data.length, "notices");
-        setItems(data.map(noticeToItem));
+        setItems((data as unknown as Notice[]).map(noticeToItem));
       }
       setLoading(false);
     }

@@ -11,7 +11,7 @@ export async function getContentItems(options?: {
   if (!isSupabaseConfigured) return [] as ContentItem[];
   let query = supabase
     .from("content_items")
-    .select("*")
+    .select("id, title, slug, content_type, summary, content, thumbnail_url, media_url, featured, published_at")
     .order("published_at", { ascending: false });
 
   if (options?.type) {
@@ -77,7 +77,7 @@ export async function deleteContentItem(id: string) {
 export async function getNotices(options?: { limit?: number }) {
   let query = supabase
     .from("notices")
-    .select("*")
+    .select("id, title, category, summary, body, priority, published_at")
     .order("published_at", { ascending: false });
 
   if (options?.limit) {
@@ -127,7 +127,7 @@ export async function getActivities(options?: {
   featured?: boolean;
   limit?: number;
 }) {
-  let query = supabase.from("activities").select("*");
+  let query = supabase.from("activities").select("id, title, category, all_day, location, start_date, end_date, featured");
 
   if (options?.upcoming) {
     query = query

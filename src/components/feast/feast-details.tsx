@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Clock, MapPin, Loader2, X, Eye, EyeOff, Trophy, ChevronDown, ChevronUp } from "lucide-react";
 import type { FeastCompetition } from "@/lib/feast-data";
 import { useFeast } from "@/hooks/use-feast";
@@ -400,9 +400,9 @@ function CompetitionCard({ comp, catColor }: {
 function CompetitionTabs({ competitions }: { competitions: FeastCompetition[] }) {
   const [activeTab, setActiveTab] = useState<CatSlug | "">("");
 
-  // Which cats have at least 1 competition
-  const availableCats = CAT_CONFIG.filter((cat) =>
-    competitions.some((c) => c.competitionCategorySlug === cat.slug)
+  const availableCats = useMemo(
+    () => CAT_CONFIG.filter((cat) => competitions.some((c) => c.competitionCategorySlug === cat.slug)),
+    [competitions]
   );
 
   const resolvedTab: CatSlug | "" =
@@ -410,8 +410,9 @@ function CompetitionTabs({ competitions }: { competitions: FeastCompetition[] })
       ? (activeTab as CatSlug)
       : (availableCats[0]?.slug ?? "");
 
-  const filtered = competitions.filter(
-    (c) => c.competitionCategorySlug === resolvedTab
+  const filtered = useMemo(
+    () => competitions.filter((c) => c.competitionCategorySlug === resolvedTab),
+    [competitions, resolvedTab]
   );
 
   const activeCat = CAT_CONFIG.find((c) => c.slug === resolvedTab);

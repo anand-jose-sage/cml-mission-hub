@@ -1,19 +1,21 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import dynamic from "next/dynamic";
 import type { CMLTheme } from "@/lib/theme";
 import { Blobs } from "@/components/home/blobs";
 import { buildFeastTheme, FeastNav } from "./feast-shared";
-import { FeastLanding } from "./feast-landing";
-import { FeastDetails } from "./feast-details";
-import { FeastRegister } from "./feast-register";
 import type { RegResult } from "./feast-register";
-import { FeastSuccess } from "./feast-success";
-import { FeastResults } from "./feast-results";
-import { FeastLeaderboard } from "./feast-leaderboard";
-import { FeastParticipants } from "./feast-participants";
-import { FeastRegistrations } from "./feast-registrations";
-import { FeastEditRegister } from "./feast-edit-register";
+
+const FeastLanding      = dynamic(() => import("./feast-landing").then(m => ({ default: m.FeastLanding })));
+const FeastDetails      = dynamic(() => import("./feast-details").then(m => ({ default: m.FeastDetails })));
+const FeastRegister     = dynamic(() => import("./feast-register").then(m => ({ default: m.FeastRegister })));
+const FeastSuccess      = dynamic(() => import("./feast-success").then(m => ({ default: m.FeastSuccess })));
+const FeastResults      = dynamic(() => import("./feast-results").then(m => ({ default: m.FeastResults })));
+const FeastLeaderboard  = dynamic(() => import("./feast-leaderboard").then(m => ({ default: m.FeastLeaderboard })));
+const FeastParticipants = dynamic(() => import("./feast-participants").then(m => ({ default: m.FeastParticipants })));
+const FeastRegistrations= dynamic(() => import("./feast-registrations").then(m => ({ default: m.FeastRegistrations })));
+const FeastEditRegister = dynamic(() => import("./feast-edit-register").then(m => ({ default: m.FeastEditRegister })));
 
 type Screen = "landing" | "details" | "register" | "success" | "results" | "leaderboard" | "participants" | "registrations" | "edit-registration";
 
