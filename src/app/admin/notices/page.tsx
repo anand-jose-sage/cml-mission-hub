@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
+import { localInputToISO, isoToLocalInput, nowLocalInput } from "@/lib/datetime";
 import type { Notice, Priority } from "@/types";
 
 const PRIORITIES: Priority[] = ["low", "normal", "high", "urgent"];
@@ -47,7 +48,7 @@ const emptyForm: FormState = {
   summary: "",
   body: "",
   priority: "normal",
-  published_at: new Date().toISOString().slice(0, 16),
+  published_at: nowLocalInput(),
 };
 
 export default function AdminNoticesPage() {
@@ -89,7 +90,7 @@ export default function AdminNoticesPage() {
       summary: n.summary ?? "",
       body: n.body ?? "",
       priority: n.priority,
-      published_at: n.published_at ? n.published_at.slice(0, 16) : "",
+      published_at: n.published_at ? isoToLocalInput(n.published_at) : "",
     });
     setShowForm(true);
   }
@@ -102,7 +103,7 @@ export default function AdminNoticesPage() {
       summary: form.summary || null,
       body: form.body || null,
       priority: form.priority,
-      published_at: form.published_at,
+      published_at: localInputToISO(form.published_at),
       created_by: profile?.id ?? null,
     };
 

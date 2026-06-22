@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
+import { localInputToISO, isoToLocalInput } from "@/lib/datetime";
 import type { Activity, ActivityCategory } from "@/types";
 
 const CATEGORIES: ActivityCategory[] = [
@@ -34,6 +35,20 @@ function formatTime(d: string) {
     hour: "numeric", minute: "2-digit", hour12: true,
   });
 }
+
+// Module-scope so its identity is stable across renders. Defining this inside
+// the page component remounts every wrapped <input> on each keystroke, which
+// drops focus mid-typing.
+function F({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="text-sm font-medium text-gray-700 mb-1 block">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+const inputCls = "w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#6B46FF]/30";
 
 interface FormState {
   title: string;
@@ -106,8 +121,8 @@ export default function AdminActivitiesPage() {
       description: a.description ?? "",
       category: a.category ?? "activity",
       location: a.location ?? "",
-      start_date: a.start_date ? a.start_date.slice(0, 16) : "",
-      end_date: a.end_date ? a.end_date.slice(0, 16) : "",
+      start_date: a.start_date ? isoToLocalInput(a.start_date) : "",
+      end_date: a.end_date ? isoToLocalInput(a.end_date) : "",
       all_day: a.all_day,
       featured: a.featured,
       cover_image: a.cover_image ?? "",
@@ -126,8 +141,8 @@ export default function AdminActivitiesPage() {
       description: form.description || null,
       category: form.category,
       location: form.location || null,
-      start_date: form.start_date,
-      end_date: form.end_date || null,
+      start_date: localInputToISO(form.start_date),
+      end_date: form.end_date ? localInputToISO(form.end_date) : null,
       all_day: form.all_day,
       featured: form.featured,
       cover_image: form.cover_image || null,
@@ -152,17 +167,6 @@ export default function AdminActivitiesPage() {
     await supabase.from("activities").delete().eq("id", id);
     fetchItems();
   }
-
-  function F({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-      <label className="block">
-        <span className="text-sm font-medium text-gray-700 mb-1 block">{label}</span>
-        {children}
-      </label>
-    );
-  }
-
-  const inputCls = "w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#6B46FF]/30";
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-5 sm:py-8">

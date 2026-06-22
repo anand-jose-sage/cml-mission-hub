@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
+import { localInputToISO, isoToLocalInput, nowLocalInput } from "@/lib/datetime";
 import type { ContentItem, ContentType } from "@/types";
 
 const CONTENT_TYPES: ContentType[] = [
@@ -66,7 +67,7 @@ const emptyForm: FormState = {
   thumbnail_url: "",
   media_url: "",
   featured: false,
-  published_at: new Date().toISOString().slice(0, 16),
+  published_at: nowLocalInput(),
 };
 
 export default function AdminContentPage() {
@@ -113,7 +114,7 @@ export default function AdminContentPage() {
       thumbnail_url: item.thumbnail_url ?? "",
       media_url: item.media_url ?? "",
       featured: item.featured,
-      published_at: item.published_at ? item.published_at.slice(0, 16) : "",
+      published_at: item.published_at ? isoToLocalInput(item.published_at) : "",
     });
     setShowForm(true);
   }
@@ -132,7 +133,7 @@ export default function AdminContentPage() {
       thumbnail_url: form.thumbnail_url || null,
       media_url: form.media_url || null,
       featured: form.featured,
-      published_at: form.published_at,
+      published_at: localInputToISO(form.published_at),
       created_by: profile?.id ?? null,
     };
 

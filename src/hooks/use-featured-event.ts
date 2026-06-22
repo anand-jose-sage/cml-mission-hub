@@ -37,6 +37,22 @@ function activityToFeatured(a: Activity): FeaturedEvent {
   };
 }
 
+// Inclusive end-of-day for a date or timestamp string, in local time — so an
+// event whose end date is *today* is still considered current until midnight.
+function endOfDayMs(dateStr: string): number {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return NaN;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime();
+}
+
+// An event is still worth featuring until its end date has passed. Multi-day
+// events use end_date; single-point events fall back to start_date. Once that
+// day is over the event is hidden so the hero never lingers on a finished event.
+function notEnded(a: Activity, now: number): boolean {
+  const endMs = endOfDayMs(a.end_date ?? a.start_date);
+  return Number.isFinite(endMs) && endMs >= now;
+}
+
 export function useFeaturedEvent() {
   const [event, setEvent] = useState<FeaturedEvent | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,13 +67,14 @@ export function useFeaturedEvent() {
     setLoading(true);
 
     async function fetchFeatured() {
-      // Try upcoming featured first
+      const now = Date.now();
+
+      // Try featured events first — earliest one that hasn't ended yet.
       const { data, error } = await supabase
         .from("activities")
         .select("*")
         .eq("featured", true)
-        .order("start_date", { ascending: true })
-        .limit(1);
+        .order("start_date", { ascending: true });
 
       if (cancelled) return;
 
@@ -65,16 +82,16 @@ export function useFeaturedEvent() {
         console.error("[useFeaturedEvent] Supabase error:", error.message);
       }
 
-      if (data && data.length > 0) {
-        console.log("[useFeaturedEvent] Found featured:", data[0].title);
-        setEvent(activityToFeatured(data[0]));
+      const featured = (data ?? []).find((a) => notEnded(a, now));
+
+      if (featured) {
+        setEvent(activityToFeatured(featured));
       } else {
-        // Fallback: any upcoming activity
+        // Fallback: earliest non-ended activity of any kind.
         const { data: anyData, error: anyError } = await supabase
           .from("activities")
           .select("*")
-          .order("start_date", { ascending: true })
-          .limit(1);
+          .order("start_date", { ascending: true });
 
         if (cancelled) return;
 
@@ -82,10 +99,8 @@ export function useFeaturedEvent() {
           console.error("[useFeaturedEvent] Fallback error:", anyError.message);
         }
 
-        if (anyData && anyData.length > 0) {
-          console.log("[useFeaturedEvent] Using fallback activity:", anyData[0].title);
-          setEvent(activityToFeatured(anyData[0]));
-        }
+        const upcoming = (anyData ?? []).find((a) => notEnded(a, now));
+        setEvent(upcoming ? activityToFeatured(upcoming) : null);
       }
 
       setLoading(false);

@@ -50,20 +50,23 @@ export function BottomNav({ active, setActive, theme }: BottomNavProps) {
               <div
                 className="flex items-center justify-center transition-all"
                 style={{
-                  width: on ? 42 : 36,
+                  width: on ? 44 : 36,
                   height: 32,
-                  borderRadius: 12,
+                  borderRadius: 13,
                   background: on
-                    ? "linear-gradient(160deg, rgba(107,70,255,0.16), rgba(167,139,250,0.16))"
+                    ? "linear-gradient(145deg, #B79BF7, #9173EE)"
                     : "transparent",
+                  boxShadow: on
+                    ? "0 8px 16px rgba(140,100,230,0.4), inset 0 1.5px 2px rgba(255,255,255,0.55)"
+                    : "none",
                 }}
               >
                 {IconComp && (
                   <IconComp
                     size={21}
-                    color={on ? COLORS.purple : COLORS.faint}
+                    color={on ? "#fff" : COLORS.faint}
                     strokeWidth={on ? 2 : 1.9}
-                    fill={on ? COLORS.purple : "none"}
+                    fill={on ? "#fff" : "none"}
                   />
                 )}
               </div>

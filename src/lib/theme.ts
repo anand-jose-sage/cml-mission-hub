@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 export type Treatment = "warm-white" | "lavender-wash" | "aurora-glass";
 export type HeroGradient = "royal" | "dusk" | "dawn";
 
@@ -64,16 +66,17 @@ export function buildTheme(
   if (treatment === "aurora-glass") {
     return {
       ...base,
+      // Lighter, airier wash — softer entry into the multi-hue pastel system
       pageBg:
-        "linear-gradient(165deg, #E7DBFF 0%, #F1D7F4 45%, #FFE2D2 100%)",
+        "linear-gradient(165deg, #ECE4FF 0%, #F6E5F6 46%, #FFEADC 100%)",
       card: {
-        background: "rgba(255,255,255,0.5)",
+        background: "rgba(255,255,255,0.55)",
         border: "1px solid rgba(255,255,255,0.9)",
         backdropFilter: "blur(16px) saturate(180%)",
       },
-      softShadow: "0 14px 38px rgba(107,70,255,0.16)",
-      chip: "rgba(255,255,255,0.6)",
-      navBg: "rgba(255,255,255,0.5)",
+      softShadow: "0 14px 32px rgba(120,90,200,0.15)",
+      chip: "rgba(255,255,255,0.62)",
+      navBg: "rgba(255,255,255,0.55)",
       blobs: "vivid",
     };
   }
@@ -102,3 +105,26 @@ export const TINT_COLORS = {
 } as const;
 
 export type TintColor = keyof typeof TINT_COLORS;
+
+// ── Multi-hue pastel accents (soft 3D squircle icons) ─────────────────────
+// `from`/`to` drive the icon-tile gradient; `ink` is the on-tile glyph color.
+export const ACCENTS = {
+  lavender: { from: "#CDBFF8", to: "#A98BF0", ink: "#4A3499" },
+  coral:    { from: "#F7C9AE", to: "#F2A988", ink: "#A65428" },
+  mint:     { from: "#B6E6D2", to: "#86D2B2", ink: "#1B7C58" },
+  pink:     { from: "#F3C2D6", to: "#E89BBC", ink: "#B43A6B" },
+  sky:      { from: "#BBD9F4", to: "#8FBCEC", ink: "#2B6299" },
+} as const;
+
+export type AccentKey = keyof typeof ACCENTS;
+
+// Soft-extruded pastel tile: gradient face, tinted drop shadow, inner top light.
+export function softTile(key: AccentKey, radius = 18): CSSProperties {
+  const a = ACCENTS[key];
+  return {
+    background: `linear-gradient(145deg, ${a.from}, ${a.to})`,
+    boxShadow: `0 10px 20px ${a.to}59, inset 0 2px 3px rgba(255,255,255,0.6)`,
+    color: a.ink,
+    borderRadius: radius,
+  };
+}

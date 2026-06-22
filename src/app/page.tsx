@@ -17,6 +17,7 @@ import { NoticeBoard } from "@/components/notices/notice-board";
 import { MediaCenter } from "@/components/media/media-center";
 import { ActivitiesScreen } from "@/components/activities/activities-screen";
 import { FeastPortalCard } from "@/components/feast/feast-portal-card";
+import { QuickAccess } from "@/components/home/quick-access";
 import { FeastModule } from "@/components/feast/feast-module";
 
 export default function HomePage() {
@@ -110,6 +111,14 @@ export default function HomePage() {
               <HeroEvent theme={theme} />
 
               <FeastPortalCard onEnter={() => setInFeast(true)} />
+
+              {/* Quick access — soft 3D shortcuts */}
+              <QuickAccess
+                onFeast={() => setInFeast(true)}
+                onNotices={() => setTab("notices")}
+                onMedia={() => setTab("media")}
+                onEvents={() => setTab("activities")}
+              />
 
               {/* Today's Mission timeline */}
               <SectionHead title="Today's Mission" action="More" onAction={() => setTab("media")} />
