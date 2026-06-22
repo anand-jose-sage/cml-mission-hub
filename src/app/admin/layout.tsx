@@ -11,6 +11,7 @@ import {
   Users,
   Trophy,
   UserCheck,
+  ClipboardCheck,
   ClipboardList,
   Layers,
   Medal,
@@ -51,6 +52,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/admin/participants", label: "Participants", icon: UserCheck,    color: "#0891B2" },
       { href: "/admin/entries",      label: "Entries",      icon: ClipboardList, color: "#0F766E" },
+      { href: "/admin/participation", label: "Participation", icon: ClipboardCheck, color: "#BE185D" },
       { href: "/admin/results",      label: "Results",      icon: Medal,         color: "#D97706" },
       { href: "/admin/standings",    label: "Standings",    icon: Trophy,        color: "#7C3AED" },
     ],

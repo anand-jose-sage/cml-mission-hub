@@ -247,6 +247,29 @@ export async function updateParticipant(input: UpdateInput): Promise<{ error?: s
   }
 }
 
+// ─── PARTICIPATION MARKING ─────────────────────────────────────────────────
+
+// Toggle the `participated` flag for a single registration. Writes through the
+// service-role client because participant_registrations has no auth UPDATE RLS
+// policy (only public read/insert).
+export async function setParticipation(
+  registrationId: string,
+  participated: boolean
+): Promise<{ error?: string }> {
+  const admin = getSupabaseAdmin();
+  try {
+    const { error } = await admin
+      .from("participant_registrations")
+      .update({ participated })
+      .eq("id", registrationId);
+    if (error) return { error: error.message };
+    return {};
+  } catch (e) {
+    console.error("[setParticipation] unexpected:", e);
+    return { error: "Something went wrong." };
+  }
+}
+
 // ─── COMPETITION STATUS ────────────────────────────────────────────────────
 
 export interface CompStatusInput {
