@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { COLORS, type CMLTheme } from "@/lib/theme";
 import { useActivities, type ActivityItem } from "@/hooks/use-activities";
+import { usePlanContent } from "@/hooks/use-plan";
+import { MonthThemeHeader, ChurchPartBar, MonthStones, MonthPrograms } from "@/components/plan/plan-sections";
 
 /* ─── constants ────────────────────────────────────────── */
 const INK = "#241F4D";
@@ -28,12 +30,20 @@ const DOW = ["S", "M", "T", "W", "T", "F", "S"];
 const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /* ─── activity tint system ─────────────────────────────── */
-const AT: Record<string, { pale: string; ink: string; dot: string; soft: string }> = {
-  purple: { pale: "#EDE7FF", ink: "#5B3FCC", dot: "#7C5CFF", soft: "rgba(91,63,204,0.12)" },
-  coral:  { pale: "#FFE7DC", ink: "#B5402B", dot: "#F4663F", soft: "rgba(181,64,43,0.12)" },
-  gold:   { pale: "#FFF1CB", ink: "#9A6A00", dot: "#E2A312", soft: "rgba(154,106,0,0.14)" },
-  mint:   { pale: "#DCF6E6", ink: "#15803D", dot: "#2FB269", soft: "rgba(21,128,61,0.12)" },
-  sky:    { pale: "#DCEDFF", ink: "#0B6BB8", dot: "#3DA0F0", soft: "rgba(11,107,184,0.12)" },
+// `cellBg`/`cellNum` (optional) override the calendar day-cell fill so the most
+// important days read boldly; everything else falls back to pale + ink.
+const AT: Record<string, { pale: string; ink: string; dot: string; soft: string; cellBg?: string; cellNum?: string }> = {
+  purple: { pale: "#EDE7FF", ink: "#5B3FCC", dot: "#7C5CFF", soft: "rgba(91,63,204,0.12)", cellBg: "linear-gradient(155deg, #7A66E0, #5B3FCC)", cellNum: "#ffffff" },
+  coral:  { pale: "#FFE7DC", ink: "#B5402B", dot: "#F4663F", soft: "rgba(181,64,43,0.12)", cellBg: "linear-gradient(155deg, #F4663F, #C23E27)", cellNum: "#ffffff" },
+  gold:   { pale: "#FFF1CB", ink: "#9A6A00", dot: "#E2A312", soft: "rgba(154,106,0,0.14)", cellBg: "linear-gradient(155deg, #C8860C, #8A5E00)", cellNum: "#ffffff" },
+  mint:   { pale: "#DCF6E6", ink: "#15803D", dot: "#2FB269", soft: "rgba(21,128,61,0.12)", cellBg: "linear-gradient(155deg, #2FB269, #15803D)", cellNum: "#ffffff" },
+  sky:    { pale: "#DCEDFF", ink: "#0B6BB8", dot: "#3DA0F0", soft: "rgba(11,107,184,0.12)", cellBg: "linear-gradient(155deg, #3FA3F0, #1366A6)", cellNum: "#ffffff" },
+  // Feast — pink, solid fill with white number
+  feast:     { pale: "#FCE7F3", ink: "#BE185D", dot: "#EC4899", soft: "rgba(190,24,93,0.12)", cellBg: "#DB2777", cellNum: "#ffffff" },
+  // Solemnity — red group, solid fill with white number
+  solemnity: { pale: "#FDE3E1", ink: "#B42318", dot: "#E2574C", soft: "rgba(180,35,24,0.12)", cellBg: "#D64541", cellNum: "#ffffff" },
+  // Memorial — darker sky-blue gradient with white number
+  memorial:  { pale: "#DCEDFF", ink: "#0B6BB8", dot: "#3DA0F0", soft: "rgba(11,107,184,0.12)", cellBg: "linear-gradient(155deg, #3FA3F0, #1366A6)", cellNum: "#ffffff" },
 };
 
 /* ─── icon lookup ──────────────────────────────────────── */
@@ -72,8 +82,10 @@ function DayCell({
 }) {
   if (d == null) return <div className="aspect-square" />;
 
-  const special = acts.some((a) => a.special);
-  const dotTints = [...new Set(acts.filter((a) => !a.saint).map((a) => a.tint))].slice(0, 3);
+  // Mark a day by the highest-priority activity's pastel colour (filled cell).
+  // Priority: special (feast/solemnity/season/celebration) → saint → first.
+  const markAct = acts.find((a) => a.special) ?? acts.find((a) => a.saint) ?? acts[0] ?? null;
+  const mark = markAct ? AT[markAct.tint] : null;
 
   let bgStyle = "transparent";
   let numColor = isSunday ? "#DC2626" : INK;
@@ -86,12 +98,14 @@ function DayCell({
     numColor = "#fff";
     numWeight = 700;
   } else if (isToday) {
-    bgStyle = "transparent";
+    bgStyle = mark ? mark.pale : "transparent";
     shadow = "inset 0 0 0 2px #16A34A";
     numColor = "#15803D";
     numWeight = 700;
-  } else if (acts.length > 0) {
-    bgStyle = "rgba(107,70,255,0.05)";
+  } else if (mark) {
+    bgStyle = mark.cellBg ?? mark.pale;
+    numColor = mark.cellNum ?? mark.ink;
+    numWeight = 700;
   }
 
   return (
@@ -118,29 +132,6 @@ function DayCell({
         {d}
       </span>
 
-      {/* markers */}
-      {(special || dotTints.length > 0) && (
-        <span className="absolute bottom-[4%] left-0 right-0 flex justify-center items-center gap-[2.5px] h-[6px]">
-          {special && (
-            <Sparkles
-              size={8.5}
-              fill={selected ? "#fff" : "#E2A312"}
-              color={selected ? "#fff" : "#E2A312"}
-            />
-          )}
-          {dotTints.map((tn, i) => (
-            <span
-              key={i}
-              className="rounded-full"
-              style={{
-                width: 4.5,
-                height: 4.5,
-                background: selected ? "rgba(255,255,255,0.9)" : AT[tn].dot,
-              }}
-            />
-          ))}
-        </span>
-      )}
     </button>
   );
 }
@@ -284,6 +275,7 @@ interface ActivitiesScreenProps {
 
 export function ActivitiesScreen({ theme }: ActivitiesScreenProps) {
   const { items: allActivities, loading } = useActivities();
+  const { months: planMonths } = usePlanContent();
   const [view, setView] = useState({ y: TODAY.y, m: TODAY.m });
   const [sel, setSel] = useState<number | null>(null);
   const [drag, setDrag] = useState(0);
@@ -343,6 +335,10 @@ export function ActivitiesScreen({ theme }: ActivitiesScreenProps) {
   const shown = sel != null ? monthActs.filter((a) => covers(a, sel)) : monthActs;
   const isCurMonth = view.y === TODAY.y && view.m === TODAY.m;
 
+  // Static annual-plan content for the month currently in view
+  const viewMonthKey = `${view.y}-${String(view.m + 1).padStart(2, "0")}`;
+  const planMonth = planMonths.find((m) => m.monthKey === viewMonthKey) ?? null;
+
   const selLabel = sel != null
     ? `${WEEKDAY[new Date(view.y, view.m, sel).getDay()]}, ${sel} ${MABBR[view.m]}`
     : `${MONTHS[view.m]} '${String(view.y).slice(2)}`;
@@ -377,6 +373,20 @@ export function ActivitiesScreen({ theme }: ActivitiesScreenProps) {
           </button>
         </div>
       </div>
+
+      {/* ── annual plan: month theme hero (very top) ── */}
+      {planMonth && (
+        <div className="px-5 mt-3">
+          <MonthThemeHeader month={planMonth} />
+        </div>
+      )}
+
+      {/* ── annual plan: church-build progress (above calendar) ── */}
+      {planMonth && (
+        <div className="px-5 mt-3">
+          <ChurchPartBar month={planMonth} />
+        </div>
+      )}
 
       {/* ── calendar card ── */}
       <div className="px-5 pt-[18px]">
@@ -480,12 +490,12 @@ export function ActivitiesScreen({ theme }: ActivitiesScreenProps) {
             style={{ borderTop: "1px solid rgba(36,31,77,0.06)" }}
           >
             <span className="inline-flex items-center gap-[5px] text-[11px]" style={{ color: COLORS.sub }}>
-              <span className="w-[5px] h-[5px] rounded-full" style={{ background: "#7C5CFF" }} />
-              Activity
+              <span className="w-3 h-3 rounded-full" style={{ background: AT.feast.cellBg }} />
+              Feast
             </span>
             <span className="inline-flex items-center gap-[5px] text-[11px]" style={{ color: COLORS.sub }}>
-              <Sparkles size={10} fill="#E2A312" color="#E2A312" />
-              Feast
+              <span className="w-3 h-3 rounded-full" style={{ background: AT.solemnity.cellBg }} />
+              Solemnity
             </span>
             <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: COLORS.faint }}>
               <ChevronLeft size={11} color={COLORS.faint} strokeWidth={2.4} />
@@ -576,6 +586,14 @@ export function ActivitiesScreen({ theme }: ActivitiesScreenProps) {
           {sel != null ? "Tap a date to explore other days" : "Swipe the calendar to change month"}
         </div>
       </div>
+
+      {/* ── annual plan: stones + common programs (after the listing) ── */}
+      {planMonth && (
+        <div className="px-5 mt-2 space-y-3">
+          <MonthStones month={planMonth} />
+          <MonthPrograms month={planMonth} />
+        </div>
+      )}
     </div>
   );
 }

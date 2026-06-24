@@ -232,6 +232,56 @@ export interface GroupTeam {
   created_at: string;
 }
 
+// ============================================================
+// ANNUAL PLAN (Pravarthana Margarekha) — key-value JSONB content
+// ============================================================
+export interface PlanProject { title: string; desc: string; }
+export interface PlanPillar { label: string; title: string; desc: string; }
+export interface PlanChurchPartRef { monthKey: string; ml: string; en: string; index: number; }
+
+export interface PlanMeta {
+  org: string;
+  title: string;
+  yearLabel: string;
+  yearTheme: string;
+  subTheme: string;
+  subThemeLine: string;
+  objectives: string[];
+  projects: PlanProject[];
+  buildChurch: {
+    intro: string;
+    quote: string;
+    quoteRef: string;
+    littleWay: string;
+    pillars: PlanPillar[];
+    parts: PlanChurchPartRef[];
+  };
+  virtues: string[];
+  awards: string[];
+}
+
+export interface PlanFeastDay { date: string; day: string; name: string; type: string; }
+export interface PlanProgram { title: string; desc: string; }
+
+export interface PlanMonth {
+  index: number;
+  monthKey: string;          // e.g. "2026-07"
+  monthEn: string;           // e.g. "JULY 2026"
+  monthMl: string;           // e.g. "ജൂലൈ"
+  accent: string;            // hex
+  actionTheme: string;
+  churchLine: string;
+  churchPart: { ml: string; en: string; index: number; total: number };
+  tagline: string;
+  description: string;
+  virtue: string;
+  stones: string[];
+  feastDays: PlanFeastDay[];
+  programs: PlanProgram[];
+}
+
+export interface PlanContent { meta: PlanMeta | null; months: PlanMonth[]; }
+
 export interface Database {
   public: {
     Tables: {

@@ -10,7 +10,7 @@ export interface ActivityItem {
   end?: number;       // last day (multi-day spans)
   month: number;      // 0-indexed month
   year: number;
-  tint: "purple" | "coral" | "gold" | "mint" | "sky";
+  tint: "purple" | "coral" | "gold" | "mint" | "sky" | "feast" | "solemnity" | "memorial";
   cat: string;        // category label
   icon: string;       // lucide icon name
   title: string;
@@ -30,9 +30,9 @@ const CAT_CONFIG: Record<string, {
   saint: boolean;
   special: boolean;
 }> = {
-  feast:       { label: "Feast",       icon: "Sparkles", tint: "coral",  saint: true,  special: true },
-  solemnity:   { label: "Solemnity",   icon: "Sparkles", tint: "gold",   saint: true,  special: true },
-  memorial:    { label: "Memorial",    icon: "Sparkles", tint: "sky",    saint: true,  special: false },
+  feast:       { label: "Feast",       icon: "Sparkles", tint: "feast",     saint: true,  special: true },
+  solemnity:   { label: "Solemnity",   icon: "Sparkles", tint: "solemnity", saint: true,  special: true },
+  memorial:    { label: "Memorial",    icon: "Sparkles", tint: "memorial", saint: true,  special: false },
   season:      { label: "Season",      icon: "Sparkles", tint: "purple", saint: false, special: true },
   celebration: { label: "Celebration", icon: "Sparkles", tint: "coral",  saint: false, special: true },
   meeting:     { label: "Meeting",     icon: "Megaphone",tint: "purple", saint: false, special: false },
@@ -117,15 +117,17 @@ export function useActivities() {
 
     async function fetch() {
       const now = new Date();
-      const from = new Date(now.getFullYear(), now.getMonth() - 2, 1).toISOString().split("T")[0];
-      const to   = new Date(now.getFullYear(), now.getMonth() + 4, 0).toISOString().split("T")[0];
+      // Wide window so the full annual plan (Jul → May) of feast-day activities
+      // loads regardless of the current month: 3 months back → 13 months ahead.
+      const from = new Date(now.getFullYear(), now.getMonth() - 3, 1).toISOString().split("T")[0];
+      const to   = new Date(now.getFullYear(), now.getMonth() + 13, 0).toISOString().split("T")[0];
       const { data, error } = await supabase
         .from("activities")
         .select("id, title, category, all_day, location, start_date, end_date, featured")
         .gte("start_date", from)
         .lte("start_date", to)
         .order("start_date", { ascending: true })
-        .limit(200);
+        .limit(500);
 
       if (cancelled) return;
 
