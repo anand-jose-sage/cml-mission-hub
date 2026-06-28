@@ -20,12 +20,19 @@ import { COLORS, type CMLTheme } from "@/lib/theme";
 import { useActivities, type ActivityItem } from "@/hooks/use-activities";
 
 /* ─── activity tint system ─────────────────────────────── */
+// Must stay in sync with the keys in src/hooks/use-activities.ts (ActivityItem.tint).
+// Activities-screen has its own copy with the same set — if a tint key is missing
+// here, the home-page row crashes on `t.dot`. The runtime lookup below uses a
+// `|| AT.purple` fallback so any future key drift degrades gracefully.
 const AT: Record<string, { pale: string; ink: string; dot: string; soft: string }> = {
-  purple: { pale: "#EDE7FF", ink: "#5B3FCC", dot: "#7C5CFF", soft: "rgba(91,63,204,0.12)" },
-  coral:  { pale: "#FFE7DC", ink: "#B5402B", dot: "#F4663F", soft: "rgba(181,64,43,0.12)" },
-  gold:   { pale: "#FFF1CB", ink: "#9A6A00", dot: "#E2A312", soft: "rgba(154,106,0,0.14)" },
-  mint:   { pale: "#DCF6E6", ink: "#15803D", dot: "#2FB269", soft: "rgba(21,128,61,0.12)" },
-  sky:    { pale: "#DCEDFF", ink: "#0B6BB8", dot: "#3DA0F0", soft: "rgba(11,107,184,0.12)" },
+  purple:    { pale: "#EDE7FF", ink: "#5B3FCC", dot: "#7C5CFF", soft: "rgba(91,63,204,0.12)" },
+  coral:     { pale: "#FFE7DC", ink: "#B5402B", dot: "#F4663F", soft: "rgba(181,64,43,0.12)" },
+  gold:      { pale: "#FFF1CB", ink: "#9A6A00", dot: "#E2A312", soft: "rgba(154,106,0,0.14)" },
+  mint:      { pale: "#DCF6E6", ink: "#15803D", dot: "#2FB269", soft: "rgba(21,128,61,0.12)" },
+  sky:       { pale: "#DCEDFF", ink: "#0B6BB8", dot: "#3DA0F0", soft: "rgba(11,107,184,0.12)" },
+  feast:     { pale: "#FCE7F3", ink: "#BE185D", dot: "#DB2777", soft: "rgba(190,24,93,0.12)" },
+  solemnity: { pale: "#FDE3E1", ink: "#B42318", dot: "#D64541", soft: "rgba(180,35,24,0.12)" },
+  memorial:  { pale: "#DCEDFF", ink: "#0B6BB8", dot: "#3FA3F0", soft: "rgba(11,107,184,0.12)" },
 };
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>> = {
@@ -36,7 +43,7 @@ const MABBR = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "O
 
 /* ─── ActivityCard ─────────────────────────────────────── */
 function ActivityCard({ a, idx }: { a: ActivityItem; idx: number }) {
-  const t = AT[a.tint];
+  const t = AT[a.tint] ?? AT.purple;
   const IconComp = ICON_MAP[a.icon];
   const dateLabel = a.end ? `${a.d}–${a.end}` : String(a.d);
 

@@ -57,9 +57,14 @@ export async function registerParticipant(input: RegInput): Promise<RegOutput | 
       competitionCategoryId = catRow?.id ?? null;
     }
 
+    // Atomic per-feast counter (starts at 1111). See migration-reg-numbers.sql.
     const prefix = getRegPrefix(input.feastSlug);
-    const suffix = Date.now().toString().slice(-5);
-    const regNo = `${prefix}-${suffix}`;
+    const { data: nextNum, error: numErr } = await supabase.rpc("next_reg_number", { p_feast_id: feastRow.id });
+    if (numErr || nextNum == null) {
+      console.error("[registerParticipant] next_reg_number:", numErr?.message);
+      return { error: "Could not allocate a registration number." };
+    }
+    const regNo = `${prefix}-${nextNum}`;
 
     // Insert participant
     const { data: participant, error: pErr } = await supabase
@@ -132,8 +137,23 @@ export async function createParticipantAdmin(input: AdminRegInput): Promise<{ er
       competitionCategoryId = catRow?.id ?? null;
     }
 
-    const suffix = Date.now().toString().slice(-5);
-    const regNo = `ADM-${suffix}`;
+    // Use the same per-feast incremental counter as the public flow, plus the
+    // feast's own prefix (LF26, AF26, …) — keeps registration numbers uniform
+    // regardless of which flow created them.
+    const { data: feastRow, error: feastErr } = await admin
+      .from("feasts")
+      .select("slug")
+      .eq("id", input.feastId)
+      .single();
+    if (feastErr || !feastRow) {
+      return { error: "Feast not found." };
+    }
+    const { data: nextNum, error: numErr } = await admin.rpc("next_reg_number", { p_feast_id: input.feastId });
+    if (numErr || nextNum == null) {
+      console.error("[createParticipantAdmin] next_reg_number:", numErr?.message);
+      return { error: "Could not allocate a registration number." };
+    }
+    const regNo = `${getRegPrefix(feastRow.slug as string)}-${nextNum}`;
 
     const { data: participant, error: pErr } = await admin
       .from("participants")

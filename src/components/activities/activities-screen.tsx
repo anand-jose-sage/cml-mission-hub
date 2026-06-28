@@ -85,7 +85,7 @@ function DayCell({
   // Mark a day by the highest-priority activity's pastel colour (filled cell).
   // Priority: special (feast/solemnity/season/celebration) → saint → first.
   const markAct = acts.find((a) => a.special) ?? acts.find((a) => a.saint) ?? acts[0] ?? null;
-  const mark = markAct ? AT[markAct.tint] : null;
+  const mark = markAct ? (AT[markAct.tint] ?? AT.purple) : null;
 
   let bgStyle = "transparent";
   let numColor = isSunday ? "#DC2626" : INK;
@@ -178,7 +178,7 @@ function MonthGrid({
 
 /* ─── ActivityRow ──────────────────────────────────────── */
 function ActivityRow({ a, m }: { a: ActivityItem; m: number }) {
-  const t = AT[a.tint];
+  const t = AT[a.tint] ?? AT.purple;
   const IconComp = ICON_MAP[a.icon];
   const dateLabel = a.end ? `${a.d}–${a.end}` : String(a.d);
 
