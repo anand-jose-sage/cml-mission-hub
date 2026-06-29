@@ -2,14 +2,20 @@ export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://cml-hub.vercel.app");
 
-export const SITE_NAME = "CML Mission Hub";
-export const SITE_SHORT_NAME = "CML Hub";
+export const SITE_NAME = "Cherupushpa Mission League Kalpetta Meghala | ചെറുപുഷ്പ മിഷൻ ലീഗ് കൽപ്പറ്റ മേഖല";
+export const SITE_SHORT_NAME = "CML Kalpetta";
 export const SITE_DESCRIPTION =
-  "Cherupushpa Mission League, Kalpetta — your daily journey of faith, service, and community. Feast registrations, results, and mission updates all in one place.";
+  "Official website of Cherupushpa Mission League (CML),Kalpetta Meghala under Diocese of Mananthavady. Get the latest notices, activities, feast registrations, results, spiritual messages, downloads, and mission updates.";
 export const SITE_KEYWORDS = [
   "CML", "Cherupushpa Mission League", "Kalpetta", "Catholic mission",
   "feast competitions", "literature feast", "arts feast",
-  "mission hub", "CML Kalpetta", "Meghala", "Malayalam mission",
+  "mission hub", "CML Kalpetta", "Meghala", "Malayalam mission","ചെറുപുഷ്പ മിഷൻ ലീഗ്",
+  "കൽപ്പറ്റ മേഖല",
+  "സിഎംഎൽ",
+  "കത്തോലിക്കാ സഭ",
+  "സീറോ മലബാർ",
+  "കലാമത്സരം",
+  "സാഹിത്യ മത്സരം"
 ];
 export const SITE_LOCALE = "en_IN";
 export const SITE_LANG = "en";
