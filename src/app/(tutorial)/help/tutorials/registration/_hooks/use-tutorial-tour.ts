@@ -1,13 +1,19 @@
 "use client";
 
+import "driver.js/dist/driver.css";
+import "../_components/tutorial-driver.css";
+
 import { useEffect, useRef } from "react";
 import type { DriveStep, Driver } from "driver.js";
 
 interface UseTutorialTourOptions {
   onComplete?: () => void;
+  /** Label for the last-step button. Defaults to "Finish". Pass "Next" when more sub-tours follow. */
+  doneBtnText?: string;
 }
 
 export function useTutorialTour(steps: DriveStep[], opts?: UseTutorialTourOptions) {
+  const doneBtnText = opts?.doneBtnText ?? "Finish";
   const onCompleteRef = useRef(opts?.onComplete);
   useEffect(() => {
     onCompleteRef.current = opts?.onComplete;
@@ -34,7 +40,7 @@ export function useTutorialTour(steps: DriveStep[], opts?: UseTutorialTourOption
         popoverClass: "tutorial-popover",
         nextBtnText: "Next",
         prevBtnText: "Back",
-        doneBtnText: "Finish",
+        doneBtnText,
         onNextClick: (_el, _step, { state, driver: drv }) => {
           if (state.activeIndex === steps.length - 1) {
             drv.destroy();
