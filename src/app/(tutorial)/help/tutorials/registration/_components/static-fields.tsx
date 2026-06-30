@@ -73,7 +73,6 @@ export function StaticGenderChips({ value, theme, dataTour }: { value: "boy" | "
   const options = [
     { value: "boy", label: "Boy" },
     { value: "girl", label: "Girl" },
-    { value: "other", label: "Other" },
   ] as const;
   return (
     <div className="mb-3" data-tour={dataTour}>
