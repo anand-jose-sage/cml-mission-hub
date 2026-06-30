@@ -69,7 +69,9 @@ export function useFeaturedEvent() {
     async function fetchFeatured() {
       const now = Date.now();
 
-      // Try featured events first — earliest one that hasn't ended yet.
+      // Only show events explicitly marked featured — earliest one that
+      // hasn't ended yet. No fallback to non-featured activities: if no
+      // featured activity is active, HeroEvent renders nothing.
       const { data, error } = await supabase
         .from("activities")
         .select("*")
@@ -83,26 +85,7 @@ export function useFeaturedEvent() {
       }
 
       const featured = (data ?? []).find((a) => notEnded(a, now));
-
-      if (featured) {
-        setEvent(activityToFeatured(featured));
-      } else {
-        // Fallback: earliest non-ended activity of any kind.
-        const { data: anyData, error: anyError } = await supabase
-          .from("activities")
-          .select("*")
-          .order("start_date", { ascending: true });
-
-        if (cancelled) return;
-
-        if (anyError) {
-          console.error("[useFeaturedEvent] Fallback error:", anyError.message);
-        }
-
-        const upcoming = (anyData ?? []).find((a) => notEnded(a, now));
-        setEvent(upcoming ? activityToFeatured(upcoming) : null);
-      }
-
+      setEvent(featured ? activityToFeatured(featured) : null);
       setLoading(false);
     }
 
