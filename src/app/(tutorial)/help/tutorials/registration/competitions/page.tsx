@@ -87,6 +87,7 @@ export default function CompetitionsStep() {
   const selectedCount = DEMO_SELECTED_IDS.length;
   useTutorialTour(COMPETITIONS_TOUR, {
     onComplete: () => router.push("/help/tutorials/registration/review"),
+    doneBtnText: "Next",
   });
   return (
     <TutorialPage
