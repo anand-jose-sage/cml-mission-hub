@@ -1,0 +1,104 @@
+@keyframes tutorial-popover-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.tutorial-popover {
+  border-radius: 18px !important;
+  background: #fff !important;
+  box-shadow: 0 24px 48px rgba(30, 27, 75, 0.22), 0 0 0 1px rgba(107, 70, 255, 0.12) !important;
+  max-width: 320px !important;
+  font-family: var(--font-poppins), sans-serif !important;
+  padding: 18px 18px 14px !important;
+}
+
+.driver-fade .driver-popover.tutorial-popover {
+  animation: tutorial-popover-in 320ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.tutorial-popover .driver-popover-title {
+  font-family: var(--font-anek), sans-serif;
+  color: #1E1B4B;
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.tutorial-popover .driver-popover-description {
+  color: #6B6792;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.tutorial-popover .driver-popover-progress-text {
+  color: #9D99BC;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tutorial-popover .driver-popover-footer {
+  margin-top: 14px;
+  gap: 8px;
+}
+
+.tutorial-popover .driver-popover-footer button {
+  font-family: var(--font-poppins), sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  text-shadow: none !important;
+}
+
+.tutorial-popover .driver-popover-next-btn {
+  background: linear-gradient(135deg, #6B46FF, #A78BFA) !important;
+  color: #fff !important;
+  border: none !important;
+  box-shadow: 0 6px 16px rgba(107, 70, 255, 0.35) !important;
+  border-radius: 10px !important;
+  padding: 8px 14px !important;
+}
+
+.tutorial-popover .driver-popover-prev-btn {
+  background: rgba(107, 70, 255, 0.09) !important;
+  color: #1E1B4B !important;
+  border: 1px solid rgba(107, 70, 255, 0.2) !important;
+  border-radius: 10px !important;
+  padding: 8px 14px !important;
+}
+
+.tutorial-popover .driver-popover-close-btn {
+  color: #9D99BC !important;
+  font-size: 18px !important;
+  top: 10px !important;
+  right: 12px !important;
+}
+
+.tutorial-popover .driver-popover-close-btn:hover {
+  color: #1E1B4B !important;
+}
+
+.tutorial-popover .tutorial-meta-actions {
+  display: flex;
+  gap: 12px;
+  margin-right: auto;
+}
+
+.tutorial-popover .tutorial-skip-btn,
+.tutorial-popover .tutorial-restart-btn {
+  background: none;
+  border: none;
+  color: #9D99BC;
+  font-family: var(--font-poppins), sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.tutorial-popover .tutorial-skip-btn:hover,
+.tutorial-popover .tutorial-restart-btn:hover {
+  color: #6B46FF;
+}
