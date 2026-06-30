@@ -19,13 +19,19 @@ import { ActivitiesScreen } from "@/components/activities/activities-screen";
 import { FeastPortalCard } from "@/components/feast/feast-portal-card";
 import { QuickAccess } from "@/components/home/quick-access";
 import { FeastModule } from "@/components/feast/feast-module";
+import { useTutorialPrelude } from "@/app/(tutorial)/help/tutorials/registration/_hooks/use-tutorial-prelude";
 
 export default function HomePage() {
   const theme = useMemo(() => buildTheme("aurora-glass", "dusk", 28), []);
   const [tab, setTab] = useState("home");
   const [sel, setSel] = useState<number | null>(null); // null = all week
   const [noticeDetailOpen, setNoticeDetailOpen] = useState(false);
-  const [inFeast, setInFeast] = useState(false);
+  const [inFeastInternal, setInFeastInternal] = useState(false);
+  const tutorial = useTutorialPrelude();
+  const inFeast = tutorial.active ? tutorial.inFeast : inFeastInternal;
+  const setInFeast = (v: boolean) => {
+    if (!tutorial.active) setInFeastInternal(v);
+  };
   const scrollRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -57,7 +63,12 @@ export default function HomePage() {
   if (inFeast) {
     return (
       <div className="relative h-dvh w-full overflow-hidden max-w-md mx-auto" style={{ background: theme.pageBg }}>
-        <FeastModule onExit={() => setInFeast(false)} parentTheme={theme} />
+        <FeastModule
+          onExit={() => setInFeast(false)}
+          parentTheme={theme}
+          tutorialStep={tutorial.feastStep ?? undefined}
+          tutorialDetails={tutorial.feastDetails ?? undefined}
+        />
       </div>
     );
   }

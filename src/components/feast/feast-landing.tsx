@@ -8,12 +8,12 @@ import {
   FeastTopBar, FeastIcon, type FeastTheme,
 } from "./feast-shared";
 
-function FeastCard({ feast, theme, onOpen }: { feast: Feast; theme: FeastTheme; onOpen: () => void }) {
+function FeastCard({ feast, theme, onOpen, dataTour }: { feast: Feast; theme: FeastTheme; onOpen: () => void; dataTour?: string }) {
   const eventCount = feast.eventCount ?? feast.competitions.length;
   const regCount = feast.registrations;
   return (
     <GlassPanel theme={theme} pressable glow={feast.accent} onClick={onOpen} style={{ overflow: "hidden", marginBottom: 12 }}>
-      <div className="relative p-[15px] pb-[13px]">
+      <div className="relative p-[15px] pb-[13px]" data-tour={dataTour}>
         <div className="absolute -top-5 -right-2.5 w-[120px] h-[120px] rounded-full" style={{ background: feast.accent + "40", filter: "blur(30px)" }} />
         <div className="relative flex items-center gap-3">
           <div className="w-[50px] h-[50px] rounded-[14px] flex-shrink-0 flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${feast.tint[0]}, ${feast.tint[1]})`, boxShadow: `0 8px 22px ${feast.accent}60` }}>
@@ -43,6 +43,7 @@ function FeastCard({ feast, theme, onOpen }: { feast: Feast; theme: FeastTheme; 
           </div>
         </div>
         <button
+          data-tour={dataTour ? `${dataTour}-view-btn` : undefined}
           className="relative w-full active:scale-95 transition-transform flex items-center justify-center gap-[7px]"
           style={{
             padding: "12px 18px",
@@ -92,8 +93,14 @@ export function FeastLanding({ theme, onOpen, onExit, onSearch }: {
         Active Feasts
       </SectionTitle>
 
-      {visibleFeasts.map((f) => (
-        <FeastCard key={f.slug} feast={f} theme={theme} onOpen={() => onOpen(f.slug)} />
+      {visibleFeasts.map((f, i) => (
+        <FeastCard
+          key={f.slug}
+          feast={f}
+          theme={theme}
+          onOpen={() => onOpen(f.slug)}
+          dataTour={i === 0 ? "feast-listing-first" : undefined}
+        />
       ))}
 
       <GlassPanel

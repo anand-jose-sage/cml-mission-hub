@@ -5,7 +5,10 @@ import dynamic from "next/dynamic";
 import type { CMLTheme } from "@/lib/theme";
 import { Blobs } from "@/components/home/blobs";
 import { buildFeastTheme, FeastNav } from "./feast-shared";
+import type { FeastDetailsTutorial } from "./feast-details";
 import type { RegResult } from "./feast-register";
+
+export type FeastModuleTutorialStep = "landing" | "details" | "login" | "register-home";
 
 const FeastLanding      = dynamic(() => import("./feast-landing").then(m => ({ default: m.FeastLanding })));
 const FeastDetails      = dynamic(() => import("./feast-details").then(m => ({ default: m.FeastDetails })));
@@ -19,9 +22,27 @@ const FeastEditRegister = dynamic(() => import("./feast-edit-register").then(m =
 
 type Screen = "landing" | "details" | "register" | "success" | "results" | "leaderboard" | "participants" | "registrations" | "edit-registration";
 
-export function FeastModule({ onExit, parentTheme }: { onExit: () => void; parentTheme: CMLTheme }) {
+export function FeastModule({
+  onExit,
+  parentTheme,
+  tutorialStep,
+  tutorialDetails,
+}: {
+  onExit: () => void;
+  parentTheme: CMLTheme;
+  tutorialStep?: FeastModuleTutorialStep;
+  tutorialDetails?: FeastDetailsTutorial;
+}) {
   const theme = buildFeastTheme(parentTheme);
-  const [screen, setScreen] = useState<Screen>("landing");
+  const tutorialScreen: Screen | null = tutorialStep === "landing" ? "landing"
+    : tutorialStep === "details" || tutorialStep === "login" || tutorialStep === "register-home" ? "details"
+    : null;
+  const [internalScreen, setInternalScreen] = useState<Screen>("landing");
+  const screen: Screen = tutorialScreen ?? internalScreen;
+  const setScreen = (s: Screen) => {
+    if (tutorialScreen) return; // tutorial controls screen
+    setInternalScreen(s);
+  };
   const [feastSlug, setFeastSlug] = useState("literature-feast-2026");
   const [regResult, setRegResult] = useState<RegResult | null>(null);
   const [editParticipantId, setEditParticipantId] = useState<string | null>(null);
@@ -54,7 +75,7 @@ export function FeastModule({ onExit, parentTheme }: { onExit: () => void; paren
       body = <FeastLanding theme={theme} onExit={onExit} onOpen={(slug) => go("details", slug)} onSearch={() => setScreen("participants")} />;
       break;
     case "details":
-      body = <FeastDetails slug={feastSlug} theme={theme} onBack={() => setScreen("landing")} onExit={onExit} go={go} />;
+      body = <FeastDetails slug={feastSlug} theme={theme} onBack={() => setScreen("landing")} onExit={onExit} go={go} tutorial={tutorialDetails} />;
       break;
     case "register":
       body = <FeastRegister slug={feastSlug} theme={theme} onBack={() => setScreen("details")} onExit={onExit} onDone={(r) => { setRegResult(r); setScreen("success"); }} />;

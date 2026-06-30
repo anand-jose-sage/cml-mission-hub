@@ -4,7 +4,7 @@ import { Trophy, Sparkles, ArrowRight } from "lucide-react";
 
 export function FeastPortalCard({ onEnter }: { onEnter: () => void }) {
   return (
-    <div className="px-5 pt-2 pb-1">
+    <div className="px-5 pt-2 pb-1" data-tour="feast-portal-card">
       <button
         onClick={onEnter}
         className="relative overflow-hidden w-full text-left cursor-pointer rounded-[26px] p-[18px] active:scale-[0.98] transition-transform"
