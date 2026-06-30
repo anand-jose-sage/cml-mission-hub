@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Clock, MapPin, Loader2, X, Eye, EyeOff, Trophy, ChevronDown, ChevronUp } from "lucide-react";
 import type { FeastCompetition } from "@/lib/feast-data";
 import { useFeast } from "@/hooks/use-feast";
@@ -12,7 +12,21 @@ import {
   FeastTopBar, type FeastTheme,
 } from "./feast-shared";
 
-function LoginSheet({ theme, onClose }: { theme: FeastTheme; onClose: () => void }) {
+export type LoginTutorialPhase = "idle" | "typing-email" | "typing-password" | "ready" | "submitting";
+
+export function LoginSheet({
+  theme,
+  onClose,
+  tutorialMode,
+  tutorialPhase,
+  onTutorialSubmit,
+}: {
+  theme: FeastTheme;
+  onClose: () => void;
+  tutorialMode?: boolean;
+  tutorialPhase?: LoginTutorialPhase;
+  onTutorialSubmit?: () => void;
+}) {
   const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,7 +34,48 @@ function LoginSheet({ theme, onClose }: { theme: FeastTheme; onClose: () => void
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
+  // Tutorial mode: animate typing into the email / password fields when phase changes.
+  useEffect(() => {
+    if (!tutorialMode) return;
+    if (tutorialPhase === "typing-email") {
+      const target = "admin@cmlkalpetta.com";
+      setEmail("");
+      setPassword("");
+      setErr("");
+      let i = 0;
+      const interval = setInterval(() => {
+        i++;
+        setEmail(target.slice(0, i));
+        if (i >= target.length) clearInterval(interval);
+      }, 40);
+      return () => clearInterval(interval);
+    }
+    if (tutorialPhase === "typing-password") {
+      const target = "demo-pass-1234";
+      setPassword("");
+      let i = 0;
+      const interval = setInterval(() => {
+        i++;
+        setPassword(target.slice(0, i));
+        if (i >= target.length) clearInterval(interval);
+      }, 40);
+      return () => clearInterval(interval);
+    }
+    if (tutorialPhase === "submitting") {
+      setBusy(true);
+      const t = setTimeout(() => {
+        setBusy(false);
+        onTutorialSubmit?.();
+      }, 700);
+      return () => clearTimeout(t);
+    }
+  }, [tutorialMode, tutorialPhase, onTutorialSubmit]);
+
   const submit = async () => {
+    if (tutorialMode) {
+      // Tutorial flow drives submit via phase; ignore manual clicks here.
+      return;
+    }
     if (!email.trim() || !password) return;
     setBusy(true);
     setErr("");
@@ -47,20 +102,23 @@ function LoginSheet({ theme, onClose }: { theme: FeastTheme; onClose: () => void
 
         <div className="space-y-3">
           <input
+            data-tour="login-email"
             type="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            readOnly={tutorialMode}
             className={inputCls}
             style={{ background: theme.fill, border: `1px solid ${theme.hairline}`, color: theme.text }}
           />
-          <div className="relative">
+          <div className="relative" data-tour="login-password">
             <input
               type={showPw ? "text" : "password"}
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()}
+              readOnly={tutorialMode}
               className={inputCls}
               style={{ background: theme.fill, border: `1px solid ${theme.hairline}`, color: theme.text, paddingRight: 44 }}
             />
@@ -75,16 +133,18 @@ function LoginSheet({ theme, onClose }: { theme: FeastTheme; onClose: () => void
           {err && <p className="text-[12.5px] px-1" style={{ color: "#EF4444" }}>{err}</p>}
         </div>
 
-        <GlowBtn
-          variant="primary"
-          full
-          size="lg"
-          icon={busy ? undefined : "LogIn"}
-          onClick={submit}
-          style={{ marginTop: 18 }}
-        >
-          {busy ? <Loader2 size={18} className="animate-spin" /> : "Sign In"}
-        </GlowBtn>
+        <div data-tour="login-submit">
+          <GlowBtn
+            variant="primary"
+            full
+            size="lg"
+            icon={busy ? undefined : "LogIn"}
+            onClick={submit}
+            style={{ marginTop: 18 }}
+          >
+            {busy ? <Loader2 size={18} className="animate-spin" /> : "Sign In"}
+          </GlowBtn>
+        </div>
       </div>
     </div>
   );
@@ -486,17 +546,35 @@ function CompetitionTabs({ competitions }: { competitions: FeastCompetition[] })
   );
 }
 
-export function FeastDetails({ slug, theme, onBack, onExit, go }: {
+export interface FeastDetailsTutorial {
+  loggedIn: boolean;
+  loginOpen: boolean;
+  loginPhase?: LoginTutorialPhase;
+  onLoginClose?: () => void;
+  onTutorialSubmit?: () => void;
+}
+
+export function FeastDetails({ slug, theme, onBack, onExit, go, tutorial }: {
   slug: string;
   theme: FeastTheme;
   onBack: () => void;
   onExit: () => void;
   go: (screen: string, slug?: string) => void;
+  tutorial?: FeastDetailsTutorial;
 }) {
   const { feast, loading } = useFeast(slug);
   const { session, loading: authLoading } = useAuth();
-  const [showLogin, setShowLogin] = useState(false);
-  const isAuthorized = !!session;
+  const [showLoginInternal, setShowLoginInternal] = useState(false);
+  const showLogin = tutorial ? tutorial.loginOpen : showLoginInternal;
+  const setShowLogin = (v: boolean) => {
+    if (tutorial) {
+      if (!v) tutorial.onLoginClose?.();
+    } else {
+      setShowLoginInternal(v);
+    }
+  };
+  const isAuthorized = tutorial ? tutorial.loggedIn : !!session;
+  const showAuthBlock = tutorial ? true : !authLoading;
 
   if (loading && !feast?.competitions.length) {
     return (
@@ -512,6 +590,7 @@ export function FeastDetails({ slug, theme, onBack, onExit, go }: {
     <div className="px-5">
       <FeastTopBar title={feast.name} onBack={onBack} onExit={onExit} theme={theme} />
       {/* Hero banner */}
+      <div data-tour="feast-info">
       <GlassPanel theme={theme} strong glow={feast.accent} style={{ overflow: "hidden", marginBottom: 16 }}>
         <div className="relative p-[18px]" style={{ background: `linear-gradient(140deg, ${feast.tint[0]}cc, ${feast.tint[1]}cc)` }}>
           <div className="absolute -top-[30px] -right-5 w-[130px] h-[130px] rounded-full" style={{ background: "rgba(255,255,255,0.2)", filter: "blur(20px)" }} />
@@ -536,21 +615,34 @@ export function FeastDetails({ slug, theme, onBack, onExit, go }: {
           </div>
         </div>
       </GlassPanel>
+      </div>
 
       {feast.blurb && <p className="text-[13px] leading-relaxed mb-4" style={{ color: theme.sub }}>{feast.blurb}</p>}
 
-      {!authLoading && (
+      {showAuthBlock && (
         isAuthorized ? (
-          <GlowBtn variant="gold" full size="lg" icon="Ticket" onClick={() => go("register", slug)} style={{ marginBottom: 10 }}>
-            Register Now — it&apos;s free
-          </GlowBtn>
+          <div data-tour="register-btn">
+            <GlowBtn variant="gold" full size="lg" icon="Ticket" onClick={() => go("register", slug)} style={{ marginBottom: 10 }}>
+              Register Now — it&apos;s free
+            </GlowBtn>
+          </div>
         ) : (
-          <GlowBtn variant="ghost" full size="lg" icon="Lock" onClick={() => setShowLogin(true)} style={{ marginBottom: 10 }}>
-            Login to Register
-          </GlowBtn>
+          <div data-tour="login-btn">
+            <GlowBtn variant="ghost" full size="lg" icon="Lock" onClick={() => setShowLogin(true)} style={{ marginBottom: 10 }}>
+              Login to Register
+            </GlowBtn>
+          </div>
         )
       )}
-      {showLogin && <LoginSheet theme={theme} onClose={() => setShowLogin(false)} />}
+      {showLogin && (
+        <LoginSheet
+          theme={theme}
+          onClose={() => setShowLogin(false)}
+          tutorialMode={!!tutorial}
+          tutorialPhase={tutorial?.loginPhase}
+          onTutorialSubmit={tutorial?.onTutorialSubmit}
+        />
+      )}
       <div className="flex gap-2.5 mb-1">
         <GlowBtn variant="ghost" full icon="Medal" onClick={() => go("results", slug)}>Results</GlowBtn>
         {isAuthorized
