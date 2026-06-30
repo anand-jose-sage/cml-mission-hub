@@ -132,9 +132,10 @@ function TimelineItem({ item, theme, last, idx, onNoticeClick, onOpenAudio }: Ti
                 src={item.mediaUrl}
                 poster={item.thumbnailUrl ?? undefined}
                 controls
+                playsInline
                 preload="metadata"
                 className="w-full rounded-xl"
-                style={{ height: 132, objectFit: "cover" }}
+                style={{ display: "block", height: "auto", maxHeight: 520 }}
               />
             ) : (
               <>
