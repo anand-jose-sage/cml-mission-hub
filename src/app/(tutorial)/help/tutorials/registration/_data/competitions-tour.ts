@@ -5,7 +5,7 @@ export const COMPETITIONS_TOUR: DriveStep[] = [
     element: '[data-tour="comp-first"]',
     popover: {
       title: "Competition cards",
-      description: "Each card is an event the participant is eligible for. Tap a card to select or deselect it.",
+      description: "ഓരോ കാർഡും പങ്കെടുക്കുന്നയാൾക്ക് യോഗ്യതയുള്ള ഒരു മത്സര ഇനമാണ് . ഒരു മത്സരം  തിരഞ്ഞെടുക്കാനോ തിരഞ്ഞെടുത്തത് മാറ്റാനോ അതിൽ ടാപ്പ് ചെയ്യുക.",
       side: "bottom",
       align: "start",
     },
@@ -14,7 +14,7 @@ export const COMPETITIONS_TOUR: DriveStep[] = [
     element: '[data-tour="comp-gendered"]',
     popover: {
       title: "Gender & category badges",
-      description: "Some competitions are restricted to Boys or Girls and to specific age categories. Only eligible ones are shown.",
+      description: "ചില മത്സരങ്ങൾ ആൺകുട്ടികൾക്കും പെൺകുട്ടികൾക്കും പ്രത്യേക പ്രായ വിഭാഗങ്ങൾക്കും മാത്രമായി പരിമിതപ്പെടുത്തിയിരിക്കുന്നു.",
       side: "top",
       align: "start",
     },
@@ -23,7 +23,7 @@ export const COMPETITIONS_TOUR: DriveStep[] = [
     element: '[data-tour="selected-count"]',
     popover: {
       title: "Selected count",
-      description: "This counter updates as you pick competitions. There's no hard limit — pick as many as you want.",
+      description: "നിങ്ങൾ മത്സരങ്ങൾ തിരഞ്ഞെടുക്കുമ്പോൾ ഈ കൗണ്ടർ അപ്ഡേറ്റ് ചെയ്യുന്നു. പരമാവധി പരിധി 2 ആണ്.",
       side: "top",
       align: "start",
     },
@@ -32,7 +32,7 @@ export const COMPETITIONS_TOUR: DriveStep[] = [
     element: '[data-tour="next-button"]',
     popover: {
       title: "Continue to review",
-      description: "When you're done picking, tap Next to review the registration before submitting.",
+      description: "നിങ്ങൾ മത്സരങ്ങൾ തിരഞ്ഞെടുക്കുമ്പോൾ, രജിസ്ട്രേഷൻ പരിശോധിക്കാൻ Next ടാപ്പ് ചെയ്യുക.",
       side: "top",
       align: "end",
     },

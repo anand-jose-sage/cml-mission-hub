@@ -5,7 +5,7 @@ export const DETAILS_TOUR: DriveStep[] = [
     element: '[data-tour="name"]',
     popover: {
       title: "Participant name",
-      description: "Enter the participant's full name as it should appear on the registration.",
+      description: "Enter the participant's full name  പങ്കെടുക്കുന്നയാളുടെ മുഴുവൻ പേര് നൽകുക.",
       side: "bottom",
       align: "start",
     },
@@ -14,7 +14,7 @@ export const DETAILS_TOUR: DriveStep[] = [
     element: '[data-tour="house-name"]',
     popover: {
       title: "House name",
-      description: "Optional. The family or house name helps distinguish participants who share a first name.",
+      description: "Optional. The House name helps distinguish participants who share a first name പങ്കെടുക്കുന്നയാളുടെ  വീട്ടു പേര് നൽകുക",
       side: "bottom",
       align: "start",
     },
@@ -23,7 +23,7 @@ export const DETAILS_TOUR: DriveStep[] = [
     element: '[data-tour="dob"]',
     popover: {
       title: "Date of birth",
-      description: "Used to automatically place the participant in the correct age category.",
+      description: "പങ്കെടുക്കുന്നയാളെ ശരിയായ പ്രായ വിഭാഗത്തിൽ ഉൾപ്പെടുത്താൻ ഉപയോഗിക്കുന്നു.",
       side: "bottom",
       align: "start",
     },
@@ -32,7 +32,7 @@ export const DETAILS_TOUR: DriveStep[] = [
     element: '[data-tour="category"]',
     popover: {
       title: "Competition category",
-      description: "Derived from the date of birth. This decides which events the participant is eligible for.",
+      description: "ജനന തിയ്യതി അടിസ്ഥാനമാക്കി നിർണയിക്കുന്നു. ഇത് മത്സരാർത്ഥി ഏത് ഇവന്റുകളിൽ പങ്കെടുക്കാൻ യോഗ്യനാണ് എന്ന് തീരുമാനിക്കുന്നു.",
       side: "bottom",
       align: "start",
     },
@@ -41,7 +41,7 @@ export const DETAILS_TOUR: DriveStep[] = [
     element: '[data-tour="gender"]',
     popover: {
       title: "Gender",
-      description: "Required for competitions that are split into Boys / Girls categories.",
+      description: "ആൺകുട്ടികൾ / പെൺകുട്ടികൾ എന്നിങ്ങനെ തിരിച്ചിരിക്കുന്ന മത്സരങ്ങൾക്ക് ആവശ്യമാണ്",
       side: "top",
       align: "start",
     },
@@ -59,7 +59,7 @@ export const DETAILS_TOUR: DriveStep[] = [
     element: '[data-tour="shakha"]',
     popover: {
       title: "Your shakha",
-      description: "Registrations are filed under your admin shakha automatically — no need to pick one.",
+      description: "നിങ്ങളുടെ ശാഖയ്ക്ക് കീഴിൽ രജിസ്ട്രേഷനുകൾ Automatically ഫയൽ ചെയ്യപ്പെടുന്നു - ഒരെണ്ണം തിരഞ്ഞെടുക്കേണ്ടതില്ല.",
       side: "top",
       align: "start",
     },
@@ -68,7 +68,7 @@ export const DETAILS_TOUR: DriveStep[] = [
     element: '[data-tour="next-button"]',
     popover: {
       title: "Continue",
-      description: "Once the details look right, tap Next to choose competitions.",
+      description: "വിവരങ്ങൾ ശരിയാണെന്ന് ഉറപ്പായാൽ, അടുത്തത് തിരഞ്ഞെടുക്കാൻ Next ടാപ്പ് ചെയ്യുക.",
       side: "top",
       align: "end",
     },

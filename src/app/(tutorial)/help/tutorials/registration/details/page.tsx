@@ -21,7 +21,8 @@ export default function DetailsStep() {
   return (
     <TutorialPage
       title="Registration Details"
-      subtitle="Fill in the participant's name, date of birth, gender and shakha."
+      subtitle="മത്സരാർത്ഥിയുടെ പേര്, വീട്ടുപേര്, ജനന തിയ്യതി, ഫോൺ നമ്പർ എന്നിവ പൂരിപ്പിക്കുക.
+ഫോൺ നമ്പർ നിർബന്ധമില്ല"
       theme={theme}
     >
       <GlassPanel theme={theme} style={{ padding: 16, marginBottom: 14 }}>

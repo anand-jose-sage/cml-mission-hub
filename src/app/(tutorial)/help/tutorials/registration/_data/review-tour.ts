@@ -5,7 +5,7 @@ export const REVIEW_TOUR: DriveStep[] = [
     element: '[data-tour="review-summary"]',
     popover: {
       title: "Confirm the details",
-      description: "Everything entered so far is listed here. This is your last chance to spot mistakes before saving.",
+      description: "ഇതുവരെ നൽകിയതെല്ലാം ഇവിടെ പട്ടികപ്പെടുത്തിയിട്ടുണ്ട്. സേവ് ചെയ്യുന്നതിനുമുമ്പ് തെറ്റുകൾ കണ്ടെത്താനുള്ള നിങ്ങളുടെ അവസാന അവസരമാണിത്.",
       side: "bottom",
       align: "start",
     },
@@ -14,7 +14,7 @@ export const REVIEW_TOUR: DriveStep[] = [
     element: '[data-tour="review-category"]',
     popover: {
       title: "Category & shakha",
-      description: "The category is derived from the date of birth, and the shakha is your admin shakha — both are filled in automatically.",
+      description: "വിഭാഗം ജനന തിയ്യതി അടിസ്ഥാനമാക്കി നിർണയിക്കുന്നു, ശാഖ നിങ്ങളുടെ അഡ്മിൻ ശാഖയാണ് —  സ്വയം പൂരിപ്പിക്കപ്പെടുന്നു.",
       side: "top",
       align: "start",
     },
@@ -23,7 +23,7 @@ export const REVIEW_TOUR: DriveStep[] = [
     element: '[data-tour="review-comps"]',
     popover: {
       title: "Selected competitions",
-      description: "Every competition the participant will compete in. To add or remove any, tap Back to step 2.",
+      description: "പങ്കെടുക്കുന്ന എല്ലാ മത്സരങ്ങളും ഇവിടെ കാണിക്കുന്നു. ഏതെങ്കിലും മാറ്റം ചെയ്യാൻ, Back ടാപ്പ് ചെയ്ത് step 2 ലേക്ക് പോകുക.",
       side: "top",
       align: "start",
     },
@@ -32,7 +32,7 @@ export const REVIEW_TOUR: DriveStep[] = [
     element: '[data-tour="next-button"]',
     popover: {
       title: "Confirm registration",
-      description: "Tap Next to save the registration. The participant will get a unique registration number.",
+      description: "Next ടാപ്പ് ചെയ്ത് രജിസ്ട്രേഷൻ സേവ് ചെയ്യുക. ഒരു  രജിസ്ട്രേഷൻ നമ്പർ ലഭിക്കും.",
       side: "top",
       align: "end",
     },

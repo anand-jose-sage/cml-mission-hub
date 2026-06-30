@@ -31,11 +31,8 @@ export const DEMO_COMPETITIONS: DemoCompetition[] = [
   { id: "essay",      name: "Essay Writing",         cat: "Individual", time: "9:30 AM",  icon: "FileText", gender: null,    categorySlug: "senior" },
   { id: "poetry",     name: "Poetry Writing",        cat: "Individual", time: "10:30 AM", icon: "PenTool",  gender: null,    categorySlug: "senior" },
   { id: "story",      name: "Story Writing",         cat: "Individual", time: "11:30 AM", icon: "BookOpen", gender: null,    categorySlug: "senior" },
-  { id: "elocution",  name: "Elocution",             cat: "Individual", time: "1:30 PM",  icon: "Mic",      gender: "girls", categorySlug: "senior" },
-  { id: "recitation", name: "Recitation",            cat: "Individual", time: "2:30 PM",  icon: "Mic",      gender: null,    categorySlug: "senior" },
-  { id: "quiz",       name: "Bible & Literature Quiz", cat: "Team",     time: "4:30 PM",  icon: "Sparkles", gender: null,    categorySlug: "senior" },
 ];
 
-export const DEMO_SELECTED_IDS = ["essay", "elocution", "recitation"];
+export const DEMO_SELECTED_IDS = ["essay", "story"];
 
 export const DEMO_REG_NO = "LF26-0148";
