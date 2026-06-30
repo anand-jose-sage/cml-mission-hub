@@ -17,6 +17,7 @@ export default function DetailsStep() {
   const p = DEMO_PARTICIPANT;
   useTutorialTour(DETAILS_TOUR, {
     onComplete: () => router.push("/help/tutorials/registration/competitions"),
+    doneBtnText: "Next",
   });
   return (
     <TutorialPage

@@ -35,6 +35,7 @@ export default function ReviewStep() {
   const genderLabel = p.gender.charAt(0).toUpperCase() + p.gender.slice(1);
   useTutorialTour(REVIEW_TOUR, {
     onComplete: () => router.push("/help/tutorials/registration/success"),
+    doneBtnText: "Next",
   });
 
   return (

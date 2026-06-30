@@ -133,7 +133,8 @@ export function useTutorialPrelude(): PreludeState {
     }
   }, [step, router]);
 
-  useTutorialTour(steps, { onComplete });
+  // Every sub-tour in the prelude hands off to another screen — never use "Finish" here.
+  useTutorialTour(steps, { onComplete, doneBtnText: "Next" });
 
   const feastStep: FeastModuleTutorialStep | null =
     step === "landing" ? "landing"
