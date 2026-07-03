@@ -8,7 +8,7 @@ import { buildFeastTheme, FeastNav } from "./feast-shared";
 import type { FeastDetailsTutorial } from "./feast-details";
 import type { RegResult } from "./feast-register";
 
-export type FeastModuleTutorialStep = "landing" | "details" | "login" | "register-home";
+export type FeastModuleTutorialStep = "landing" | "details" | "login" | "register-home" | "my-registrations-details" | "my-registrations" | "edit-registration-form";
 
 const FeastLanding      = dynamic(() => import("./feast-landing").then(m => ({ default: m.FeastLanding })));
 const FeastDetails      = dynamic(() => import("./feast-details").then(m => ({ default: m.FeastDetails })));
@@ -27,15 +27,19 @@ export function FeastModule({
   parentTheme,
   tutorialStep,
   tutorialDetails,
+  onTutorialAction,
 }: {
   onExit: () => void;
   parentTheme: CMLTheme;
   tutorialStep?: FeastModuleTutorialStep;
   tutorialDetails?: FeastDetailsTutorial;
+  onTutorialAction?: (action: string) => void;
 }) {
   const theme = buildFeastTheme(parentTheme);
   const tutorialScreen: Screen | null = tutorialStep === "landing" ? "landing"
-    : tutorialStep === "details" || tutorialStep === "login" || tutorialStep === "register-home" ? "details"
+    : tutorialStep === "details" || tutorialStep === "login" || tutorialStep === "register-home" || tutorialStep === "my-registrations-details" ? "details"
+    : tutorialStep === "my-registrations" ? "registrations"
+    : tutorialStep === "edit-registration-form" ? "edit-registration"
     : null;
   const [internalScreen, setInternalScreen] = useState<Screen>("landing");
   const screen: Screen = tutorialScreen ?? internalScreen;
@@ -43,7 +47,7 @@ export function FeastModule({
     if (tutorialScreen) return; // tutorial controls screen
     setInternalScreen(s);
   };
-  const [feastSlug, setFeastSlug] = useState("literature-feast-2026");
+  const [feastSlug, setFeastSlug] = useState("literature_2026");
   const [regResult, setRegResult] = useState<RegResult | null>(null);
   const [editParticipantId, setEditParticipantId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLElement>(null);
@@ -93,10 +97,10 @@ export function FeastModule({
       body = <FeastParticipants slug={feastSlug} theme={theme} onBack={() => setScreen("landing")} onExit={onExit} setFeastSlug={setFeastSlug} />;
       break;
     case "registrations":
-      body = <FeastRegistrations slug={feastSlug} theme={theme} onBack={() => setScreen("details")} onExit={onExit} onEdit={(id) => { setEditParticipantId(id); setScreen("edit-registration"); }} />;
+      body = <FeastRegistrations slug={feastSlug} theme={theme} onBack={() => setScreen("details")} onExit={onExit} onEdit={(id) => { setEditParticipantId(id); setScreen("edit-registration"); onTutorialAction?.("edit-tap"); }} />;
       break;
     case "edit-registration":
-      body = <FeastEditRegister slug={feastSlug} participantId={editParticipantId!} theme={theme} onBack={() => setScreen("registrations")} onDone={() => setScreen("registrations")} onExit={onExit} />;
+      body = <FeastEditRegister slug={feastSlug} participantId={editParticipantId!} theme={theme} onBack={() => setScreen("registrations")} onDone={() => setScreen("registrations")} onExit={onExit} onTutorialAction={onTutorialAction} />;
       break;
   }
 

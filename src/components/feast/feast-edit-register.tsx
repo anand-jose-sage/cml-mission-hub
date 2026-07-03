@@ -57,7 +57,7 @@ function CategoryPill({ dob, theme }: { dob: string; theme: FeastTheme }) {
   const label = CATEGORY_LABELS[slug];
   const color = CATEGORY_COLORS[slug] || theme.lavender;
   return (
-    <div className="flex items-center gap-2 px-3.5 py-2 rounded-[12px] mb-3" style={{ background: color + "18", border: `1px solid ${color}44` }}>
+    <div data-tour="edit-category-badge" className="flex items-center gap-2 px-3.5 py-2 rounded-[12px] mb-3" style={{ background: color + "18", border: `1px solid ${color}44` }}>
       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color, boxShadow: `0 0 8px ${color}` }} />
       <span className="text-[12.5px] font-semibold" style={{ fontFamily: "var(--font-poppins),sans-serif", color }}>
         Competition Category: <strong>{label}</strong>
@@ -111,13 +111,14 @@ function StepDots({ step, theme }: { step: number; theme: FeastTheme }) {
 
 // ─── main ──────────────────────────────────────────────────────────────────
 
-export function FeastEditRegister({ slug, participantId, theme, onBack, onDone, onExit }: {
+export function FeastEditRegister({ slug, participantId, theme, onBack, onDone, onExit, onTutorialAction }: {
   slug: string;
   participantId: string;
   theme: FeastTheme;
   onBack: () => void;
   onDone: () => void;
   onExit: () => void;
+  onTutorialAction?: (action: string) => void;
 }) {
   const { feast } = useFeast(slug);
   const [step, setStep] = useState(0);
@@ -178,6 +179,7 @@ export function FeastEditRegister({ slug, participantId, theme, onBack, onDone, 
     });
     setSubmitting(false);
     if (result.error) { setServerError(result.error); return; }
+    onTutorialAction?.("save-success");
     onDone();
   };
 
@@ -186,6 +188,7 @@ export function FeastEditRegister({ slug, participantId, theme, onBack, onDone, 
     const result = await deleteParticipant(participantId);
     setDeleting(false);
     if (result.error) { setServerError(result.error); return; }
+    onTutorialAction?.("delete-success");
     onDone();
   };
 
@@ -205,38 +208,44 @@ export function FeastEditRegister({ slug, participantId, theme, onBack, onDone, 
       {/* ── Step 0: details ── */}
       {step === 0 && (
         <div>
-          <GlassPanel theme={theme} style={{ padding: 16, marginBottom: 14 }}>
-            <TextField label="Full Name" value={form.name} onChange={(v) => set("name", v)} placeholder="e.g. Ann Maria Joy" theme={theme} icon="user" />
-            <TextField label="House Name" value={form.houseName} onChange={(v) => set("houseName", v)} placeholder="e.g. Thekkedath House" theme={theme} />
-            <DateField label="Date of Birth" value={form.dob} onChange={(v) => set("dob", v)} theme={theme} />
-            <CategoryPill dob={form.dob} theme={theme} />
-            <GenderPicker value={form.gender} onChange={(v) => set("gender", v)} theme={theme} />
-            <TextField label="Phone (optional)" value={form.phone} onChange={(v) => set("phone", v.replace(/[^\d]/g, "").slice(0, 10))} placeholder="10-digit mobile" theme={theme} type="tel" icon="phone" />
-          </GlassPanel>
-          <GlowBtn variant="primary" full size="lg" disabled={!step1ok} iconRight="ArrowRight" onClick={() => setStep(1)}>Continue</GlowBtn>
+          <div data-tour="edit-registration-form">
+            <GlassPanel theme={theme} style={{ padding: 16, marginBottom: 14 }}>
+              <TextField label="Full Name" value={form.name} onChange={(v) => set("name", v)} placeholder="e.g. Ann Maria Joy" theme={theme} icon="user" />
+              <TextField label="House Name" value={form.houseName} onChange={(v) => set("houseName", v)} placeholder="e.g. Thekkedath House" theme={theme} />
+              <DateField label="Date of Birth" value={form.dob} onChange={(v) => set("dob", v)} theme={theme} />
+              <CategoryPill dob={form.dob} theme={theme} />
+              <GenderPicker value={form.gender} onChange={(v) => set("gender", v)} theme={theme} />
+              <TextField label="Phone (optional)" value={form.phone} onChange={(v) => set("phone", v.replace(/[^\d]/g, "").slice(0, 10))} placeholder="10-digit mobile" theme={theme} type="tel" icon="phone" />
+            </GlassPanel>
+          </div>
+          <div data-tour="edit-continue-btn">
+            <GlowBtn variant="primary" full size="lg" disabled={!step1ok} iconRight="ArrowRight" onClick={() => { setStep(1); onTutorialAction?.("continue-tap"); }}>Continue</GlowBtn>
+          </div>
           {!step1ok && <p className="text-center text-[11.5px] mt-2.5" style={{ color: theme.faint }}>Name, date of birth and gender are required</p>}
 
           {/* Delete */}
           <div className="mt-4">
             {!confirmDelete ? (
-              <button onClick={() => setConfirmDelete(true)}
+              <button data-tour="edit-delete-btn" onClick={() => { setConfirmDelete(true); onTutorialAction?.("delete-tap"); }}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-none cursor-pointer text-[13px] font-semibold"
                 style={{ background: "#fee2e2", color: "#ef4444" }}>
                 <Trash2 size={15} /> Remove Registration
               </button>
             ) : (
-              <div className="p-4 rounded-2xl text-center" style={{ background: "#fee2e2", border: "1px solid #fca5a5" }}>
+              <div data-tour="edit-delete-confirm" className="p-4 rounded-2xl text-center" style={{ background: "#fee2e2", border: "1px solid #fca5a5" }}>
                 <p className="text-[13px] font-semibold mb-3" style={{ color: "#b91c1c" }}>Delete this registration permanently?</p>
                 <div className="flex gap-2">
                   <button onClick={() => setConfirmDelete(false)}
                     className="flex-1 py-2.5 rounded-xl text-[13px] font-medium cursor-pointer border-none"
                     style={{ background: "rgba(255,255,255,0.8)", color: "#374151" }}>Cancel</button>
-                  <button onClick={handleDelete} disabled={deleting}
-                    className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold cursor-pointer border-none flex items-center justify-center gap-1.5"
-                    style={{ background: "#ef4444", color: "#fff" }}>
-                    {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                    {deleting ? "Deleting…" : "Yes, Delete"}
-                  </button>
+                  <div data-tour="edit-delete-yes-btn" className="flex-1">
+                    <button onClick={handleDelete} disabled={deleting}
+                      className="w-full py-2.5 rounded-xl text-[13px] font-semibold cursor-pointer border-none flex items-center justify-center gap-1.5"
+                      style={{ background: "#ef4444", color: "#fff" }}>
+                      {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                      {deleting ? "Deleting…" : "Yes, Delete"}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

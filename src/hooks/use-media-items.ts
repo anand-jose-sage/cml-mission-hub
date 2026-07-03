@@ -12,6 +12,7 @@ export interface MediaGalleryItem {
   summary: string;
   type: MediaFilter;
   thumbnailUrl: string | null;
+  mediaUrl: string | null;
   publishedAt: string;
   date: string;
   month: string;
@@ -34,6 +35,7 @@ function contentToGalleryItem(item: ContentItem): MediaGalleryItem {
     summary: item.summary ?? "",
     type: item.content_type as MediaFilter,
     thumbnailUrl: item.thumbnail_url,
+    mediaUrl: item.media_url,
     publishedAt: item.published_at,
     date,
     month,

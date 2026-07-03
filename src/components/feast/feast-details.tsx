@@ -646,7 +646,7 @@ export function FeastDetails({ slug, theme, onBack, onExit, go, tutorial }: {
       <div className="flex gap-2.5 mb-1">
         <GlowBtn variant="ghost" full icon="Medal" onClick={() => go("results", slug)}>Results</GlowBtn>
         {isAuthorized
-          ? <GlowBtn variant="ghost" full icon="ClipboardList" onClick={() => go("registrations", slug)}>My Registrations</GlowBtn>
+          ? <div data-tour="my-registrations-btn" style={{ width: "100%" }}><GlowBtn variant="ghost" full icon="ClipboardList" onClick={() => go("registrations", slug)}>My Registrations</GlowBtn></div>
           : <GlowBtn variant="ghost" full icon="Trophy" onClick={() => go("leaderboard", slug)}>Leaderboard</GlowBtn>
         }
       </div>

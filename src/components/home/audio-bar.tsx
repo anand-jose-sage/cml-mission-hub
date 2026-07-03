@@ -28,7 +28,6 @@ export function AudioBar({ src }: AudioBarProps) {
     // Clean URL — strip surrounding quotes if stored that way in DB
     const cleanSrc = src.replace(/^["']|["']$/g, "").trim();
     const audio = new Audio();
-    audio.crossOrigin = "anonymous";
     audio.preload = "metadata";
     audio.src = cleanSrc;
     audioRef.current = audio;

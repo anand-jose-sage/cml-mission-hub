@@ -42,7 +42,6 @@ export function FullscreenAudioPlayer({
     if (!open || !src) return;
     const cleanSrc = src.replace(/^["']|["']$/g, "").trim();
     const audio = new Audio();
-    audio.crossOrigin = "anonymous";
     audio.preload = "metadata";
     audio.src = cleanSrc;
     audioRef.current = audio;

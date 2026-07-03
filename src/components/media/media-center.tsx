@@ -9,6 +9,7 @@ import {
   Film,
   Loader2,
   Bell,
+  X,
 } from "lucide-react";
 import { COLORS, type CMLTheme } from "@/lib/theme";
 import {
@@ -16,6 +17,7 @@ import {
   type MediaFilter,
   type MediaGalleryItem,
 } from "@/hooks/use-media-items";
+import { AudioBar } from "@/components/home/audio-bar";
 
 /* ─── filter config ─────────────────────────────────── */
 const FILTERS: { id: MediaFilter; label: string }[] = [
@@ -82,11 +84,13 @@ function GalleryTile({
   theme,
   idx,
   tall,
+  onPlay,
 }: {
   item: MediaGalleryItem;
   theme: CMLTheme;
   idx: number;
   tall: boolean;
+  onPlay: (item: MediaGalleryItem) => void;
 }) {
   const config = TYPE_CONFIG[item.type] ?? TYPE_CONFIG.reel;
   const Icon = config.icon;
@@ -97,6 +101,7 @@ function GalleryTile({
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: idx * 0.04, ease: "easeOut" }}
+      onClick={() => isVisual && item.mediaUrl && onPlay(item)}
       className="relative overflow-hidden cursor-pointer group"
       style={{
         borderRadius: theme.radius - 6,
@@ -204,7 +209,7 @@ function MediaListCard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: idx * 0.05, ease: "easeOut" }}
-      className="flex items-center gap-3 p-3 cursor-pointer group"
+      className="p-3 group"
       style={{
         background: theme.card.background,
         border: theme.card.border,
@@ -214,40 +219,98 @@ function MediaListCard({
         WebkitBackdropFilter: theme.card.backdropFilter,
       }}
     >
-      <div
-        className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
-        style={{ background: config.bg }}
-      >
-        <Icon size={22} color={config.ink} strokeWidth={1.8} />
-      </div>
-      <div className="flex-1 min-w-0">
+      <div className="flex items-center gap-3">
         <div
-          className="font-[family-name:var(--font-poppins)] font-semibold text-[14px] leading-tight truncate"
-          style={{ color: COLORS.text }}
+          className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: config.bg }}
         >
-          {item.title}
+          <Icon size={22} color={config.ink} strokeWidth={1.8} />
         </div>
-        <div
-          className="text-[11.5px] leading-snug mt-1 line-clamp-1"
-          style={{ color: COLORS.sub }}
-        >
-          {item.summary}
-        </div>
-      </div>
-      <div className="flex flex-col items-end shrink-0 gap-1">
-        {item.duration && (
-          <span
-            className="text-[10px] font-medium px-1.5 py-0.5 rounded-md"
-            style={{ background: config.bg, color: config.ink }}
+        <div className="flex-1 min-w-0">
+          <div
+            className="font-[family-name:var(--font-poppins)] font-semibold text-[14px] leading-tight truncate"
+            style={{ color: COLORS.text }}
           >
-            {item.duration}
+            {item.title}
+          </div>
+          <div
+            className="text-[11.5px] leading-snug mt-1 line-clamp-1"
+            style={{ color: COLORS.sub }}
+          >
+            {item.summary}
+          </div>
+        </div>
+        <div className="flex flex-col items-end shrink-0 gap-1">
+          {item.duration && (
+            <span
+              className="text-[10px] font-medium px-1.5 py-0.5 rounded-md"
+              style={{ background: config.bg, color: config.ink }}
+            >
+              {item.duration}
+            </span>
+          )}
+          <span className="text-[10px]" style={{ color: COLORS.faint }}>
+            {item.date} {item.month}
           </span>
-        )}
-        <span className="text-[10px]" style={{ color: COLORS.faint }}>
-          {item.date} {item.month}
-        </span>
+        </div>
       </div>
+      {item.mediaUrl && (
+        <div className="mt-2.5">
+          <AudioBar src={item.mediaUrl} />
+        </div>
+      )}
     </motion.div>
+  );
+}
+
+/* ─── Video lightbox ────────────────────────────────── */
+function VideoLightbox({
+  item,
+  onClose,
+}: {
+  item: MediaGalleryItem | null;
+  onClose: () => void;
+}) {
+  return (
+    <AnimatePresence>
+      {item && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.25 }}
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center max-w-md mx-auto px-5"
+          style={{ background: "rgba(15, 10, 40, 0.92)" }}
+        >
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-5 w-9 h-9 rounded-full flex items-center justify-center border-none cursor-pointer z-[1]"
+            style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(10px)" }}
+          >
+            <X size={18} color="rgba(255,255,255,0.9)" />
+          </button>
+          {/* No hardcoded aspect-ratio box here — the video sizes to its own
+              natural width/height so portrait reels and landscape videos both
+              play undistorted instead of being squished into a fixed tile. */}
+          <video
+            key={item.id}
+            src={item.mediaUrl ?? undefined}
+            poster={item.thumbnailUrl ?? undefined}
+            controls
+            autoPlay
+            playsInline
+            className="w-full rounded-xl"
+            style={{ display: "block", maxHeight: "80vh", height: "auto" }}
+          />
+          <p
+            className="font-[family-name:var(--font-poppins)] font-semibold text-[14px] text-center mt-4 px-4"
+            style={{ color: "rgba(255,255,255,0.9)" }}
+          >
+            {item.title}
+          </p>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -261,6 +324,7 @@ interface MediaCenterProps {
 export function MediaCenter({ theme }: MediaCenterProps) {
   const [filter, setFilter] = useState<MediaFilter>("all");
   const { items, loading } = useMediaItems(filter);
+  const [videoItem, setVideoItem] = useState<MediaGalleryItem | null>(null);
 
   const visualItems = items.filter(
     (i) => i.type === "reel" || i.type === "video"
@@ -438,6 +502,7 @@ export function MediaCenter({ theme }: MediaCenterProps) {
                         theme={theme}
                         idx={idx}
                         tall={idx === 0 || idx === 3}
+                        onPlay={setVideoItem}
                       />
                     ))}
                   </div>
@@ -480,6 +545,7 @@ export function MediaCenter({ theme }: MediaCenterProps) {
           )}
         </motion.div>
       </AnimatePresence>
+      <VideoLightbox item={videoItem} onClose={() => setVideoItem(null)} />
     </div>
   );
 }

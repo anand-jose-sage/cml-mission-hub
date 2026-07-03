@@ -20,6 +20,9 @@ import { FeastPortalCard } from "@/components/feast/feast-portal-card";
 import { QuickAccess } from "@/components/home/quick-access";
 import { FeastModule } from "@/components/feast/feast-module";
 import { useTutorialPrelude } from "@/app/(tutorial)/help/tutorials/registration/_hooks/use-tutorial-prelude";
+import { useMyRegistrationsTutorial } from "@/app/(tutorial)/help/tutorials/my-registrations/_hooks/use-my-registrations-tutorial";
+import { useEditRegistrationTutorial } from "@/app/(tutorial)/help/tutorials/edit-registration/_hooks/use-edit-registration-tutorial";
+import { useDeleteRegistrationTutorial } from "@/app/(tutorial)/help/tutorials/delete-registration/_hooks/use-delete-registration-tutorial";
 
 export default function HomePage() {
   const theme = useMemo(() => buildTheme("aurora-glass", "dusk", 28), []);
@@ -28,9 +31,21 @@ export default function HomePage() {
   const [noticeDetailOpen, setNoticeDetailOpen] = useState(false);
   const [inFeastInternal, setInFeastInternal] = useState(false);
   const tutorial = useTutorialPrelude();
-  const inFeast = tutorial.active ? tutorial.inFeast : inFeastInternal;
+  const myRegTutorial = useMyRegistrationsTutorial();
+  const editRegTutorial = useEditRegistrationTutorial();
+  const deleteRegTutorial = useDeleteRegistrationTutorial();
+  const activeTutorial = tutorial.active ? tutorial
+    : myRegTutorial.active ? myRegTutorial
+    : editRegTutorial.active ? editRegTutorial
+    : deleteRegTutorial.active ? deleteRegTutorial
+    : null;
+  const onTutorialAction: ((action: string) => void) | undefined =
+    activeTutorial && "onTutorialAction" in activeTutorial
+      ? (activeTutorial as { onTutorialAction: (action: string) => void }).onTutorialAction
+      : undefined;
+  const inFeast = activeTutorial ? activeTutorial.inFeast : inFeastInternal;
   const setInFeast = (v: boolean) => {
-    if (!tutorial.active) setInFeastInternal(v);
+    if (!activeTutorial) setInFeastInternal(v);
   };
   const scrollRef = useRef<HTMLElement>(null);
 
@@ -66,8 +81,9 @@ export default function HomePage() {
         <FeastModule
           onExit={() => setInFeast(false)}
           parentTheme={theme}
-          tutorialStep={tutorial.feastStep ?? undefined}
-          tutorialDetails={tutorial.feastDetails ?? undefined}
+          tutorialStep={activeTutorial?.feastStep ?? undefined}
+          tutorialDetails={activeTutorial?.feastDetails ?? undefined}
+          onTutorialAction={onTutorialAction}
         />
       </div>
     );

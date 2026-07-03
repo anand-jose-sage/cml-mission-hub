@@ -48,17 +48,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Get initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const profile = await fetchProfile(session.user.id);
-        setState({ session, profile, loading: false });
-      } else {
-        setState({ session: null, profile: null, loading: false });
-      }
-    });
-
-    // Listen for auth changes
+    // onAuthStateChange fires once immediately with the current session (INITIAL_SESSION
+    // event) and again on every subsequent auth change — no separate getSession() call
+    // needed, and adding one would double-fetch the profile on initial load.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {

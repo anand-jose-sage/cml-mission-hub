@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronDown, Loader2, UserX, Lock, Pencil } from "lucide-react";
+import { ChevronDown, Loader2, UserX, Lock, Pencil, Download } from "lucide-react";
 import { useFeast } from "@/hooks/use-feast";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
@@ -24,8 +24,8 @@ interface RegRow {
   participant: ParticipantRow | null;
 }
 
-// Edit registrations locked after June 19 2026 4:00 PM IST (10:30 AM UTC)
-const EDIT_DEADLINE = new Date("2026-06-19T10:30:00Z");
+// Edit registrations locked after July 19 2026 4:00 PM IST (10:30 AM UTC)
+const EDIT_DEADLINE = new Date("2026-07-19T10:30:00Z");
 const isEditLocked = () => new Date() >= EDIT_DEADLINE;
 
 // ---------- helpers ----------
@@ -38,34 +38,27 @@ function normGender(g: string | null | undefined) {
   return "common";
 }
 
+// Participant's own gender (boy/girl/other) → single letter for the print sheet
+function genderLetter(g: string | null | undefined) {
+  if (!g) return "";
+  const l = g.toLowerCase();
+  if (l.startsWith("b") || l === "male") return "B";
+  if (l.startsWith("g") || l === "female") return "G";
+  return "";
+}
+
+const CATEGORY_ORDER = ["sub_junior", "junior", "senior", "super_senior", "elder"] as const;
+
+const esc = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
 const GENDER_STYLE: Record<string, { label: string; bg: string; color: string }> = {
   boys:   { label: "Boys",   bg: "#dbeafe", color: "#1d4ed8" },
   girls:  { label: "Girls",  bg: "#fce7f3", color: "#be185d" },
   common: { label: "Common", bg: "#f0fdf4", color: "#15803d" },
 };
 
-// Stable avatar colour from name string
-function avatarColor(name: string) {
-  const palette = ["#7C3AED", "#EC4899", "#F59E0B", "#10B981", "#3B82F6", "#EF4444", "#8B5CF6"];
-  let h = 0;
-  for (const c of name) h = (h * 31 + c.charCodeAt(0)) % palette.length;
-  return palette[h];
-}
-
 // ---------- sub-components ----------
-
-function Avatar({ name, size = 34 }: { name: string; size?: number }) {
-  const bg = avatarColor(name);
-  const initials = name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
-  return (
-    <div
-      className="rounded-full flex items-center justify-center font-bold shrink-0"
-      style={{ width: size, height: size, background: bg, color: "#fff", fontSize: size * 0.38 }}
-    >
-      {initials}
-    </div>
-  );
-}
 
 function Badge({ label, bg, color, border }: { label: string; bg: string; color: string; border?: string }) {
   return (
@@ -79,7 +72,7 @@ function Badge({ label, bg, color, border }: { label: string; bg: string; color:
 }
 
 function AccordionRow({
-  compName, gender, catSlug, regs, idx, theme, accent, onEdit,
+  compName, gender, catSlug, regs, idx, theme, accent, onEdit, isFirstWithRegistrations,
 }: {
   compName: string;
   gender: string | null | undefined;
@@ -89,6 +82,7 @@ function AccordionRow({
   theme: FeastTheme;
   accent: string;
   onEdit: (participantId: string) => void;
+  isFirstWithRegistrations?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ng = normGender(gender);
@@ -109,6 +103,7 @@ function AccordionRow({
 
   return (
     <div
+      data-tour={idx === 0 ? "registration-category-card" : undefined}
       className="rounded-2xl mb-3 overflow-hidden"
       style={{
         background: theme.glassStrong.background,
@@ -118,6 +113,7 @@ function AccordionRow({
     >
       {/* Header */}
       <button
+        data-tour={isFirstWithRegistrations ? "edit-existing-registration-card" : undefined}
         onClick={() => setOpen((o) => !o)}
         className="w-full border-none cursor-pointer flex items-center gap-3 text-left active:scale-[0.99] transition-transform"
         style={{ background: "none", padding: "13px 14px" }}
@@ -152,6 +148,7 @@ function AccordionRow({
 
         {/* Chevron */}
         <div
+          data-tour={idx === 0 ? "registration-category-expand" : undefined}
           className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-transform duration-300"
           style={{ background: theme.fill, transform: open ? "rotate(180deg)" : "none" }}
         >
@@ -161,8 +158,9 @@ function AccordionRow({
 
       {/* Expanded participants */}
       <div
+        data-tour={idx === 0 ? "registration-participant-list" : undefined}
         className="overflow-hidden transition-all duration-300"
-        style={{ maxHeight: open ? (count === 0 ? 64 : count * 68 + 8) : 0 }}
+        style={{ maxHeight: open ? (count === 0 ? 64 : count * 78 + 8) : 0 }}
       >
         <div style={{ borderTop: `1px solid ${theme.hairline}` }}>
           {count === 0 ? (
@@ -177,32 +175,38 @@ function AccordionRow({
               return (
                 <div
                   key={r.id}
-                  className="flex items-center gap-3 px-4 py-3"
-                  style={{ borderBottom: ri < regs.length - 1 ? `1px solid ${theme.hairline}` : undefined }}
+                  className="flex items-center gap-3 px-4 py-3.5"
+                  style={{
+                    borderBottom: ri < regs.length - 1 ? `1px solid ${theme.hairline}` : undefined,
+                    background: ri % 2 === 1 ? theme.fill + "80" : "transparent",
+                  }}
                 >
-                  <Avatar name={p.name} size={36} />
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-[13.5px] leading-snug" style={{ color: theme.text }}>
+                    <div className="font-extrabold text-[14.5px] leading-snug truncate" style={{ color: theme.text }}>
                       {p.name}
                     </div>
-                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                       {p.house_name && (
-                        <span className="text-[11.5px]" style={{ color: theme.faint }}>{p.house_name}</span>
+                        <span className="text-[12px] font-semibold" style={{ color: theme.sub }}>{p.house_name}</span>
                       )}
-                      {p.house_name && <span style={{ color: theme.faint, fontSize: 10 }}>·</span>}
+                      {p.house_name && p.shakha?.name && <span style={{ color: theme.faint, fontSize: 10 }}>·</span>}
                       {p.shakha?.name && (
-                        <span className="text-[11.5px]" style={{ color: theme.sub }}>{p.shakha.name}</span>
+                        <span className="text-[12px] font-semibold" style={{ color: theme.sub }}>{p.shakha.name}</span>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     {p.registration_number && (
-                      <span className="font-mono text-[10.5px] px-2 py-1 rounded-lg" style={{ background: theme.fill, color: theme.faint }}>
+                      <span
+                        className="font-mono text-[10.5px] font-bold px-2 py-1 rounded-lg"
+                        style={{ background: theme.fillStrong, color: theme.text }}
+                      >
                         {p.registration_number}
                       </span>
                     )}
                     {!isEditLocked() && (
                       <button
+                        data-tour={isFirstWithRegistrations && ri === 0 ? "edit-existing-registration-edit-btn" : undefined}
                         onClick={(e) => { e.stopPropagation(); onEdit(p.id); }}
                         className="w-7 h-7 rounded-full flex items-center justify-center border-none cursor-pointer active:scale-95 transition-transform"
                         style={{ background: theme.fillStrong }}
@@ -233,38 +237,53 @@ export function FeastRegistrations({ slug, theme, onBack, onExit, onEdit }: {
   const { feast, loading: feastLoading } = useFeast(slug);
   const { session } = useAuth();
   const [myShakhaId, setMyShakhaId] = useState<string | null | undefined>(undefined); // undefined = not yet loaded
+  const [myShakhaName, setMyShakhaName] = useState<string | null>(null);
   const [regs, setRegs] = useState<RegRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
+  const retry = () => { setLoadError(null); setMyShakhaId(undefined); setLoading(true); setRetryTick((t) => t + 1); };
 
   // Fetch admin's shakha_id directly — don't rely on AuthProvider's profile which may not load
   useEffect(() => {
     if (!session?.user?.id) { setMyShakhaId(null); return; }
-    supabase
-      .from("profiles")
-      .select("shakha_id, role")
-      .eq("id", session.user.id)
-      .maybeSingle()
+    Promise.resolve(
+      supabase
+        .from("profiles")
+        .select("shakha_id, role, shakha:shakhas(name)")
+        .eq("id", session.user.id)
+        .maybeSingle()
+    )
       .then(({ data }) => {
         setMyShakhaId(data?.shakha_id ?? null);
+        const shakha = data?.shakha as { name: string } | { name: string }[] | null | undefined;
+        setMyShakhaName((Array.isArray(shakha) ? shakha[0] : shakha)?.name ?? null);
+      })
+      .catch(() => {
+        setMyShakhaId(null);
+        setLoadError("Couldn't load your profile. Check your connection and try again.");
       });
-  }, [session]);
+  }, [session, retryTick]);
 
   useEffect(() => {
     if (!feast || myShakhaId === undefined) return; // wait until shakha_id is resolved
     const ids = feast.competitions.map((c) => c.id);
     if (ids.length === 0) { setLoading(false); return; }
 
-    supabase
-      .from("participant_registrations")
-      .select(`
-        id,
-        feast_competition_id,
-        participant:participants(
-          id, name, house_name, shakha_id, registration_number, gender,
-          shakha:shakhas(name)
-        )
-      `)
-      .in("feast_competition_id", ids)
+    Promise.resolve(
+      supabase
+        .from("participant_registrations")
+        .select(`
+          id,
+          feast_competition_id,
+          participant:participants(
+            id, name, house_name, shakha_id, registration_number, gender,
+            shakha:shakhas(name)
+          )
+        `)
+        .in("feast_competition_id", ids)
+    )
       .then(({ data }) => {
         // Normalise: Supabase may return nested joins as arrays — flatten to single objects
         const all = ((data ?? []) as unknown[]).map((row) => {
@@ -281,12 +300,32 @@ export function FeastRegistrations({ slug, theme, onBack, onExit, onEdit }: {
           : all;
         setRegs(filtered);
         setLoading(false);
+      })
+      .catch(() => {
+        setLoading(false);
+        setLoadError("Couldn't load registrations. Check your connection and try again.");
       });
-  }, [feast, myShakhaId]);
+  }, [feast, myShakhaId, retryTick]);
+
+  const errorState = (
+    <div className="px-5">
+      <FeastTopBar title="My Registrations" onBack={onBack} onExit={onExit} theme={theme} />
+      <div className="flex flex-col items-center justify-center pt-16 pb-8 gap-4 px-6">
+        <p className="text-[13px] text-center leading-relaxed" style={{ color: theme.sub }}>{loadError}</p>
+        <button
+          onClick={retry}
+          className="px-6 py-2.5 rounded-full text-[13px] font-semibold border-none cursor-pointer"
+          style={{ background: theme.fillStrong, color: theme.purple }}
+        >
+          Retry
+        </button>
+      </div>
+    </div>
+  );
 
   // Still resolving auth
   if (myShakhaId === undefined) {
-    return (
+    return loadError ? errorState : (
       <div className="flex items-center justify-center pt-24">
         <Loader2 size={28} className="animate-spin" style={{ color: theme.lavender }} />
       </div>
@@ -328,7 +367,7 @@ export function FeastRegistrations({ slug, theme, onBack, onExit, onEdit }: {
   }
 
   if (feastLoading || loading) {
-    return (
+    return loadError ? errorState : (
       <div className="flex items-center justify-center pt-24">
         <Loader2 size={28} className="animate-spin" style={{ color: theme.lavender }} />
       </div>
@@ -344,7 +383,107 @@ export function FeastRegistrations({ slug, theme, onBack, onExit, onEdit }: {
   }
 
   const totalRegs = regs.length;
-  const shakhaLabel = "Your Shakha";
+  const shakhaLabel = myShakhaName ?? "Your Shakha";
+  const firstNonEmptyIdx = feast.competitions.findIndex((c) => (regsByComp[c.id]?.length ?? 0) > 0);
+
+  const downloadRegistrationsPDF = () => {
+    if (totalRegs === 0) return;
+
+    const compById: Record<string, { name: string; catSlug: string | null }> = {};
+    for (const c of feast.competitions) {
+      compById[c.id] = { name: c.name, catSlug: c.competitionCategorySlug ?? null };
+    }
+
+    const buckets: Record<string, RegRow[]> = {};
+    for (const r of regs) {
+      if (!r.participant) continue;
+      const catSlug = compById[r.feast_competition_id]?.catSlug ?? "other";
+      if (!buckets[catSlug]) buckets[catSlug] = [];
+      buckets[catSlug].push(r);
+    }
+
+    let sl = 0;
+    const sectionsHtml = [...CATEGORY_ORDER, "other"]
+      .filter((slug) => buckets[slug]?.length)
+      .map((slug) => {
+        const label = slug === "other" ? "Other" : (CATEGORY_LABELS[slug] ?? slug);
+        const rows = buckets[slug]
+          .map((r) => {
+            const p = r.participant!;
+            sl += 1;
+            const compName = compById[r.feast_competition_id]?.name ?? "";
+            return `<tr>
+              <td class="sl">${sl}</td>
+              <td class="reg">${esc(p.registration_number ?? "—")}</td>
+              <td class="name">${esc(p.name)}</td>
+              <td class="house">${esc(p.house_name ?? "—")}</td>
+              <td class="bg">${esc(genderLetter(p.gender))}</td>
+              <td class="comp">${esc(compName)}</td>
+            </tr>`;
+          })
+          .join("");
+        return `<tr class="cat-head"><td colspan="6">${esc(label)}</td></tr>${rows}`;
+      })
+      .join("");
+
+    const html = `<!doctype html><html><head><meta charset="utf-8">
+<title>Registrations — ${esc(shakhaLabel)}</title>
+<style>
+  @page { size: A4 portrait; margin: 16mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; border-left: 3px solid #6B46FF; border-right: 3px solid #6B46FF; padding: 0 12px; }
+  .hdr { text-align: center; margin-bottom: 16px; }
+  .hdr .org { font-size: 15px; letter-spacing: .08em; text-transform: uppercase; color: #6B46FF; margin: 0 0 8px; font-weight: 800; padding-bottom: 8px; border-bottom: 2px solid #6B46FF; }
+  .hdr .feast { font-size: 24px; font-weight: 900; color: #4C1D95; margin: 10px 0 4px; letter-spacing: .01em; }
+  .hdr .shakha { font-size: 14px; font-weight: 700; color: #333; margin: 0; display: inline-block; background: #f0edff; padding: 4px 12px; border-radius: 12px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  th, td { border: 1px solid #333; padding: 5px 6px; text-align: left; font-size: 12.5px; }
+  thead th { background: #f0f0f0; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+  col.c-sl   { width: 7%; }
+  col.c-reg  { width: 15%; }
+  col.c-name { width: 26%; }
+  col.c-house{ width: 18%; }
+  col.c-bg   { width: 8%; }
+  col.c-comp { width: 26%; }
+  td.sl, td.bg { text-align: center; font-weight: 700; }
+  td.reg { font-family: "Courier New", monospace; font-weight: 700; }
+  tr.cat-head td { background: #e5e0ff; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; font-size: 12px; }
+  @media print { .noprint { display: none; } }
+  .noprint { text-align: center; margin: 18px 0; }
+  .noprint button { font-size: 14px; padding: 8px 18px; cursor: pointer; }
+</style></head><body>
+  <div class="hdr">
+    <p class="org">Cherupushpa Mission League Kalpetta</p>
+    <p class="feast">${esc(feast.name)}</p>
+    <p class="shakha">Registration of shakha ${esc(shakhaLabel)}</p>
+  </div>
+  <table>
+    <colgroup>
+      <col class="c-sl"><col class="c-reg"><col class="c-name">
+      <col class="c-house"><col class="c-bg"><col class="c-comp">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>SL</th><th>Reg No</th><th>Participant Name</th>
+        <th>House Name</th><th>B/G</th><th>Competition</th>
+      </tr>
+    </thead>
+    <tbody>${sectionsHtml}</tbody>
+  </table>
+  <div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
+</body></html>`;
+
+    const w = window.open("", "_blank");
+    if (!w) {
+      setPdfError("Allow pop-ups to download the registration sheet.");
+      setTimeout(() => setPdfError(null), 3000);
+      return;
+    }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+  };
 
   return (
     <div className="px-5">
@@ -361,15 +500,31 @@ export function FeastRegistrations({ slug, theme, onBack, onExit, onEdit }: {
         >
           <span className="text-white font-bold text-[20px]" style={{ fontFamily: "var(--font-poppins),sans-serif" }}>{totalRegs}</span>
         </div>
-        <div>
-          <div className="font-bold text-[15px]" style={{ fontFamily: "var(--font-anek),sans-serif", color: theme.text }}>
+        <div data-tour="registrations-summary" className="flex-1 min-w-0">
+          <div className="font-bold text-[15px] truncate" style={{ fontFamily: "var(--font-anek),sans-serif", color: theme.text }}>
             {shakhaLabel}
           </div>
           <div className="text-[12.5px] mt-0.5" style={{ color: theme.sub }}>
             {totalRegs === 0 ? "No registrations yet" : `${totalRegs} registration${totalRegs > 1 ? "s" : ""} across ${feast.name}`}
           </div>
         </div>
+        <button
+          data-tour="download-registrations-btn"
+          onClick={downloadRegistrationsPDF}
+          disabled={totalRegs === 0}
+          className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-full border-none cursor-pointer active:scale-95 transition-transform shrink-0 disabled:opacity-40"
+          style={{ background: `linear-gradient(135deg, ${theme.purple}, ${theme.lavender})`, boxShadow: `0 6px 16px ${theme.purple}44` }}
+          aria-label="Download registrations"
+        >
+          <Download size={15} color="#fff" strokeWidth={2.5} />
+          <span className="text-white text-[12.5px] font-bold">Download</span>
+        </button>
       </div>
+      {pdfError && (
+        <div className="text-[12.5px] font-medium mb-3 px-1" style={{ color: "#EF4444" }}>
+          {pdfError}
+        </div>
+      )}
 
       {feast.competitions.map((c, i) => (
         <AccordionRow
@@ -382,6 +537,7 @@ export function FeastRegistrations({ slug, theme, onBack, onExit, onEdit }: {
           theme={theme}
           accent={feast.accent}
           onEdit={onEdit}
+          isFirstWithRegistrations={i === firstNonEmptyIdx}
         />
       ))}
       <div className="h-2" />
