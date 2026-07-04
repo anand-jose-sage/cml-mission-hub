@@ -292,7 +292,9 @@ export default function ScreenPage() {
 
   const activeFeast = feasts.find((f) => f.slug === activeSlug);
   const ranked = [...rows].sort((a, b) => a.rank - b.rank);
-  const hasLb = ranked.some((r) => r.points > 0);
+  // Show the standings table (all-zero, alphabetical) as soon as shakhas exist —
+  // don't wait for any points to be published.
+  const hasLb = ranked.length > 0;
   const hasComps = (screen2?.competitions?.length ?? 0) > 0;
   const busy = dataLoading || feastsLoading;
 

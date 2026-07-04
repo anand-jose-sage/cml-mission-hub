@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion, useScroll, useTransform, useSpring, type MotionValue } from "framer-motion";
+import { motion, AnimatePresence, useScroll, useTransform, useSpring, type MotionValue } from "framer-motion";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
 import { ParticleField } from "./particle-field";
 import { PhoneMockup } from "./phone-mockup";
+import { Fireworks } from "./fireworks";
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
 
@@ -191,6 +192,10 @@ function ArrivalSection() {
   return (
     <section ref={ref} style={{ position: "relative", height: "300vh" }}>
       <div style={{ position: "sticky", top: 0, height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+        {/* Fireworks — fire once on mount, yellow + red, alongside the logo's
+            continuous float/particle loops */}
+        <Fireworks />
+
         {/* logo — double-click runs the cinematic guided tour (~70s, with
             small pit stops at every section) */}
         <motion.div
@@ -224,6 +229,57 @@ function ArrivalSection() {
             />
           ))}
         </motion.div>
+
+        {/* Org name + "Presents" — persistent banner below the logo (not overlapping it).
+            Each character of the org name gets its own flame-flicker animation. */}
+        <style>{`
+          .flame-char {
+            display: inline-block;
+            white-space: pre;
+            color: #FFF3C4;
+            animation: flameFlicker 0.7s ease-in-out infinite;
+          }
+          @keyframes flameFlicker {
+            0%, 100% { text-shadow: 0 -1px 4px #FFEB3B, 0 -4px 10px #FFA000, 0 -8px 18px #FF5722, 0 -12px 26px #E64A19; }
+            50%      { text-shadow: 0 -2px 6px #FFEB3B, 0 -6px 14px #FFA000, 0 -10px 22px #FF5722, 0 -14px 30px #E64A19; }
+          }
+        `}</style>
+        <div
+          style={{
+            position: "absolute", left: 0, right: 0, bottom: "calc(50% + 130px)",
+            textAlign: "center", pointerEvents: "none", padding: "0 24px", zIndex: 2,
+          }}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1, delay: 0.2, ease: "easeOut" }}
+          >
+            <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "0.15em" }}>
+              {"CHERUPUSHPA MISSION LEAGUE KALPETTA MEGHALA".split(" ").map((word, wi) => (
+                <span key={wi} style={{ display: "inline-block", whiteSpace: "nowrap", marginRight: "0.3em" }}>
+                  {word.split("").map((ch, i) => (
+                    <span key={i} className="flame-char" style={{ animationDelay: `${(i % 6) * 0.09}s` }}>
+                      {ch}
+                    </span>
+                  ))}
+                </span>
+              ))}
+            </div>
+            <motion.div
+              style={{
+                marginTop: 10, fontSize: 34, fontWeight: 800, letterSpacing: "0.05em",
+                backgroundImage: `linear-gradient(90deg, ${COLORS.gold} 0%, #fff7c2 50%, ${COLORS.gold} 100%)`,
+                backgroundSize: "220% 100%",
+                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+              }}
+              animate={{ backgroundPositionX: ["0%", "120%"] }}
+              transition={{ duration: 1.6, delay: 0.3, ease: "easeInOut", repeat: Infinity, repeatType: "mirror" }}
+            >
+              Presents
+            </motion.div>
+          </motion.div>
+        </div>
 
         {/* Text reveal */}
         <div style={{ position: "absolute", bottom: "16vh", left: 0, right: 0, textAlign: "center" }}>
@@ -1276,6 +1332,13 @@ function RegistrationSection() {
   useEffect(() => step.on("change", (v) => setActive(Math.floor(v))), [step]);
 
   const steps = ["Details", "Events", "Review", "Confirm"];
+  const stepImages = [
+    "/launch/registration-details.png",
+    "/launch/registration-events.png",
+    "/launch/registration-review.png",
+    "/launch/registration-confirm.png",
+  ];
+  const activeIdx = Math.min(active, steps.length - 1);
 
   return (
     <section ref={ref} style={{ position: "relative", height: "350vh" }}>
@@ -1309,8 +1372,19 @@ function RegistrationSection() {
           </div>
 
           {/* Phone center */}
-          <div style={{ position: "relative" }}>
-            <PhoneMockup src="/launch/registration.png" label="Register" tint="purple" width={300} />
+          <div style={{ position: "relative", width: 300, height: 300 * 2.05 }}>
+            <AnimatePresence>
+              <motion.div
+                key={activeIdx}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.35, ease: "easeOut" }}
+                style={{ position: "absolute", inset: 0 }}
+              >
+                <PhoneMockup src={stepImages[activeIdx]} label={steps[activeIdx]} tint="purple" width={300} />
+              </motion.div>
+            </AnimatePresence>
             {active >= 3 && (
               <motion.div
                 initial={{ scale: 0, opacity: 0 }}

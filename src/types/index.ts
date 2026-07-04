@@ -149,6 +149,7 @@ export interface Competition {
   category: string | null;          // art | music | writing | dance | drama | speech | quiz
   gender: string | null;            // boys | girls | open
   competition_category_id: string | null;
+  icon: string | null;              // literal emoji, e.g. "📝" — falls back to the category mapping
   description: string | null;
   created_at: string;
   competition_category?: CompetitionCategory;

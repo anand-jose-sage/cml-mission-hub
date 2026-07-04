@@ -186,7 +186,9 @@ export function FeastRegister({ slug, theme, onBack, onExit, onDone }: {
   const [form, setForm] = useState({ name: "", houseName: "", dob: "", gender: "", phone: "" });
   const [picked, setPicked] = useState<string[]>([]);
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
-  const toggle = (id: string) => setPicked((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
+  const toggle = (id: string) => setPicked((p) =>
+    p.includes(id) ? p.filter((x) => x !== id) : p.length >= 2 ? p : [...p, id]
+  );
 
   // Load admin's shakha from their profile
   useEffect(() => {
@@ -297,9 +299,20 @@ export function FeastRegister({ slug, theme, onBack, onExit, onDone }: {
         });
         return (
           <div>
-            <p className="text-[13px] mb-3 leading-relaxed" style={{ color: theme.sub }}>
-              Showing competitions for your category. Select the ones you&apos;d like to enter.
-            </p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[13px] leading-relaxed" style={{ color: theme.sub }}>
+                Showing competitions for your category. Select the ones you&apos;d like to enter.
+              </p>
+              <span className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ml-2"
+                style={{ background: picked.length >= 2 ? "#fef3c7" : theme.purple + "1a", color: picked.length >= 2 ? "#b45309" : theme.purple }}>
+                {picked.length} / 2
+              </span>
+            </div>
+            {picked.length >= 2 && (
+              <div className="mb-3 px-3.5 py-2.5 rounded-[14px] text-[12.5px]" style={{ background: "#fef3c7", color: "#b45309", border: "1px solid #fde68a" }}>
+                Maximum 2 competitions allowed. Deselect one to change.
+              </div>
+            )}
             {eligibleComps.length === 0 ? (
               <div className="text-center py-10 rounded-2xl" style={{ background: theme.fill }}>
                 <p className="text-[14px] font-semibold mb-1" style={{ color: theme.sub }}>No competitions available</p>

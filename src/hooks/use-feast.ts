@@ -48,7 +48,7 @@ const COMP_ICON_MAP: Record<string, string> = {
 };
 
 function compIcon(category: string | null): string {
-  return COMP_ICON_MAP[category ?? ""] ?? "Star";
+  return COMP_ICON_MAP[category ?? ""] ?? "⭐";
 }
 
 function formatDateRange(start: string | null, end: string | null): string {
@@ -268,6 +268,7 @@ export function useFeast(slug: string) {
           name: string; type: string; category: string | null;
           gender: string | null;
           competition_category_id: string | null;
+          icon: string | null;
         } | null;
         const staticComp = staticFeast?.competitions.find(
           (sc) => sc.name.toLowerCase() === (c?.name ?? "").toLowerCase()
@@ -280,7 +281,7 @@ export function useFeast(slug: string) {
           venue: fc.venue ?? "",
           filled: filledMap[fc.id] ?? 0,
           cap: fc.max_slots ?? 0,
-          icon: staticComp?.icon ?? compIcon(c?.category ?? null),
+          icon: c?.icon || staticComp?.icon || compIcon(c?.category ?? null),
           gender: c?.gender ?? null,
           competitionCategorySlug: c?.competition_category_id ? (catSlugMap[c.competition_category_id] ?? null) : null,
           stage: (fc as Record<string, unknown>).stage as string | null ?? null,

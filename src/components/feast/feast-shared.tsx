@@ -20,8 +20,14 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; color?: stri
 
 export function FeastIcon({ name, size = 20, color, className }: { name: string; size?: number; color?: string; className?: string }) {
   const Comp = ICON_MAP[name];
-  if (!Comp) return null;
-  return <Comp size={size} color={color} className={className} />;
+  if (Comp) return <Comp size={size} color={color} className={className} />;
+  if (!name) return null;
+  // Not a known lucide name — treat it as a literal emoji (e.g. set per-competition in Supabase).
+  return (
+    <span className={className} style={{ fontSize: size, lineHeight: 1 }}>
+      {name}
+    </span>
+  );
 }
 
 export interface FeastTheme {

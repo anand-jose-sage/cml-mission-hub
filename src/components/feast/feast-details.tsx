@@ -623,7 +623,7 @@ export function FeastDetails({ slug, theme, onBack, onExit, go, tutorial }: {
         isAuthorized ? (
           <div data-tour="register-btn">
             <GlowBtn variant="gold" full size="lg" icon="Ticket" onClick={() => go("register", slug)} style={{ marginBottom: 10 }}>
-              Register Now — it&apos;s free
+              Register Now
             </GlowBtn>
           </div>
         ) : (
