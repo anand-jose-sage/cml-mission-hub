@@ -102,14 +102,15 @@ export function AboutScreen({ theme }: AboutScreenProps) {
           </h3>
 
           <div className="flex flex-col gap-2">
-            <MemberRow role="Director" name="—" />
-            <MemberRow role="Joint Director" name="Sr Melvia SH" />
+            <MemberRow role="Director" name="Rev Fr Jerin Poykayil" />
+            <MemberRow role="Joint Director" name="Sr Melvia Ambaril SH" />
             <MemberRow role="President" name="Tony K T" />
-            <MemberRow role="Vice President" name="—" />
+            <MemberRow role="Vice President" name="Rincy" />
             <MemberRow role="Secretary" name="Anand Jose" />
-            <MemberRow role="Joint Secretary" name="—" />
+            <MemberRow role="Joint Secretary" name="Smt Betty" />
             <MemberRow role="Organizer" name="Sudeesh Edathumparambi" />
             <MemberRow role="Organizer" name="Smt Rari" />
+            <MemberRow role="Organizer" name="Robin Arackal" />
             <MemberRow role="Roopatha Exe" name="Jhon Pullapillil" />
             <MemberRow role="Roopatha Exe" name="Vineetha Maria" />
           </div>

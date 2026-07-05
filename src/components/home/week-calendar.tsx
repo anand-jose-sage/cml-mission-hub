@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import { COLORS, type CMLTheme } from "@/lib/theme";
 
 const DOW_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -13,9 +13,16 @@ interface WeekCalendarProps {
 }
 
 export function WeekCalendar({ theme, sel, setSel, dates }: WeekCalendarProps) {
-  const today = useMemo(() => {
+  // Computed client-side only, post-hydration: `new Date()` depends on the
+  // runtime's clock/timezone, so evaluating it during render would let the
+  // server (e.g. UTC on Vercel) and the client (the visitor's local
+  // timezone) disagree on which cell is "today" — a hydration mismatch.
+  // Starting at `null` renders identically on both passes; the effect fills
+  // in the real value right after mount.
+  const [today, setToday] = useState<number | null>(null);
+  useEffect(() => {
     const n = new Date();
-    return new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime();
+    setToday(new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime());
   }, []);
 
   return (

@@ -10,6 +10,7 @@ import Lenis from "lenis";
 import { ParticleField } from "./particle-field";
 import { PhoneMockup } from "./phone-mockup";
 import { Fireworks } from "./fireworks";
+import { BackgroundMusic } from "./background-music";
 
 if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
 
@@ -58,7 +59,7 @@ function startCinematicTour() {
 // ─── Smooth scroll provider ──────────────────────────────────────────────────
 // Lenis drives a virtual scroll; GSAP's ticker is bound to it so ScrollTrigger
 // fires in sync. Without that wiring, pinned/scrub sections jitter.
-function useLenisScroll() {
+function useLenisScroll(onFirstScroll?: () => void) {
   useEffect(() => {
     const lenis = new Lenis({
       duration: 1.4,
@@ -66,7 +67,14 @@ function useLenisScroll() {
       smoothWheel: true,
     });
     lenisInstance = lenis;
-    const onScroll = () => ScrollTrigger.update();
+    let firstScrollFired = false;
+    const onScroll = () => {
+      ScrollTrigger.update();
+      if (!firstScrollFired) {
+        firstScrollFired = true;
+        onFirstScroll?.();
+      }
+    };
     lenis.on("scroll", onScroll);
     const raf = (time: number) => lenis.raf(time * 1000);
     gsap.ticker.add(raf);
@@ -77,6 +85,7 @@ function useLenisScroll() {
       lenis.destroy();
       if (lenisInstance === lenis) lenisInstance = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }
 
@@ -1073,6 +1082,16 @@ function EcosystemSection() {
           </motion.div>
         </div>
 
+        {/* Dark scrim so the gradient heading stays readable over the light
+            Home screenshot behind it — paints after the mockups (same z-index
+            as the Home mockup, later in DOM order wins) but below the text. */}
+        <div
+          style={{
+            position: "absolute", inset: 0, zIndex: 2, pointerEvents: "none",
+            background: "radial-gradient(circle at center, rgba(5,3,15,0.75) 0%, rgba(5,3,15,0.45) 40%, transparent 70%)",
+          }}
+        />
+
         <div style={{ position: "relative", zIndex: 3, textAlign: "center", maxWidth: 760 }}>
           <Eyebrow>Digital Ecosystem</Eyebrow>
           <Headline size={64} gradient>Everything Your Unit Needs</Headline>
@@ -1514,7 +1533,21 @@ function FinalSection() {
 
 // ─── Root experience ─────────────────────────────────────────────────────────
 export function LaunchExperience() {
-  useLenisScroll();
+  // Background music can't autoplay without a user gesture — unlock it on
+  // the visitor's first scroll (wheel/touch/Lenis alike), then it loops on
+  // its own regardless of further scroll activity (see BackgroundMusic).
+  const [musicUnlocked, setMusicUnlocked] = useState(false);
+  useLenisScroll(() => setMusicUnlocked(true));
+  useEffect(() => {
+    if (musicUnlocked) return;
+    const unlock = () => setMusicUnlocked(true);
+    window.addEventListener("wheel", unlock, { once: true, passive: true });
+    window.addEventListener("touchstart", unlock, { once: true, passive: true });
+    return () => {
+      window.removeEventListener("wheel", unlock);
+      window.removeEventListener("touchstart", unlock);
+    };
+  }, [musicUnlocked]);
 
   // Section 4 (Activities) — special-cased so timeline grows as user scrolls
   const actRef = useRef<HTMLDivElement | null>(null);
@@ -1526,6 +1559,7 @@ export function LaunchExperience() {
     <div style={{ position: "relative", background: COLORS.ink, color: "#fff", minHeight: "100vh" }}>
       <ParticleField />
       <TopNav />
+      <BackgroundMusic playing={musicUnlocked} />
 
       <ArrivalSection />
       <SaintsRevealSection />

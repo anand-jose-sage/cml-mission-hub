@@ -66,8 +66,14 @@ export function PhoneMockup({
             sizes={`${width}px`}
             style={{ objectFit: "cover" }}
             // App screenshots are placeholders until the user drops PNGs in
-            // public/launch/. Failing silently keeps the gradient face.
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+            // public/launch/. Falls back to the gradient face on failure, but
+            // logs it — a failure once the file exists (e.g. a stale deploy
+            // or optimizer error) should be visible, not silently identical
+            // to "the file was never added."
+            onError={(e) => {
+              console.error("[PhoneMockup] Failed to load image:", src);
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
           />
         ) : null}
         {/* Placeholder label visible when src is missing */}
