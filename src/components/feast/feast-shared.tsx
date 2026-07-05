@@ -1,6 +1,7 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { motion, useMotionValue, useTransform, animate } from "framer-motion";
 import {
   Trophy, Sparkles, ArrowLeft, ArrowRight, LogOut, ChevronRight,
   ChevronDown, Clock, MapPin, Check, Ticket, Medal, Search, X,
@@ -290,6 +291,19 @@ export function FeastTabs({
   );
 }
 
+const FEAST_NAV_BUBBLE_SIZE = 54;
+// Notch radius is a few px larger than the bubble so a thin halo ring of
+// page background shows around the bubble where it meets the bar.
+const FEAST_NAV_NOTCH_RADIUS = FEAST_NAV_BUBBLE_SIZE / 2 + 3;
+// Dark navy blue — a deep, saturated color outside the bar's purple/pink
+// tint family so inactive icons/labels stay sharp without reading as flat black.
+const FEAST_NAV_INACTIVE_COLOR = "#0B2545";
+// A darker shade of the brand purple for the active label/icon, instead of
+// the brighter accent purple used for the bubble.
+const FEAST_NAV_ACTIVE_COLOR = "#4C1D95";
+// Dark burgundy for the "Hub" exit item, to set it apart from the other nav items.
+const FEAST_NAV_EXIT_COLOR = "#6E1423";
+
 export function FeastNav({ active, onNav, theme }: { active: string; onNav: (id: string) => void; theme: FeastTheme }) {
   const items = [
     { id: "landing", icon: "Sparkles", label: "Feasts" },
@@ -298,41 +312,78 @@ export function FeastNav({ active, onNav, theme }: { active: string; onNav: (id:
     { id: "participants", icon: "Search", label: "Search" },
     { id: "exit", icon: "LogOut", label: "Hub" },
   ];
+  const itemCount = items.length;
+  const activeIndex = Math.max(0, items.findIndex((item) => item.id === active));
+
+  const index = useMotionValue(activeIndex);
+  useEffect(() => {
+    const controls = animate(index, activeIndex, {
+      type: "spring",
+      stiffness: 380,
+      damping: 32,
+    });
+    return controls.stop;
+  }, [activeIndex, index]);
+
+  const bubbleLeft = useTransform(index, (v) => `${((v + 0.5) / itemCount) * 100}%`);
+  const maskImage = useTransform(index, (v) => {
+    const cx = ((v + 0.5) / itemCount) * 100;
+    return `radial-gradient(circle ${FEAST_NAV_NOTCH_RADIUS}px at ${cx}% 0px, transparent 0px, transparent ${FEAST_NAV_NOTCH_RADIUS - 1}px, black ${FEAST_NAV_NOTCH_RADIUS + 1}px, black 100%)`;
+  });
+
+  const activeItem = items[activeIndex];
+
   return (
     <div className="absolute left-0 right-0 bottom-0 z-40 px-3.5 pb-[22px] pointer-events-none">
-      <div
-        className="pointer-events-auto flex justify-around items-center rounded-[26px] py-2.5 px-1.5"
-        style={{
-          background: theme.navBg,
-          border: "1px solid rgba(255,255,255,0.6)",
-          boxShadow: "0 12px 34px rgba(30,27,75,0.18)",
-          backdropFilter: "blur(22px) saturate(180%)",
-          WebkitBackdropFilter: "blur(22px) saturate(180%)",
-        }}
-      >
-        {items.map((n) => {
-          const on = active === n.id;
-          const isExit = n.id === "exit";
-          return (
-            <button
-              key={n.id}
-              onClick={() => onNav(n.id)}
-              className="border-none bg-none cursor-pointer flex-1 flex flex-col items-center gap-1 py-1"
-              style={{ background: "none", color: on ? theme.purple : isExit ? theme.gold : theme.faint }}
-            >
-              <div
-                className="flex items-center justify-center rounded-xl transition-all"
-                style={{
-                  width: on ? 42 : 36, height: 32,
-                  background: on ? "linear-gradient(160deg, rgba(107,70,255,0.16), rgba(167,139,250,0.16))" : "transparent",
-                }}
+      <div className="relative pointer-events-auto" style={{ paddingTop: FEAST_NAV_BUBBLE_SIZE / 2 }}>
+        <motion.div
+          className="flex justify-around items-center rounded-[26px] py-2.5 px-1.5"
+          style={{
+            background: `linear-gradient(135deg, rgba(167,139,250,0.72), rgba(190,24,147,0.4) 45%, rgba(107,70,255,0.8)), ${theme.navBg}`,
+            border: "1px solid rgba(255,255,255,0.45)",
+            boxShadow: "0 12px 34px rgba(107,70,255,0.28), inset 0 1px 1px rgba(255,255,255,0.5)",
+            backdropFilter: "blur(8px) saturate(140%)",
+            WebkitBackdropFilter: "blur(8px) saturate(140%)",
+            WebkitMaskImage: maskImage,
+            maskImage: maskImage,
+          }}
+        >
+          {items.map((n) => {
+            const on = active === n.id;
+            const isExit = n.id === "exit";
+            return (
+              <button
+                key={n.id}
+                onClick={() => onNav(n.id)}
+                className="border-none bg-none cursor-pointer flex-1 flex flex-col items-center gap-1 py-1"
+                style={{ background: "none", color: on ? FEAST_NAV_ACTIVE_COLOR : isExit ? FEAST_NAV_EXIT_COLOR : FEAST_NAV_INACTIVE_COLOR }}
               >
-                <FeastIcon name={n.icon} size={20} color={on ? theme.purple : isExit ? theme.gold : theme.faint} />
-              </div>
-              <span className="text-[9.5px]" style={{ fontWeight: on ? 700 : 500, fontFamily: "var(--font-poppins), sans-serif" }}>{n.label}</span>
-            </button>
-          );
-        })}
+                <div
+                  className="flex items-center justify-center transition-opacity duration-200"
+                  style={{ height: 32, opacity: on ? 0 : 1 }}
+                >
+                  <FeastIcon name={n.icon} size={20} color={isExit ? FEAST_NAV_EXIT_COLOR : FEAST_NAV_INACTIVE_COLOR} />
+                </div>
+                <span className="text-[12px]" style={{ fontWeight: on ? 800 : 700, fontFamily: "var(--font-poppins), sans-serif" }}>{n.label}</span>
+              </button>
+            );
+          })}
+        </motion.div>
+
+        <motion.div
+          className="absolute top-0 flex items-center justify-center pointer-events-none"
+          style={{
+            left: bubbleLeft,
+            x: "-50%",
+            width: FEAST_NAV_BUBBLE_SIZE,
+            height: FEAST_NAV_BUBBLE_SIZE,
+            borderRadius: "50%",
+            background: `linear-gradient(145deg, ${theme.lavender}, ${theme.purple})`,
+            boxShadow: "0 8px 20px rgba(140,100,230,0.45), inset 0 1.5px 2px rgba(255,255,255,0.55)",
+          }}
+        >
+          {activeItem && <FeastIcon name={activeItem.icon} size={23} color="#fff" />}
+        </motion.div>
       </div>
     </div>
   );
