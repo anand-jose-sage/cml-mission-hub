@@ -103,6 +103,7 @@ export const SHAKHA_COLOR_MAP: Record<string, string> = {
   Puzhamudi:    "#4338CA", // indigo
   Rippon:       "#C2410C", // orange
   Theneri:      "#A21CAF", // fuchsia
+  Thrikkaipetta:"#92400E", // brown
   Vazhavatta:   "#475569", // slate
   Vythiri:      "#0369A1", // sky
 };

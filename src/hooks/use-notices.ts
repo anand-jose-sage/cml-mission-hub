@@ -75,7 +75,7 @@ function noticeToItem(n: Notice): NoticeItem {
   };
 }
 
-export function useNotices() {
+export function useNotices(limit: number = 100) {
   const [items, setItems] = useState<NoticeItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -94,7 +94,7 @@ export function useNotices() {
         .from("notices")
         .select("id, title, category, summary, body, priority, published_at")
         .order("published_at", { ascending: false })
-        .limit(100);
+        .limit(limit);
 
       if (cancelled) return;
 
@@ -117,7 +117,7 @@ export function useNotices() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [limit]);
 
   return { items, loading };
 }

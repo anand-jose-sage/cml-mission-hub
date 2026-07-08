@@ -102,7 +102,7 @@ export function useMissionItems() {
     async function fetchItems() {
       const { data, error } = await supabase
         .from("content_items")
-        .select("*")
+        .select("content_type, title, published_at, summary, media_url, thumbnail_url")
         .order("published_at", { ascending: false })
         .limit(4);
 
@@ -114,7 +114,7 @@ export function useMissionItems() {
 
       if (data) {
         console.log("[useMissionItems] Fetched", data.length, "items");
-        setItems(data.map(contentToMissionItem));
+        setItems((data as unknown as ContentItem[]).map(contentToMissionItem));
       }
       setLoading(false);
     }

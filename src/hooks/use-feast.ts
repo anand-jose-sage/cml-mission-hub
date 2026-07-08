@@ -143,6 +143,7 @@ export function useFeasts() {
       const { data, error } = await supabase
         .from("feasts")
         .select("*")
+        .neq("status", "draft")
         .order("start_date");
 
       if (error) console.error("[useFeasts]", error.message);
@@ -150,27 +151,18 @@ export function useFeasts() {
 
       const feastIds = data.map((r) => r.id);
 
-      // Load competition counts + participant counts in parallel
-      const [{ data: fcRows }, { data: participantRows }] = await Promise.all([
-        supabase
-          .from("feast_competitions")
-          .select("feast_id")
-          .in("feast_id", feastIds),
-        supabase
-          .from("participants")
-          .select("feast_id")
-          .in("feast_id", feastIds),
-      ]);
+      // Single grouped-aggregate RPC replaces two full-row-fetch-then-
+      // count-in-JS queries (previously: fetch every feast_competitions
+      // row + every participants row across ALL feasts just to count them).
+      const { data: countRows, error: countErr } = await supabase
+        .rpc("get_feast_counts", { p_feast_ids: feastIds });
+      if (countErr) console.error("[useFeasts] counts", countErr.message);
 
-      // Build per-feast counts
       const eventCountMap: Record<string, number> = {};
-      for (const r of fcRows ?? []) {
-        eventCountMap[r.feast_id as string] = (eventCountMap[r.feast_id as string] ?? 0) + 1;
-      }
-
       const regCountMap: Record<string, number> = {};
-      for (const r of participantRows ?? []) {
-        regCountMap[r.feast_id as string] = (regCountMap[r.feast_id as string] ?? 0) + 1;
+      for (const r of countRows ?? []) {
+        eventCountMap[r.feast_id as string] = Number(r.event_count) || 0;
+        regCountMap[r.feast_id as string] = Number(r.registration_count) || 0;
       }
 
       const feastsWithComps = new Set(Object.keys(eventCountMap));
@@ -229,7 +221,11 @@ export function useFeast(slug: string) {
       const [{ data: fcs }, { count: regsCount }, { data: catRows }] = await Promise.all([
         supabase
           .from("feast_competitions")
-          .select("*, competition:competitions(*)")
+          .select(`
+            id, time_slot, venue, max_slots, stage, scheduled_time,
+            comp_status, progress_pct, info,
+            competition:competitions(name, type, category, gender, competition_category_id, icon)
+          `)
           .eq("feast_id", feastRow.id)
           .order("display_order"),
         supabase
@@ -264,7 +260,7 @@ export function useFeast(slug: string) {
 
       const staticFeast = FEASTS[slug];
       const comps: StaticComp[] = (fcs ?? []).map((fc) => {
-        const c = fc.competition as {
+        const c = fc.competition as unknown as {
           name: string; type: string; category: string | null;
           gender: string | null;
           competition_category_id: string | null;

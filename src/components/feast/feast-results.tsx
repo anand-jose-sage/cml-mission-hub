@@ -356,24 +356,21 @@ export function FeastResults({ slug, theme, onBack, onExit, onSearchNav, setFeas
         <ChevronDown size={14} color="#C4B5FD" style={{ transform: "rotate(-90deg)" }} />
       </button>
 
-      {/* Competition results for selected feast.
-          Only render FeastContent once activeSlug is a confirmed feast — otherwise
-          the unvalidated initial slug resolves "not found" and flashes an empty state. */}
-      {feastsLoading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 size={22} className="animate-spin" style={{ color: theme.lavender }} />
-        </div>
-      ) : feasts.length === 0 ? (
+      {/* Competition results for selected feast. FeastContent mounts immediately
+          with the already-known activeSlug (in parallel with the feast list load)
+          rather than waiting on feastsLoading — only fall back to a loading/empty
+          state once feasts have resolved and activeSlug turns out invalid. */}
+      {!feastsLoading && feasts.length === 0 ? (
         <div className="flex flex-col items-center py-16 gap-3">
           <BookOpen size={28} color={theme.faint} />
           <p className="text-[14px]" style={{ color: theme.sub }}>No feasts found.</p>
         </div>
-      ) : feasts.some(f => f.slug === activeSlug) ? (
-        <FeastContent key={activeSlug} slug={activeSlug} theme={theme} />
-      ) : (
+      ) : !feastsLoading && feasts.length > 0 && !feasts.some(f => f.slug === activeSlug) ? (
         <div className="flex justify-center py-16">
           <Loader2 size={22} className="animate-spin" style={{ color: theme.lavender }} />
         </div>
+      ) : (
+        <FeastContent key={activeSlug} slug={activeSlug} theme={theme} />
       )}
 
       <div className="h-6" />

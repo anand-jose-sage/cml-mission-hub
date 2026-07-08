@@ -74,9 +74,10 @@ export function useFeaturedEvent() {
       // featured activity is active, HeroEvent renders nothing.
       const { data, error } = await supabase
         .from("activities")
-        .select("*")
+        .select("title, start_date, end_date, location")
         .eq("featured", true)
-        .order("start_date", { ascending: true });
+        .order("start_date", { ascending: true })
+        .limit(5);
 
       if (cancelled) return;
 
@@ -84,7 +85,7 @@ export function useFeaturedEvent() {
         console.error("[useFeaturedEvent] Supabase error:", error.message);
       }
 
-      const featured = (data ?? []).find((a) => notEnded(a, now));
+      const featured = (data as unknown as Activity[] ?? []).find((a) => notEnded(a, now));
       setEvent(featured ? activityToFeatured(featured) : null);
       setLoading(false);
     }

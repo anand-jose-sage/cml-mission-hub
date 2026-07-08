@@ -124,7 +124,7 @@ interface HomeNoticesProps {
 }
 
 export function HomeNotices({ theme, onViewAll }: HomeNoticesProps) {
-  const { items, loading } = useNotices();
+  const { items, loading } = useNotices(5);
 
   if (loading) {
     return (
@@ -136,7 +136,7 @@ export function HomeNotices({ theme, onViewAll }: HomeNoticesProps) {
 
   if (items.length === 0) return null;
 
-  const recent = items.slice(0, 5);
+  const recent = items;
 
   return (
     <div>
