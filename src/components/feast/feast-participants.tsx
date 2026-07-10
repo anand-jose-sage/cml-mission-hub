@@ -90,32 +90,27 @@ function ParticipantCard({ row }: { row: ParticipantSearchRow }) {
 
       <button onClick={() => setOpen((o) => !o)} className="w-full text-left border-none bg-transparent pl-4 pr-3 pt-3 pb-2.5 cursor-pointer">
         <div className="flex items-start gap-3">
-          {/* Avatar */}
-          <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-black text-[15px]"
-            style={{ background: `${sc}20`, color: sc, border: `1.5px solid ${sc}44` }}>
-            {row.name.charAt(0).toUpperCase()}
-          </div>
-
           <div className="flex-1 min-w-0">
             {/* Line 1 — name | house name */}
             <div className="flex items-baseline gap-2 min-w-0 flex-wrap">
               <p className="text-[16px] leading-tight" style={{ color: "#1E1B4B", ...anek }}>{row.name}</p>
               {row.houseName && (
-                <span className="inline-flex items-baseline gap-2 text-[13.5px] font-semibold leading-tight" style={{ color: "#7C3AED" }}>
+                <span className="inline-flex items-baseline gap-2 text-[13.5px] leading-tight" style={{ color: "#7C3AED", ...anek }}>
                   <span style={{ color: "#DDD6FE" }}>|</span>
                   {row.houseName}
                 </span>
               )}
             </div>
             {/* Line 2 — shakha (strong text) + category */}
-            <div className="flex items-center gap-2.5 mt-1 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 text-[13px] font-bold" style={{ color: sc }}>
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 text-[14px] px-2 py-0.5 rounded-lg"
+                style={{ background: `${sc}1a`, color: sc, ...anek }}>
                 <span className="text-[13px] leading-none" aria-hidden="true">⛪</span>
                 {row.shakha}
               </span>
               {row.category && (
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg"
-                  style={{ background: "rgba(124,58,237,0.1)", color: "#7C3AED" }}>
+                <span className="text-[12px] px-2 py-0.5 rounded-lg"
+                  style={{ background: "rgba(124,58,237,0.12)", color: "#6D28D9", ...anek }}>
                   {CAT_LABEL[row.category] ?? row.category}
                 </span>
               )}
@@ -124,19 +119,40 @@ function ParticipantCard({ row }: { row: ParticipantSearchRow }) {
 
           <div className="shrink-0 flex flex-col items-end gap-1">
             {row.regNo && (
-              <span className="text-[10px] font-bold font-mono px-1.5 py-0.5 rounded-md"
-                style={{ background: "rgba(107,70,255,0.08)", color: "#8B5CF6" }}>
+              <span
+                className="relative inline-flex items-center text-[15px] px-3.5 py-1.5 tracking-wide"
+                style={{
+                  background: "#FCD34D",
+                  color: "#451A03",
+                  fontFamily: "var(--font-anek), sans-serif",
+                  fontWeight: 800,
+                  WebkitTextStroke: "0.3px #451A03",
+                  borderRadius: "5px",
+                  border: "1px dashed rgba(120,53,15,0.4)",
+                  boxShadow: "0 1px 3px rgba(120,53,15,0.25)",
+                }}
+              >
+                <span
+                  className="absolute -left-[5px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full"
+                  style={{ background: "rgba(255,255,255,0.9)", boxShadow: "0 0 0 1px rgba(120,53,15,0.2)" }}
+                  aria-hidden="true"
+                />
                 {row.regNo}
+                <span
+                  className="absolute -right-[5px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full"
+                  style={{ background: "rgba(255,255,255,0.9)", boxShadow: "0 0 0 1px rgba(120,53,15,0.2)" }}
+                  aria-hidden="true"
+                />
               </span>
             )}
             {totalPts > 0 && (
-              <span className="text-[11px] font-black" style={{ color: "#7C3AED" }}>{totalPts} pts</span>
+              <span className="text-[11px]" style={{ color: "#7C3AED", ...anek }}>{totalPts} pts</span>
             )}
           </div>
         </div>
 
         {/* Summary row */}
-        <div className="flex items-center gap-3 mt-2 pl-[52px]">
+        <div className="flex items-center gap-3 mt-2">
           <span className="text-[11px] font-semibold" style={{ color: "#9CA3AF" }}>
             {row.results.length} competition{row.results.length !== 1 ? "s" : ""}
           </span>
@@ -151,9 +167,9 @@ function ParticipantCard({ row }: { row: ParticipantSearchRow }) {
               <span key={`p${i}`} className="text-[11px]">{POS_STYLE[r.position!]?.emoji}</span>
             ))}
           </div>
-          <div className="ml-auto w-6 h-6 rounded-full flex items-center justify-center shrink-0"
-            style={{ background: "rgba(107,70,255,0.1)", transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.3s" }}>
-            <ChevronDown size={13} color="#8B5CF6" />
+          <div className="ml-auto w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+            style={{ background: sc, boxShadow: `0 2px 6px ${sc}55`, transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.3s" }}>
+            <ChevronDown size={15} color="#fff" strokeWidth={3} />
           </div>
         </div>
       </button>

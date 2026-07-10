@@ -140,8 +140,8 @@ function AccordionRow({
 
         {/* Count pill */}
         <div
-          className="rounded-full px-2.5 py-1 text-[12px] font-bold shrink-0 mr-1"
-          style={{ background: count > 0 ? a + "18" : theme.fill, color: count > 0 ? a : theme.faint }}
+          className="rounded-full px-2.5 py-1 text-[13px] font-black shrink-0 mr-1"
+          style={{ background: count > 0 ? a + "22" : theme.fill, color: count > 0 ? a : theme.faint }}
         >
           {count}
         </div>
@@ -149,10 +149,10 @@ function AccordionRow({
         {/* Chevron */}
         <div
           data-tour={idx === 0 ? "registration-category-expand" : undefined}
-          className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-transform duration-300"
-          style={{ background: theme.fill, transform: open ? "rotate(180deg)" : "none" }}
+          className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-transform duration-300"
+          style={{ background: a, boxShadow: `0 2px 8px ${a}66`, transform: open ? "rotate(180deg)" : "none" }}
         >
-          <ChevronDown size={14} color={theme.sub} />
+          <ChevronDown size={16} color="#fff" strokeWidth={3} />
         </div>
       </button>
 
@@ -182,26 +182,45 @@ function AccordionRow({
                   }}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="font-extrabold text-[14.5px] leading-snug truncate" style={{ color: theme.text }}>
+                    <div className="text-[14.5px] leading-snug truncate" style={{ fontFamily: "var(--font-anek),sans-serif", fontWeight: 800, color: theme.text }}>
                       {p.name}
                     </div>
                     <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                       {p.house_name && (
-                        <span className="text-[12px] font-semibold" style={{ color: theme.sub }}>{p.house_name}</span>
+                        <span className="text-[12.5px]" style={{ fontFamily: "var(--font-anek),sans-serif", fontWeight: 700, color: theme.sub }}>{p.house_name}</span>
                       )}
                       {p.house_name && p.shakha?.name && <span style={{ color: theme.faint, fontSize: 10 }}>·</span>}
                       {p.shakha?.name && (
-                        <span className="text-[12px] font-semibold" style={{ color: theme.sub }}>{p.shakha.name}</span>
+                        <span className="text-[12.5px]" style={{ fontFamily: "var(--font-anek),sans-serif", fontWeight: 700, color: theme.sub }}>{p.shakha.name}</span>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     {p.registration_number && (
                       <span
-                        className="font-mono text-[10.5px] font-bold px-2 py-1 rounded-lg"
-                        style={{ background: theme.fillStrong, color: theme.text }}
+                        className="relative inline-flex items-center text-[13px] px-2.5 py-1 tracking-wide"
+                        style={{
+                          background: "#FCD34D",
+                          color: "#451A03",
+                          fontFamily: "var(--font-anek), sans-serif",
+                          fontWeight: 800,
+                          WebkitTextStroke: "0.3px #451A03",
+                          borderRadius: "5px",
+                          border: "1px dashed rgba(120,53,15,0.4)",
+                          boxShadow: "0 1px 3px rgba(120,53,15,0.25)",
+                        }}
                       >
+                        <span
+                          className="absolute -left-[5px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full"
+                          style={{ background: "rgba(255,255,255,0.9)", boxShadow: "0 0 0 1px rgba(120,53,15,0.2)" }}
+                          aria-hidden="true"
+                        />
                         {p.registration_number}
+                        <span
+                          className="absolute -right-[5px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full"
+                          style={{ background: "rgba(255,255,255,0.9)", boxShadow: "0 0 0 1px rgba(120,53,15,0.2)" }}
+                          aria-hidden="true"
+                        />
                       </span>
                     )}
                     {!isEditLocked() && (
