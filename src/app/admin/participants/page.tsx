@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  Search, Users, Loader2, X, Download, Plus, Pencil, Trash2, Save,
+  Search, Users, Loader2, X, Download, FileDown, Plus, Pencil, Trash2, Save,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getCategorySlug, CATEGORY_LABELS } from "@/lib/competition-categories";
@@ -35,24 +35,10 @@ interface ParticipantRow {
   shakha: { id: string; name: string } | null;
   competition_category: { slug: string; name: string } | null;
   comp_count: number;
+  regCompIds: string[];
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-const GENDER_OPTIONS = [
-  { value: "", label: "All Genders" },
-  { value: "boy", label: "Boy" },
-  { value: "girl", label: "Girl" },
-];
-
-const CAT_OPTIONS = [
-  { value: "", label: "All Categories" },
-  { value: "sub_junior", label: "Sub Junior" },
-  { value: "junior", label: "Junior" },
-  { value: "senior", label: "Senior" },
-  { value: "super_senior", label: "Super Senior" },
-  { value: "elder", label: "Elder" },
-];
 
 function normGender(g: string | null): "Boy" | "Girl" | "—" {
   if (!g) return "—";
@@ -350,8 +336,7 @@ export default function ParticipantsAdminPage() {
 
   // Filters
   const [shakhaFilter, setShakhaFilter] = useState("");
-  const [genderFilter, setGenderFilter] = useState("");
-  const [catFilter, setCatFilter] = useState("");
+  const [compFilter, setCompFilter] = useState("");
   const [q, setQ] = useState("");
 
   // Slide-over
@@ -391,18 +376,22 @@ export default function ParticipantsAdminPage() {
         id, registration_number, name, house_name, phone, date_of_birth, gender, created_at,
         shakha:shakhas(id,name),
         competition_category:competition_categories(slug,name),
-        comp_count:participant_registrations(count)
+        registrations:participant_registrations(feast_competition_id)
       `)
       .eq("feast_id", feastId)
       .order("created_at", { ascending: false });
 
     setRows(
-      (data ?? []).map((p) => ({
-        ...p,
-        shakha: (Array.isArray(p.shakha) ? p.shakha[0] : p.shakha) as { id: string; name: string } | null,
-        competition_category: (Array.isArray(p.competition_category) ? p.competition_category[0] : p.competition_category) as { slug: string; name: string } | null,
-        comp_count: (p.comp_count as unknown as { count: number }[])?.[0]?.count ?? 0,
-      }))
+      (data ?? []).map((p) => {
+        const regs = (p.registrations as unknown as { feast_competition_id: string }[]) ?? [];
+        return {
+          ...p,
+          shakha: (Array.isArray(p.shakha) ? p.shakha[0] : p.shakha) as { id: string; name: string } | null,
+          competition_category: (Array.isArray(p.competition_category) ? p.competition_category[0] : p.competition_category) as { slug: string; name: string } | null,
+          comp_count: regs.length,
+          regCompIds: regs.map((r) => r.feast_competition_id),
+        };
+      })
     );
     setLoading(false);
   }, [feastId]);
@@ -411,12 +400,7 @@ export default function ParticipantsAdminPage() {
 
   const filtered = useMemo(() => rows.filter((r) => {
     if (shakhaFilter && r.shakha?.id !== shakhaFilter) return false;
-    if (genderFilter) {
-      const g = r.gender?.toLowerCase() ?? "";
-      if (genderFilter === "boy" && !["boy", "boys", "male"].includes(g)) return false;
-      if (genderFilter === "girl" && !["girl", "girls", "female"].includes(g)) return false;
-    }
-    if (catFilter && r.competition_category?.slug !== catFilter) return false;
+    if (compFilter && !r.regCompIds.includes(compFilter)) return false;
     if (q.trim()) {
       const ql = q.trim().toLowerCase();
       if (
@@ -426,7 +410,7 @@ export default function ParticipantsAdminPage() {
       ) return false;
     }
     return true;
-  }), [rows, shakhaFilter, genderFilter, catFilter, q]);
+  }), [rows, shakhaFilter, compFilter, q]);
 
   const openEdit = useCallback(async (row: ParticipantRow) => {
     setEditRow(row);
@@ -463,6 +447,71 @@ export default function ParticipantsAdminPage() {
     a.click();
   };
 
+  const exportPdf = () => {
+    const esc = (s: string) =>
+      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    const feast = feasts.find((f) => f.id === feastId);
+    const feastLine = feast ? `${feast.name} ${feast.year}` : "";
+    const comp = feastComps.find((fc) => fc.id === compFilter);
+    const subtitle = comp?.competition?.name ? `${feastLine} · ${comp.competition.name}` : feastLine;
+
+    const bodyRows = filtered.map((r, i) => `<tr>
+      <td class="sl">${i + 1}</td>
+      <td class="reg">${esc(r.registration_number ?? "—")}</td>
+      <td class="name">${esc(r.name)}</td>
+      <td class="house">${esc(r.house_name ?? "—")}</td>
+      <td class="shakha">${esc(r.shakha?.name ?? "—")}</td>
+    </tr>`).join("");
+
+    const html = `<!doctype html><html><head><meta charset="utf-8">
+<title>Participants — ${esc(subtitle)}</title>
+<style>
+  @page { size: A4 portrait; margin: 14mm 10mm; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; }
+  .page {
+    min-height: 100vh;
+    border-left: 3px double #7C3AED;
+    border-right: 3px double #7C3AED;
+    padding: 0 14px;
+  }
+  .hdr { text-align: center; margin-bottom: 16px; }
+  .hdr .org { font-size: 20.8px; font-weight: 800; margin: 0 0 3px; }
+  .hdr .sub { font-size: 15px; font-weight: 600; color: #444; margin: 0; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #333; padding: 6px 8px; font-size: 14.4px; text-align: left; }
+  thead th { background: #f0f0f0; font-size: 12.7px; text-transform: uppercase; letter-spacing: .03em; }
+  td.sl { text-align: center; font-weight: 700; width: 6%; }
+  td.reg { font-family: "Courier New", monospace; font-weight: 900; color: #4C1D95; letter-spacing: .02em; }
+  @media print { .noprint { display: none; } .page { border-left-width: 2px; border-right-width: 2px; } }
+  .noprint { text-align: center; margin: 18px 0; }
+  .noprint button { font-size: 15.4px; padding: 8px 18px; cursor: pointer; }
+</style></head><body>
+  <div class="page">
+    <div class="hdr">
+      <p class="org">Cherupushpa Mission League Kalpetta</p>
+      <p class="sub">${esc(subtitle)}</p>
+    </div>
+    <table>
+      <thead>
+        <tr><th>SL</th><th>Reg No</th><th>Name</th><th>House Name</th><th>Shakha</th></tr>
+      </thead>
+      <tbody>${bodyRows}</tbody>
+    </table>
+    <div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
+  </div>
+</body></html>`;
+
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => { w.focus(); w.print(); }, 350);
+  };
+
   const selectCls = "border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-purple-200 bg-white";
 
   return (
@@ -486,6 +535,13 @@ export default function ParticipantsAdminPage() {
             <Download size={14} /> Export
           </button>
           <button
+            onClick={exportPdf}
+            disabled={filtered.length === 0}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm hover:bg-gray-50 bg-transparent cursor-pointer disabled:opacity-40"
+          >
+            <FileDown size={14} /> Export PDF
+          </button>
+          <button
             onClick={() => { setEditRow(null); setEditRegIds([]); setPanelMode("new"); }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#7C3AED] text-white text-sm font-medium hover:bg-[#6D28D9] border-none cursor-pointer"
           >
@@ -503,11 +559,15 @@ export default function ParticipantsAdminPage() {
           <option value="">All Shakhas</option>
           {shakhas.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
-        <select value={genderFilter} onChange={(e) => setGenderFilter(e.target.value)} className={selectCls}>
-          {GENDER_OPTIONS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
-        </select>
-        <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className={selectCls}>
-          {CAT_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+        <select value={compFilter} onChange={(e) => setCompFilter(e.target.value)} className={`${selectCls} col-span-2 sm:col-span-2`}>
+          <option value="">All Competitions</option>
+          {feastComps.map((fc) => (
+            <option key={fc.id} value={fc.id}>
+              {fc.competition?.name}
+              {fc.competition?.gender && fc.competition.gender.toLowerCase() !== "common" ? ` · ${fc.competition.gender}` : ""}
+              {fc.competition?.competition_category?.name ? ` · ${fc.competition.competition_category.name}` : ""}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -534,10 +594,10 @@ export default function ParticipantsAdminPage() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
-          <table className="w-full text-sm min-w-[780px]">
+          <table className="w-full text-sm min-w-[680px]">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                {["Reg No", "Name", "House", "Shakha", "Gender", "Category", "Events", "Phone", "Date", ""].map((h) => (
+                {["Reg No", "Name", "House", "Shakha", "Category", "Events", ""].map((h) => (
                   <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -545,39 +605,64 @@ export default function ParticipantsAdminPage() {
             <tbody>
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="text-center py-12 text-gray-400 text-sm">No participants found.</td>
+                  <td colSpan={7} className="text-center py-12 text-gray-400 text-sm">No participants found.</td>
                 </tr>
               )}
               {filtered.map((r) => {
                 const gLabel = normGender(r.gender);
                 return (
                   <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors">
-                    <td className="px-3 py-3 font-mono text-xs text-purple-700 whitespace-nowrap">{r.registration_number ?? "—"}</td>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      {r.registration_number ? (
+                        <span
+                          className="relative inline-flex items-center text-[12px] px-2.5 py-1 tracking-wide"
+                          style={{
+                            background: "#FCD34D",
+                            color: "#451A03",
+                            fontFamily: "var(--font-anek), sans-serif",
+                            fontWeight: 800,
+                            WebkitTextStroke: "0.3px #451A03",
+                            borderRadius: "5px",
+                            border: "1px dashed rgba(120,53,15,0.4)",
+                            boxShadow: "0 1px 3px rgba(120,53,15,0.25)",
+                          }}
+                        >
+                          <span
+                            className="absolute -left-[5px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full"
+                            style={{ background: "#fff", boxShadow: "0 0 0 1px rgba(120,53,15,0.2)" }}
+                            aria-hidden="true"
+                          />
+                          {r.registration_number}
+                          <span
+                            className="absolute -right-[5px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full"
+                            style={{ background: "#fff", boxShadow: "0 0 0 1px rgba(120,53,15,0.2)" }}
+                            aria-hidden="true"
+                          />
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
                     <td className="px-3 py-3 font-medium text-gray-900 whitespace-nowrap">{r.name}</td>
                     <td className="px-3 py-3 text-gray-500 whitespace-nowrap">{r.house_name ?? "—"}</td>
                     <td className="px-3 py-3 text-gray-600 whitespace-nowrap">{r.shakha?.name ?? "—"}</td>
                     <td className="px-3 py-3 whitespace-nowrap">
-                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                        gLabel === "Boy" ? "bg-blue-50 text-blue-600" :
-                        gLabel === "Girl" ? "bg-pink-50 text-pink-600" :
-                        "bg-gray-100 text-gray-400"
-                      }`}>
-                        {gLabel}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 whitespace-nowrap">
-                      {r.competition_category
-                        ? <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700">{r.competition_category.name}</span>
-                        : <span className="text-gray-400">—</span>}
+                      {r.competition_category || gLabel !== "—" ? (
+                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                          gLabel === "Boy" ? "bg-blue-50 text-blue-600" :
+                          gLabel === "Girl" ? "bg-pink-50 text-pink-600" :
+                          "bg-purple-50 text-purple-700"
+                        }`}>
+                          {r.competition_category?.name ?? "—"}{gLabel !== "—" ? `-${gLabel}` : ""}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-3 text-center">
                       <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-purple-100 text-purple-700 text-xs font-semibold">
                         {r.comp_count}
                       </span>
-                    </td>
-                    <td className="px-3 py-3 text-gray-500 whitespace-nowrap">{r.phone ?? "—"}</td>
-                    <td className="px-3 py-3 text-gray-400 text-xs whitespace-nowrap">
-                      {new Date(r.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                     </td>
                     <td className="px-3 py-3">
                       <button
