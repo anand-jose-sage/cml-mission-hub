@@ -18,6 +18,7 @@ import {
   type MediaGalleryItem,
 } from "@/hooks/use-media-items";
 import { AudioBar } from "@/components/home/audio-bar";
+import { isInstagramUrl, InstagramEmbed } from "@/components/shared/instagram-embed";
 
 /* ─── filter config ─────────────────────────────────── */
 const FILTERS: { id: MediaFilter; label: string }[] = [
@@ -289,19 +290,25 @@ function VideoLightbox({
           >
             <X size={18} color="rgba(255,255,255,0.9)" />
           </button>
-          {/* No hardcoded aspect-ratio box here — the video sizes to its own
-              natural width/height so portrait reels and landscape videos both
-              play undistorted instead of being squished into a fixed tile. */}
-          <video
-            key={item.id}
-            src={item.mediaUrl ?? undefined}
-            poster={item.thumbnailUrl ?? undefined}
-            controls
-            autoPlay
-            playsInline
-            className="w-full rounded-xl"
-            style={{ display: "block", maxHeight: "80vh", height: "auto" }}
-          />
+          {item.mediaUrl && isInstagramUrl(item.mediaUrl) ? (
+            <div className="w-full flex justify-center overflow-y-auto" style={{ maxHeight: "80vh" }}>
+              <InstagramEmbed key={item.id} url={item.mediaUrl} />
+            </div>
+          ) : (
+            /* No hardcoded aspect-ratio box here — the video sizes to its own
+               natural width/height so portrait reels and landscape videos both
+               play undistorted instead of being squished into a fixed tile. */
+            <video
+              key={item.id}
+              src={item.mediaUrl ?? undefined}
+              poster={item.thumbnailUrl ?? undefined}
+              controls
+              autoPlay
+              playsInline
+              className="w-full rounded-xl"
+              style={{ display: "block", maxHeight: "80vh", height: "auto" }}
+            />
+          )}
           <p
             className="font-[family-name:var(--font-poppins)] font-semibold text-[14px] text-center mt-4 px-4"
             style={{ color: "rgba(255,255,255,0.9)" }}

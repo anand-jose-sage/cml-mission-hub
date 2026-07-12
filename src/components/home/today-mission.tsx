@@ -15,6 +15,7 @@ import {
 import { COLORS, TINT_COLORS, type CMLTheme } from "@/lib/theme";
 import { type MissionItem } from "@/lib/sample-data";
 import { PlaceholderImage } from "@/components/shared/placeholder-image";
+import { isInstagramUrl, InstagramEmbed } from "@/components/shared/instagram-embed";
 import { AudioBar } from "@/components/home/audio-bar";
 import { FullscreenAudioPlayer } from "@/components/home/fullscreen-audio-player";
 import { useMissionItems } from "@/hooks/use-mission-items";
@@ -127,7 +128,11 @@ function TimelineItem({ item, theme, last, idx, onNoticeClick, onOpenAudio }: Ti
         {/* Media */}
         {item.media === "reel" && (
           <div className="relative mb-2 rounded-xl overflow-hidden">
-            {item.mediaUrl ? (
+            {item.mediaUrl && isInstagramUrl(item.mediaUrl) ? (
+              <div className="w-full flex justify-center overflow-hidden">
+                <InstagramEmbed url={item.mediaUrl} />
+              </div>
+            ) : item.mediaUrl ? (
               <video
                 src={item.mediaUrl}
                 poster={item.thumbnailUrl ?? undefined}

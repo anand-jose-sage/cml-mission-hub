@@ -338,6 +338,8 @@ export default function ParticipantsAdminPage() {
   const [shakhaFilter, setShakhaFilter] = useState("");
   const [compFilter, setCompFilter] = useState("");
   const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const PER_PAGE = 30;
 
   // Slide-over
   const [panelMode, setPanelMode] = useState<"new" | "edit" | null>(null);
@@ -411,6 +413,13 @@ export default function ParticipantsAdminPage() {
     }
     return true;
   }), [rows, shakhaFilter, compFilter, q]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  useEffect(() => { setPage(1); }, [shakhaFilter, compFilter, q, feastId]);
+  const paged = useMemo(
+    () => filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE),
+    [filtered, page]
+  );
 
   const openEdit = useCallback(async (row: ParticipantRow) => {
     setEditRow(row);
@@ -593,12 +602,12 @@ export default function ParticipantsAdminPage() {
           <Loader2 size={22} className="animate-spin text-gray-400" />
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
+        <div className="bg-white rounded-xl overflow-hidden border border-[#1e1b4b] shadow-md overflow-x-auto">
           <table className="w-full text-sm min-w-[680px]">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
+            <thead style={{ background: "linear-gradient(90deg,#ede9fe,#f5f3ff)" }}>
+              <tr className="border-b-2" style={{ borderColor: "#c4b5fd" }}>
                 {["Reg No", "Name", "House", "Shakha", "Category", "Events", ""].map((h) => (
-                  <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">{h}</th>
+                  <th key={h} className="px-3 py-3 text-left text-[11px] font-black uppercase tracking-wider whitespace-nowrap" style={{ color: "#1e1b4b" }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -608,10 +617,17 @@ export default function ParticipantsAdminPage() {
                   <td colSpan={7} className="text-center py-12 text-gray-400 text-sm">No participants found.</td>
                 </tr>
               )}
-              {filtered.map((r) => {
+              {paged.map((r, i) => {
                 const gLabel = normGender(r.gender);
+                const isEven = i % 2 === 0;
                 return (
-                  <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors">
+                  <tr
+                    key={r.id}
+                    className="border-b transition-colors"
+                    style={{ borderColor: "#e5e7eb", background: isEven ? "#fff" : "#f8f7ff" }}
+                    onMouseEnter={(ev) => (ev.currentTarget.style.background = "#ede9fe")}
+                    onMouseLeave={(ev) => (ev.currentTarget.style.background = isEven ? "#fff" : "#f8f7ff")}
+                  >
                     <td className="px-3 py-3 whitespace-nowrap">
                       {r.registration_number ? (
                         <span
@@ -640,27 +656,31 @@ export default function ParticipantsAdminPage() {
                           />
                         </span>
                       ) : (
-                        <span className="text-gray-400">—</span>
+                        <span className="text-sm font-bold" style={{ color: "#6B7280" }}>—</span>
                       )}
                     </td>
-                    <td className="px-3 py-3 font-medium text-gray-900 whitespace-nowrap">{r.name}</td>
-                    <td className="px-3 py-3 text-gray-500 whitespace-nowrap">{r.house_name ?? "—"}</td>
-                    <td className="px-3 py-3 text-gray-600 whitespace-nowrap">{r.shakha?.name ?? "—"}</td>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      <p className="font-bold text-[14px] leading-tight" style={{ color: "#1e1b4b" }}>{r.name}</p>
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      <span className="text-[13px] font-semibold" style={{ color: "#5B21B6" }}>{r.house_name ?? "—"}</span>
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      <span className="text-[13px] font-semibold" style={{ color: "#374151" }}>{r.shakha?.name ?? "—"}</span>
+                    </td>
                     <td className="px-3 py-3 whitespace-nowrap">
                       {r.competition_category || gLabel !== "—" ? (
-                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                          gLabel === "Boy" ? "bg-blue-50 text-blue-600" :
-                          gLabel === "Girl" ? "bg-pink-50 text-pink-600" :
-                          "bg-purple-50 text-purple-700"
-                        }`}>
+                        <span className="inline-block text-[12px] font-black px-2.5 py-1 rounded-lg text-white" style={{
+                          background: gLabel === "Boy" ? "#3B82F6" : gLabel === "Girl" ? "#EC4899" : "#6B46FF",
+                        }}>
                           {r.competition_category?.name ?? "—"}{gLabel !== "—" ? `-${gLabel}` : ""}
                         </span>
                       ) : (
-                        <span className="text-gray-400">—</span>
+                        <span className="text-sm font-bold" style={{ color: "#6B7280" }}>—</span>
                       )}
                     </td>
                     <td className="px-3 py-3 text-center">
-                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-purple-100 text-purple-700 text-xs font-semibold">
+                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-black text-white" style={{ background: "#4C1D95" }}>
                         {r.comp_count}
                       </span>
                     </td>
@@ -678,6 +698,34 @@ export default function ParticipantsAdminPage() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!loading && filtered.length > 0 && pageCount > 1 && (
+        <div className="flex items-center justify-between mt-4 flex-wrap gap-2">
+          <p className="text-xs text-gray-500">
+            Showing {(page - 1) * PER_PAGE + 1}–{Math.min(page * PER_PAGE, filtered.length)} of {filtered.length}
+          </p>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 bg-transparent cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Prev
+            </button>
+            <span className="text-sm text-gray-600 px-2">
+              Page {page} of {pageCount}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+              disabled={page === pageCount}
+              className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 bg-transparent cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
 

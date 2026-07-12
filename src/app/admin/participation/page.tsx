@@ -350,7 +350,11 @@ export default function ParticipationPage() {
               <thead style={{ background: "linear-gradient(90deg,#fce7f3,#fdf2f8)" }}>
                 <tr className="border-b-2" style={{ borderColor: "#f9a8d4" }}>
                   {["Took part", "Reg No", "Participant", "House", "Shakha"].map((h) => (
-                    <th key={h} className="px-3 py-3 text-left text-[11px] font-black uppercase tracking-wider whitespace-nowrap" style={{ color: "#831843" }}>{h}</th>
+                    <th
+                      key={h}
+                      className={`px-3 py-3 text-left text-[11px] font-black uppercase tracking-wider ${h === "Took part" ? "" : "whitespace-nowrap"}`}
+                      style={{ color: "#831843", ...(h === "Took part" ? { width: 70 } : {}) }}
+                    >{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -365,7 +369,7 @@ export default function ParticipationPage() {
                       style={{ borderColor: "#e5e7eb", background: e.participated ? "#fdf2f8" : (isEven ? "#fff" : "#fafafa") }}
                       onClick={() => toggle(e)}
                     >
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-3" style={{ width: 70 }}>
                         <Checkbox checked={e.participated} busy={!!saving[e.regId]} />
                       </td>
                       <td className="px-3 py-3">
