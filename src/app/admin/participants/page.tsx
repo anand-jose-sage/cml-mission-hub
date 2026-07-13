@@ -460,21 +460,53 @@ export default function ParticipantsAdminPage() {
     const esc = (s: string) =>
       s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-    const feast = feasts.find((f) => f.id === feastId);
-    const feastLine = feast ? `${feast.name} ${feast.year}` : "";
-    const comp = feastComps.find((fc) => fc.id === compFilter);
-    const subtitle = comp?.competition?.name ? `${feastLine} · ${comp.competition.name}` : feastLine;
+    const compLabel = (fc: FeastComp) => {
+      const name = fc.competition?.name ?? "";
+      const cat = fc.competition?.competition_category?.name ?? "";
+      const gender = fc.competition?.gender;
+      const genderLabel = gender ? gender.charAt(0).toUpperCase() + gender.slice(1).toLowerCase() : "";
+      return [name, cat, genderLabel].filter(Boolean).join(" - ");
+    };
 
-    const bodyRows = filtered.map((r, i) => `<tr>
-      <td class="sl">${i + 1}</td>
-      <td class="reg">${esc(r.registration_number ?? "—")}</td>
-      <td class="name">${esc(r.name)}</td>
-      <td class="house">${esc(r.house_name ?? "—")}</td>
-      <td class="shakha">${esc(r.shakha?.name ?? "—")}</td>
-    </tr>`).join("");
+    const section = (subtitle: string, rows: ParticipantRow[], first: boolean) => {
+      const bodyRows = rows.map((r, i) => `<tr>
+        <td class="sl">${i + 1}</td>
+        <td class="reg">${esc(r.registration_number ?? "—")}</td>
+        <td class="name">${esc(r.name)}</td>
+        <td class="house">${esc(r.house_name ?? "—")}</td>
+        <td class="shakha">${esc(r.shakha?.name ?? "—")}</td>
+      </tr>`).join("");
+
+      return `<div class="section"${first ? "" : ' style="page-break-before: always;"'}>
+        <div class="hdr">
+          <p class="org">Cherupushpa Mission League Kalpetta</p>
+          <p class="sub">${esc(subtitle)}</p>
+        </div>
+        <table>
+          <thead>
+            <tr><th>SL</th><th>Reg No</th><th>Name</th><th>House Name</th><th>Shakha</th></tr>
+          </thead>
+          <tbody>${bodyRows}</tbody>
+        </table>
+      </div>`;
+    };
+
+    let sectionsHtml: string;
+    if (compFilter) {
+      const comp = feastComps.find((fc) => fc.id === compFilter);
+      const subtitle = comp ? compLabel(comp) : "";
+      sectionsHtml = section(subtitle, filtered, true);
+    } else {
+      const groups = feastComps
+        .map((fc) => ({ fc, rows: filtered.filter((r) => r.regCompIds.includes(fc.id)) }))
+        .filter((g) => g.rows.length > 0);
+      sectionsHtml = groups.length > 0
+        ? groups.map((g, i) => section(compLabel(g.fc), g.rows, i === 0)).join("")
+        : section("All Competitions", filtered, true);
+    }
 
     const html = `<!doctype html><html><head><meta charset="utf-8">
-<title>Participants — ${esc(subtitle)}</title>
+<title>Participants</title>
 <style>
   @page { size: A4 portrait; margin: 14mm 10mm; }
   * { box-sizing: border-box; }
@@ -486,6 +518,7 @@ export default function ParticipantsAdminPage() {
     border-right: 3px double #7C3AED;
     padding: 0 14px;
   }
+  .section { padding-top: 4px; }
   .hdr { text-align: center; margin-bottom: 16px; }
   .hdr .org { font-size: 20.8px; font-weight: 800; margin: 0 0 3px; }
   .hdr .sub { font-size: 15px; font-weight: 600; color: #444; margin: 0; }
@@ -499,16 +532,7 @@ export default function ParticipantsAdminPage() {
   .noprint button { font-size: 15.4px; padding: 8px 18px; cursor: pointer; }
 </style></head><body>
   <div class="page">
-    <div class="hdr">
-      <p class="org">Cherupushpa Mission League Kalpetta</p>
-      <p class="sub">${esc(subtitle)}</p>
-    </div>
-    <table>
-      <thead>
-        <tr><th>SL</th><th>Reg No</th><th>Name</th><th>House Name</th><th>Shakha</th></tr>
-      </thead>
-      <tbody>${bodyRows}</tbody>
-    </table>
+    ${sectionsHtml}
     <div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
   </div>
 </body></html>`;

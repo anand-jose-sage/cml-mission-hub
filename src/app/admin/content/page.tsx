@@ -76,6 +76,7 @@ export default function AdminContentPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
+  const [monthFilter, setMonthFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -92,10 +93,20 @@ export default function AdminContentPage() {
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
+  const monthOptions = Array.from(
+    new Set(items.map((item) => item.published_at.slice(0, 7)))
+  )
+    .sort((a, b) => b.localeCompare(a))
+    .map((ym) => ({
+      value: ym,
+      label: new Date(`${ym}-01`).toLocaleDateString("en-IN", { month: "long", year: "numeric" }),
+    }));
+
   const filtered = items.filter((item) => {
     const matchesType = filter === "All" || TYPE_LABELS[item.content_type] === filter;
     const matchesSearch = item.title.toLowerCase().includes(search.toLowerCase());
-    return matchesType && matchesSearch;
+    const matchesMonth = !monthFilter || item.published_at.slice(0, 7) === monthFilter;
+    return matchesType && matchesSearch && matchesMonth;
   });
 
   function openCreate() {
@@ -189,9 +200,21 @@ export default function AdminContentPage() {
         ))}
       </div>
 
-      <div className="relative mb-3 sm:mb-4">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input placeholder="Search content..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-9 pr-3 py-2 sm:py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#6B46FF]/30 focus:border-[#6B46FF]" />
+      <div className="flex gap-2 mb-3 sm:mb-4">
+        <div className="relative flex-1">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input placeholder="Search content..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-9 pr-3 py-2 sm:py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#6B46FF]/30 focus:border-[#6B46FF]" />
+        </div>
+        <select
+          value={monthFilter}
+          onChange={(e) => setMonthFilter(e.target.value)}
+          className="px-3 py-2 sm:py-2.5 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#6B46FF]/30 focus:border-[#6B46FF] shrink-0"
+        >
+          <option value="">All Months</option>
+          {monthOptions.map((m) => (
+            <option key={m.value} value={m.value}>{m.label}</option>
+          ))}
+        </select>
       </div>
 
       {loading ? (
