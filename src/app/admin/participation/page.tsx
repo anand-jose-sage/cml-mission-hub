@@ -252,7 +252,7 @@ export default function ParticipationPage() {
           <ClipboardCheck size={17} color="#fff" />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Participation</h1>
+          <h1 className="text-xl font-bold text-gray-900">Attendance</h1>
           <p className="text-xs text-gray-500">Mark who took part, then export the judging sheet</p>
         </div>
       </div>

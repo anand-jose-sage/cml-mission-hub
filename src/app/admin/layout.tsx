@@ -52,7 +52,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: "Feast",
     items: [
       { href: "/admin/participants", label: "Participants", icon: UserCheck,    color: "#0891B2" },
-      { href: "/admin/participation", label: "Participation", icon: ClipboardCheck, color: "#BE185D" },
+      { href: "/admin/participation", label: "Attendance", icon: ClipboardCheck, color: "#BE185D" },
       { href: "/admin/results",      label: "Results",      icon: Medal,         color: "#D97706" },
       { href: "/admin/standings",    label: "Standings",    icon: Trophy,        color: "#7C3AED" },
     ],
