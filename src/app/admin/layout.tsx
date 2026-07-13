@@ -20,6 +20,7 @@ import {
   Menu,
   X,
   ChevronRight,
+  FileSearch,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 
@@ -46,6 +47,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/admin/notices",    label: "Notices",    icon: Bell,        color: "#B45309" },
       { href: "/admin/activities", label: "Activities", icon: CalendarDays, color: "#15803D" },
       { href: "/admin/plan",       label: "Annual Plan", icon: BookOpen,    color: "#B0892F" },
+      { href: "/admin/rag-documents", label: "AI Documents", icon: FileSearch, color: "#0EA5A4" },
     ],
   },
   {

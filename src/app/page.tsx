@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { buildTheme } from "@/lib/theme";
 import { TopHeader } from "@/components/home/top-header";
 import { HeroEvent } from "@/components/home/hero-event";
@@ -19,10 +20,13 @@ import { ActivitiesScreen } from "@/components/activities/activities-screen";
 import { FeastPortalCard } from "@/components/feast/feast-portal-card";
 import { QuickAccess } from "@/components/home/quick-access";
 import { FeastModule } from "@/components/feast/feast-module";
+import { RagChatFab } from "@/components/rag-chat/rag-chat-fab";
 import { useTutorialPrelude } from "@/app/(tutorial)/help/tutorials/registration/_hooks/use-tutorial-prelude";
 import { useMyRegistrationsTutorial } from "@/app/(tutorial)/help/tutorials/my-registrations/_hooks/use-my-registrations-tutorial";
 import { useEditRegistrationTutorial } from "@/app/(tutorial)/help/tutorials/edit-registration/_hooks/use-edit-registration-tutorial";
 import { useDeleteRegistrationTutorial } from "@/app/(tutorial)/help/tutorials/delete-registration/_hooks/use-delete-registration-tutorial";
+
+const RagChatModule = dynamic(() => import("@/components/rag-chat/rag-chat-module").then((m) => ({ default: m.RagChatModule })));
 
 export default function HomePage() {
   const theme = useMemo(() => buildTheme("aurora-glass", "dusk", 28), []);
@@ -30,6 +34,7 @@ export default function HomePage() {
   const [sel, setSel] = useState<number | null>(null); // null = all week
   const [noticeDetailOpen, setNoticeDetailOpen] = useState(false);
   const [inFeastInternal, setInFeastInternal] = useState(false);
+  const [inRagChat, setInRagChat] = useState(false);
   const tutorial = useTutorialPrelude();
   const myRegTutorial = useMyRegistrationsTutorial();
   const editRegTutorial = useEditRegistrationTutorial();
@@ -85,6 +90,14 @@ export default function HomePage() {
           tutorialDetails={activeTutorial?.feastDetails ?? undefined}
           onTutorialAction={onTutorialAction}
         />
+      </div>
+    );
+  }
+
+  if (inRagChat) {
+    return (
+      <div className="relative h-dvh w-full overflow-hidden max-w-md mx-auto" style={{ background: theme.pageBg }}>
+        <RagChatModule onExit={() => setInRagChat(false)} />
       </div>
     );
   }
@@ -177,6 +190,7 @@ export default function HomePage() {
         </main>
       )}
 
+      <RagChatFab onEnter={() => setInRagChat(true)} />
       <BottomNav active={tab} setActive={setTab} theme={theme} />
     </div>
   );
