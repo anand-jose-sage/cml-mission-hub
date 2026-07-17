@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  Loader2, Search, X, ChevronDown, ClipboardCheck, UserX, FileDown, Check,
+  Loader2, Search, X, ChevronDown, ClipboardCheck, UserX, FileDown, FileStack, Check,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { setParticipation } from "@/actions/feast";
 import { CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/competition-categories";
+import { getScoreHeadings } from "@/lib/scoresheet-headings";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -33,6 +34,102 @@ interface EntryRow {
   participated: boolean;
 }
 
+// ─── Score-sheet print helpers ─────────────────────────────────────────────────
+// Shared by the single-competition export and the "export all" bulk export so
+// both produce an identical table layout.
+
+const SL_W = 7, REG_W = 25, TOT_W = 14;
+
+const SHEET_CSS = `
+  @page { size: A4 portrait; margin: 16mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; }
+  .sheet:not(:last-child) { page-break-after: always; }
+  .hdr { text-align: center; margin-bottom: 14px; }
+  .hdr .feast { font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: #444; margin: 0 0 4px; }
+  .hdr .comp { font-size: 22px; font-weight: 800; margin: 0 0 2px; }
+  .hdr .cat { font-size: 14px; font-weight: 600; color: #333; margin: 0; }
+  .ph { margin: 10px 4px; border-bottom: 1px dotted #333; height: 26px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  th, td { border: 1px solid #333; height: 28px; text-align: center; font-size: 13px; }
+  thead th {
+    background: #f0f0f0; font-size: 11px; text-transform: uppercase; letter-spacing: .03em;
+    height: auto; padding: 5px 3px; white-space: normal; overflow-wrap: break-word; line-height: 1.25;
+  }
+  thead th.score-head { text-transform: none; font-size: 10.5px; }
+  col.c-sl  { width: ${SL_W}%; }
+  col.c-reg { width: ${REG_W}%; }
+  col.c-tot { width: ${TOT_W}%; }
+  td.sl  { font-weight: 700; }
+  td.reg { font-family: "Courier New", monospace; font-weight: 700; letter-spacing: .02em; }
+  @media print { .noprint { display: none; } }
+  .noprint { text-align: center; margin: 18px 0; }
+  .noprint button { font-size: 14px; padding: 8px 18px; cursor: pointer; }
+`;
+
+function escHtml(s: string) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** One competition's header + judging table — a full print page. */
+function renderSheetSection(comp: CompOption, feastTitle: string, regNos: string[]): string {
+  const rowCount = Math.max(26, regNos.length);
+  const catLine = [comp.catName, comp.gender].filter(Boolean).join(" · ");
+  const scoreHeadings = getScoreHeadings(comp.compName, comp.catSlug);
+  const scoreCols = scoreHeadings.length;
+  const scW = (100 - SL_W - REG_W - TOT_W) / scoreCols;
+
+  const bodyRows = Array.from({ length: rowCount }, (_, i) => {
+    const reg = regNos[i] ?? "";
+    const scoreCells = Array.from({ length: scoreCols }, () => `<td class="sc"></td>`).join("");
+    return `<tr>
+        <td class="sl">${i + 1}</td>
+        <td class="reg">${escHtml(reg)}</td>
+        ${scoreCells}
+        <td class="tot"></td>
+      </tr>`;
+  }).join("");
+
+  return `<section class="sheet">
+    <div class="hdr">
+      <p class="feast">${escHtml(feastTitle)}</p>
+      <p class="comp">${escHtml(comp.compName)}</p>
+      <p class="cat">${escHtml(catLine)}</p>
+    </div>
+    <div class="ph"></div>
+    <div class="ph"></div>
+    <table>
+      <colgroup>
+        <col class="c-sl"><col class="c-reg">
+        ${Array.from({ length: scoreCols }, () => `<col style="width:${scW}%">`).join("")}
+        <col class="c-tot">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>SL</th><th>Registration No</th>
+          ${scoreHeadings.map((h) => `<th class="score-head">${escHtml(h)}</th>`).join("")}
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>${bodyRows}</tbody>
+    </table>
+  </section>`;
+}
+
+/** Opens a blank tab, writes the given HTML document, and triggers print. Returns false if the pop-up was blocked. */
+function openPrintWindow(html: string): boolean {
+  const w = window.open("", "_blank");
+  if (!w) return false;
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+  // Give the new document a tick to lay out, then open the print dialog.
+  // (onload can fire before this handler attaches after document.write, so
+  // use a short timeout; the in-page "Print" button is a manual fallback.)
+  setTimeout(() => { w.focus(); w.print(); }, 350);
+  return true;
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function ParticipationPage() {
@@ -47,6 +144,7 @@ export default function ParticipationPage() {
   const [loading,  setLoading]  = useState(false);
   const [saving,   setSaving]   = useState<Record<string, boolean>>({});
   const [msg,      setMsg]      = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [exportingAll, setExportingAll] = useState(false);
 
   const selectedFeast = feasts.find((f) => f.id === feastId) ?? null;
   const selectedComp  = comps.find((c) => c.fcId === compId) ?? null;
@@ -154,91 +252,69 @@ export default function ParticipationPage() {
     }
   };
 
-  // ── PDF (print) export — judging score sheet ──
+  // ── PDF (print) export — judging score sheet for the selected competition ──
   const exportPDF = () => {
     if (!selectedComp) return;
     const marked = entries.filter((e) => e.participated);
     const regNos = marked.map((e) => e.regNo ?? "—");
-    const rowCount = Math.max(20, regNos.length);
-
-    const esc = (s: string) =>
-      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
     const feastTitle = selectedFeast ? `${selectedFeast.name} ${selectedFeast.year}` : "";
-    const catLine = [selectedComp.catName, selectedComp.gender].filter(Boolean).join(" · ");
-
-    const bodyRows = Array.from({ length: rowCount }, (_, i) => {
-      const reg = regNos[i] ?? "";
-      return `<tr>
-        <td class="sl">${i + 1}</td>
-        <td class="reg">${esc(reg)}</td>
-        <td class="sc"></td><td class="sc"></td><td class="sc"></td><td class="sc"></td>
-        <td class="tot"></td>
-      </tr>`;
-    }).join("");
+    const section = renderSheetSection(selectedComp, feastTitle, regNos);
 
     const html = `<!doctype html><html><head><meta charset="utf-8">
-<title>Score Sheet — ${esc(selectedComp.compName)}</title>
-<style>
-  @page { size: A4 portrait; margin: 16mm 14mm; }
-  * { box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; }
-  .hdr { text-align: center; margin-bottom: 14px; }
-  .hdr .feast { font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: #444; margin: 0 0 4px; }
-  .hdr .comp { font-size: 22px; font-weight: 800; margin: 0 0 2px; }
-  .hdr .cat { font-size: 14px; font-weight: 600; color: #333; margin: 0; }
-  .ph { margin: 10px 4px; border-bottom: 1px dotted #333; height: 26px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-  th, td { border: 1px solid #333; height: 28px; text-align: center; font-size: 13px; }
-  thead th { background: #f0f0f0; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
-  col.c-sl  { width: 9%; }
-  col.c-reg { width: 31%; }
-  col.c-sc  { width: 11%; }
-  col.c-tot { width: 16%; }
-  td.sl  { font-weight: 700; }
-  td.reg { font-family: "Courier New", monospace; font-weight: 700; letter-spacing: .02em; }
-  @media print { .noprint { display: none; } }
-  .noprint { text-align: center; margin: 18px 0; }
-  .noprint button { font-size: 14px; padding: 8px 18px; cursor: pointer; }
-</style></head><body>
-  <div class="hdr">
-    <p class="feast">${esc(feastTitle)}</p>
-    <p class="comp">${esc(selectedComp.compName)}</p>
-    <p class="cat">${esc(catLine)}</p>
-  </div>
-  <div class="ph"></div>
-  <div class="ph"></div>
-  <table>
-    <colgroup>
-      <col class="c-sl"><col class="c-reg">
-      <col class="c-sc"><col class="c-sc"><col class="c-sc"><col class="c-sc">
-      <col class="c-tot">
-    </colgroup>
-    <thead>
-      <tr>
-        <th>SL</th><th>Registration No</th>
-        <th></th><th></th><th></th><th></th>
-        <th>Total</th>
-      </tr>
-    </thead>
-    <tbody>${bodyRows}</tbody>
-  </table>
+<title>Score Sheet — ${escHtml(selectedComp.compName)}</title>
+<style>${SHEET_CSS}</style></head><body>
+  ${section}
   <div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
 </body></html>`;
 
-    const w = window.open("", "_blank");
-    if (!w) {
+    if (!openPrintWindow(html)) {
       setMsg({ type: "err", text: "Allow pop-ups to export the score sheet." });
+      setTimeout(() => setMsg(null), 3000);
+    }
+  };
+
+  // ── PDF (print) export — every competition in the feast, all registrations ──
+  const exportAllPDF = async () => {
+    if (!comps.length) return;
+    setExportingAll(true);
+    const { data, error } = await supabase
+      .from("participant_registrations")
+      .select("feast_competition_id, participant:participants(registration_number)")
+      .in("feast_competition_id", comps.map((c) => c.fcId));
+    setExportingAll(false);
+
+    if (error) {
+      setMsg({ type: "err", text: "Failed to load registrations for export." });
       setTimeout(() => setMsg(null), 3000);
       return;
     }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
-    // Give the new document a tick to lay out, then open the print dialog.
-    // (onload can fire before this handler attaches after document.write, so
-    // use a short timeout; the in-page "Print" button is a manual fallback.)
-    setTimeout(() => { w.focus(); w.print(); }, 350);
+
+    const regNosByComp = new Map<string, string[]>();
+    for (const r of data ?? []) {
+      const p = (Array.isArray(r.participant) ? r.participant[0] : r.participant) as Record<string, unknown> | null;
+      const regNo = (p?.registration_number as string | null) ?? "—";
+      const fcId = r.feast_competition_id as string;
+      const list = regNosByComp.get(fcId);
+      if (list) list.push(regNo); else regNosByComp.set(fcId, [regNo]);
+    }
+    for (const list of regNosByComp.values()) {
+      list.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    }
+
+    const feastTitle = selectedFeast ? `${selectedFeast.name} ${selectedFeast.year}` : "";
+    const sections = comps.map((c) => renderSheetSection(c, feastTitle, regNosByComp.get(c.fcId) ?? [])).join("");
+
+    const html = `<!doctype html><html><head><meta charset="utf-8">
+<title>Score Sheets — ${escHtml(feastTitle)}</title>
+<style>${SHEET_CSS}</style></head><body>
+  ${sections}
+  <div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
+</body></html>`;
+
+    if (!openPrintWindow(html)) {
+      setMsg({ type: "err", text: "Allow pop-ups to export the score sheets." });
+      setTimeout(() => setMsg(null), 3000);
+    }
   };
 
   const selectCls = "border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-purple-200 bg-white w-full";
@@ -311,6 +387,16 @@ export default function ParticipationPage() {
         >
           <FileDown size={14} />
           Export PDF
+        </button>
+        <button
+          onClick={exportAllPDF}
+          disabled={!comps.length || exportingAll}
+          title="Export a score sheet for every competition in this feast, with all registered participants"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white border-none cursor-pointer disabled:opacity-40 transition-colors"
+          style={{ background: "linear-gradient(135deg,#831843,#BE185D)" }}
+        >
+          {exportingAll ? <Loader2 size={14} className="animate-spin" /> : <FileStack size={14} />}
+          Export All
         </button>
       </div>
 
