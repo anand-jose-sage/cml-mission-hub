@@ -23,6 +23,6 @@ export function getCategorySlug(dob: string): CategorySlug | "" {
   if (d >= new Date("2014-01-01T00:00:00")) return "sub_junior";
   if (d >= new Date("2011-01-01T00:00:00")) return "junior";
   if (d >= new Date("2007-01-01T00:00:00")) return "senior";
-  if (d >= new Date("1988-01-01T00:00:00")) return "super_senior";
+  if (d >= new Date("1986-01-01T00:00:00")) return "super_senior";
   return "elder";
 }
