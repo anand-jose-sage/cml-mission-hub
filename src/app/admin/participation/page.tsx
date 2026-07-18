@@ -116,6 +116,33 @@ function renderSheetSection(comp: CompOption, feastTitle: string, regNos: string
   </section>`;
 }
 
+/** Registration numbers per feast_competition, sorted, optionally restricted to those marked as took part. */
+async function fetchRegNosByComp(
+  fcIds: string[],
+  participatedOnly: boolean
+): Promise<{ regNosByComp: Map<string, string[]> | null; error: boolean }> {
+  let query = supabase
+    .from("participant_registrations")
+    .select("feast_competition_id, participant:participants(registration_number)")
+    .in("feast_competition_id", fcIds);
+  if (participatedOnly) query = query.eq("participated", true);
+  const { data, error } = await query;
+  if (error) return { regNosByComp: null, error: true };
+
+  const regNosByComp = new Map<string, string[]>();
+  for (const r of data ?? []) {
+    const p = (Array.isArray(r.participant) ? r.participant[0] : r.participant) as Record<string, unknown> | null;
+    const regNo = (p?.registration_number as string | null) ?? "—";
+    const fcId = r.feast_competition_id as string;
+    const list = regNosByComp.get(fcId);
+    if (list) list.push(regNo); else regNosByComp.set(fcId, [regNo]);
+  }
+  for (const list of regNosByComp.values()) {
+    list.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }
+  return { regNosByComp, error: false };
+}
+
 /** Opens a blank tab, writes the given HTML document, and triggers print. Returns false if the pop-up was blocked. */
 function openPrintWindow(html: string): boolean {
   const w = window.open("", "_blank");
@@ -145,9 +172,9 @@ export default function ParticipationPage() {
   const [saving,   setSaving]   = useState<Record<string, boolean>>({});
   const [msg,      setMsg]      = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [exportingAll, setExportingAll] = useState(false);
+  const [exportingJudge, setExportingJudge] = useState(false);
 
   const selectedFeast = feasts.find((f) => f.id === feastId) ?? null;
-  const selectedComp  = comps.find((c) => c.fcId === compId) ?? null;
 
   // ── Load feasts + shakhas ──
   useEffect(() => {
@@ -252,23 +279,36 @@ export default function ParticipationPage() {
     }
   };
 
-  // ── PDF (print) export — judging score sheet for the selected competition ──
-  const exportPDF = () => {
-    if (!selectedComp) return;
-    const marked = entries.filter((e) => e.participated);
-    const regNos = marked.map((e) => e.regNo ?? "—");
+  // ── PDF (print) export — one judge sheet per competition (took-part only), 3 copies each ──
+  const exportJudgeSheets = async () => {
+    if (!comps.length) return;
+    setExportingJudge(true);
+    const { regNosByComp, error } = await fetchRegNosByComp(comps.map((c) => c.fcId), true);
+    setExportingJudge(false);
+
+    if (error || !regNosByComp) {
+      setMsg({ type: "err", text: "Failed to load registrations for export." });
+      setTimeout(() => setMsg(null), 3000);
+      return;
+    }
+
     const feastTitle = selectedFeast ? `${selectedFeast.name} ${selectedFeast.year}` : "";
-    const section = renderSheetSection(selectedComp, feastTitle, regNos);
+    const sections = comps
+      .flatMap((c) => {
+        const regNos = regNosByComp.get(c.fcId) ?? [];
+        return Array.from({ length: 3 }, () => renderSheetSection(c, feastTitle, regNos));
+      })
+      .join("");
 
     const html = `<!doctype html><html><head><meta charset="utf-8">
-<title>Score Sheet — ${escHtml(selectedComp.compName)}</title>
+<title>Judge Sheets — ${escHtml(feastTitle)}</title>
 <style>${SHEET_CSS}</style></head><body>
-  ${section}
+  ${sections}
   <div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
 </body></html>`;
 
     if (!openPrintWindow(html)) {
-      setMsg({ type: "err", text: "Allow pop-ups to export the score sheet." });
+      setMsg({ type: "err", text: "Allow pop-ups to export the judge sheets." });
       setTimeout(() => setMsg(null), 3000);
     }
   };
@@ -277,28 +317,13 @@ export default function ParticipationPage() {
   const exportAllPDF = async () => {
     if (!comps.length) return;
     setExportingAll(true);
-    const { data, error } = await supabase
-      .from("participant_registrations")
-      .select("feast_competition_id, participant:participants(registration_number)")
-      .in("feast_competition_id", comps.map((c) => c.fcId));
+    const { regNosByComp, error } = await fetchRegNosByComp(comps.map((c) => c.fcId), false);
     setExportingAll(false);
 
-    if (error) {
+    if (error || !regNosByComp) {
       setMsg({ type: "err", text: "Failed to load registrations for export." });
       setTimeout(() => setMsg(null), 3000);
       return;
-    }
-
-    const regNosByComp = new Map<string, string[]>();
-    for (const r of data ?? []) {
-      const p = (Array.isArray(r.participant) ? r.participant[0] : r.participant) as Record<string, unknown> | null;
-      const regNo = (p?.registration_number as string | null) ?? "—";
-      const fcId = r.feast_competition_id as string;
-      const list = regNosByComp.get(fcId);
-      if (list) list.push(regNo); else regNosByComp.set(fcId, [regNo]);
-    }
-    for (const list of regNosByComp.values()) {
-      list.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     }
 
     const feastTitle = selectedFeast ? `${selectedFeast.name} ${selectedFeast.year}` : "";
@@ -380,13 +405,14 @@ export default function ParticipationPage() {
           <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
         </div>
         <button
-          onClick={exportPDF}
-          disabled={!compId || markedCount === 0}
+          onClick={exportJudgeSheets}
+          disabled={!comps.length || exportingJudge}
+          title="Export a judge sheet (3 copies each) for every competition in this feast, with only participants marked as took part"
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white border-none cursor-pointer disabled:opacity-40 transition-colors"
           style={{ background: "linear-gradient(135deg,#BE185D,#EC4899)" }}
         >
-          <FileDown size={14} />
-          Export PDF
+          {exportingJudge ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+          Export Judge Sheet
         </button>
         <button
           onClick={exportAllPDF}
