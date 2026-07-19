@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { setParticipation } from "@/actions/feast";
 import { CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/competition-categories";
 import { getScoreHeadings } from "@/lib/scoresheet-headings";
+import { getCompetitionSubject } from "@/lib/competition-subjects";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,16 +41,24 @@ interface EntryRow {
 
 const SL_W = 7, REG_W = 25, TOT_W = 14;
 
+// Anek Malayalam — used for the printed subject line on each sheet.
+const FONT_LINK = `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Anek+Malayalam:wght@400;600;700&display=swap" rel="stylesheet">`;
+
 const SHEET_CSS = `
   @page { size: A4 portrait; margin: 16mm 14mm; }
   * { box-sizing: border-box; }
   body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; }
+  .sheet { border-left: 6px solid #BE185D; border-right: 6px solid #BE185D; padding-left: 12px; padding-right: 12px; }
   .sheet:not(:last-child) { page-break-after: always; }
   .hdr { text-align: center; margin-bottom: 14px; }
   .hdr .feast { font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: #444; margin: 0 0 4px; }
   .hdr .comp { font-size: 22px; font-weight: 800; margin: 0 0 2px; }
   .hdr .cat { font-size: 14px; font-weight: 600; color: #333; margin: 0; }
-  .ph { margin: 10px 4px; border-bottom: 1px dotted #333; height: 26px; }
+  .subject {
+    font-family: "Anek Malayalam", Arial, sans-serif;
+    text-align: center; font-size: 15px; font-weight: 600; line-height: 1.5;
+    color: #111; margin: 10px 4px; min-height: 52px; white-space: pre-line;
+  }
   table { width: 100%; border-collapse: collapse; margin-top: 12px; }
   th, td { border: 1px solid #333; height: 28px; text-align: center; font-size: 13px; }
   thead th {
@@ -76,6 +85,7 @@ function renderSheetSection(comp: CompOption, feastTitle: string, regNos: string
   const rowCount = Math.max(26, regNos.length);
   const catLine = [comp.catName, comp.gender].filter(Boolean).join(" · ");
   const scoreHeadings = getScoreHeadings(comp.compName, comp.catSlug);
+  const subject = getCompetitionSubject(comp.compName, comp.catSlug);
   const scoreCols = scoreHeadings.length;
   const scW = (100 - SL_W - REG_W - TOT_W) / scoreCols;
 
@@ -96,8 +106,7 @@ function renderSheetSection(comp: CompOption, feastTitle: string, regNos: string
       <p class="comp">${escHtml(comp.compName)}</p>
       <p class="cat">${escHtml(catLine)}</p>
     </div>
-    <div class="ph"></div>
-    <div class="ph"></div>
+    <div class="subject">${escHtml(subject)}</div>
     <table>
       <colgroup>
         <col class="c-sl"><col class="c-reg">
@@ -302,6 +311,7 @@ export default function ParticipationPage() {
 
     const html = `<!doctype html><html><head><meta charset="utf-8">
 <title>Judge Sheets — ${escHtml(feastTitle)}</title>
+${FONT_LINK}
 <style>${SHEET_CSS}</style></head><body>
   ${sections}
   <div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
@@ -331,6 +341,7 @@ export default function ParticipationPage() {
 
     const html = `<!doctype html><html><head><meta charset="utf-8">
 <title>Score Sheets — ${escHtml(feastTitle)}</title>
+${FONT_LINK}
 <style>${SHEET_CSS}</style></head><body>
   ${sections}
   <div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
