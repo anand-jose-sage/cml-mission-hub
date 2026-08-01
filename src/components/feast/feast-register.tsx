@@ -8,8 +8,13 @@ import { supabase } from "@/lib/supabase";
 import { registerParticipant } from "@/actions/feast";
 import { getCategorySlug, CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/competition-categories";
 import {
-  GlassPanel, GlowBtn, FeastTopBar, FeastIcon, type FeastTheme,
+  GlassPanel, GlowBtn, FeastTopBar, FeastIcon, StepDots, type FeastTheme,
 } from "./feast-shared";
+
+// A Shakha may only field this many participants in any single individual
+// competition. Mirrors MAX_SHAKHA_PER_COMPETITION in src/actions/feast.ts —
+// server-side is the source of truth, this is just for the live UI hint.
+const MAX_SHAKHA_PER_COMPETITION = 2;
 
 function TextField({ label, value, onChange, placeholder, theme, type = "text", icon }: {
   label: string; value: string; onChange: (v: string) => void; placeholder: string;
@@ -122,42 +127,6 @@ function GenderPicker({ value, onChange, theme }: { value: string; onChange: (v:
   );
 }
 
-function StepDots({ step, theme }: { step: number; theme: FeastTheme }) {
-  const labels = ["Details", "Events", "Review"];
-  return (
-    <div className="flex items-center gap-1.5 mb-[18px]">
-      {labels.map((l, i) => {
-        const done = i < step;
-        const active = i === step;
-        return (
-          <div key={i} className="contents">
-            <div className="flex items-center gap-[7px]">
-              <div
-                className="w-[26px] h-[26px] rounded-full flex items-center justify-center flex-shrink-0 font-bold text-[12px]"
-                style={{
-                  fontFamily: "var(--font-poppins), sans-serif",
-                  background: done || active ? "linear-gradient(135deg, #6B46FF, #A78BFA)" : theme.fillStrong,
-                  color: done || active ? "#fff" : theme.faint,
-                  boxShadow: active ? "0 6px 16px rgba(107,70,255,0.4)" : "none",
-                }}
-              >
-                {done ? <Check size={14} color="#fff" /> : i + 1}
-              </div>
-              <span
-                className="text-[11.5px]"
-                style={{ fontWeight: active ? 700 : 500, color: active ? theme.text : theme.faint, fontFamily: "var(--font-poppins), sans-serif" }}
-              >
-                {l}
-              </span>
-            </div>
-            {i < 2 && <div className="flex-1 h-0.5 rounded" style={{ background: i < step ? theme.lavender : theme.track }} />}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 export interface RegResult {
   regNo: string;
   name: string;
@@ -185,9 +154,10 @@ export function FeastRegister({ slug, theme, onBack, onExit, onDone }: {
   const [serverError, setServerError] = useState("");
   const [form, setForm] = useState({ name: "", houseName: "", dob: "", gender: "", phone: "" });
   const [picked, setPicked] = useState<string[]>([]);
+  const [shakhaCounts, setShakhaCounts] = useState<Record<string, number>>({});
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
   const toggle = (id: string) => setPicked((p) =>
-    p.includes(id) ? p.filter((x) => x !== id) : p.length >= 2 ? p : [...p, id]
+    p.includes(id) ? p.filter((x) => x !== id) : p.length >= 2 || (shakhaCounts[id] ?? 0) >= MAX_SHAKHA_PER_COMPETITION ? p : [...p, id]
   );
 
   // Load admin's shakha from their profile
@@ -208,8 +178,38 @@ export function FeastRegister({ slug, theme, onBack, onExit, onDone }: {
   // Clear competition selections whenever DOB or gender changes — eligibility may differ
   useEffect(() => { setPicked([]); }, [form.dob, form.gender]);
 
+  // How many participants from this Shakha are already registered per individual
+  // competition — used to grey out ones already at the 2-per-Shakha cap.
+  useEffect(() => {
+    if (!adminShakha || !feast) return;
+    const compIds = feast.competitions.filter((c) => c.cat === "Individual").map((c) => c.id);
+    if (compIds.length === 0) return;
+    (async () => {
+      const { data: regs } = await supabase
+        .from("participant_registrations")
+        .select("feast_competition_id, participant_id")
+        .in("feast_competition_id", compIds);
+      if (!regs?.length) { setShakhaCounts({}); return; }
+
+      const participantIds = [...new Set(regs.map((r) => r.participant_id as string))];
+      const { data: parts } = await supabase
+        .from("participants")
+        .select("id")
+        .in("id", participantIds)
+        .eq("shakha_id", adminShakha.id);
+      const shakhaSet = new Set((parts ?? []).map((p) => p.id as string));
+
+      const counts: Record<string, number> = {};
+      for (const r of regs) {
+        if (!shakhaSet.has(r.participant_id as string)) continue;
+        const fc = r.feast_competition_id as string;
+        counts[fc] = (counts[fc] ?? 0) + 1;
+      }
+      setShakhaCounts(counts);
+    })();
+  }, [adminShakha, feast]);
+
   const step1ok = !!(form.name.trim() && form.dob && form.gender);
-  const step2ok = picked.length > 0;
 
   const submit = async () => {
     if (!feast) return;
@@ -257,7 +257,7 @@ export function FeastRegister({ slug, theme, onBack, onExit, onDone }: {
   return (
     <div className="px-5">
       <FeastTopBar title={`Register · ${feast.name}`} onBack={step === 0 ? onBack : () => setStep((s) => s - 1)} onExit={onExit} theme={theme} />
-      <StepDots step={step} theme={theme} />
+      <StepDots step={step} labels={["Details", "Events", "Review"]} theme={theme} />
 
       {step === 0 && (
         <div>
@@ -295,7 +295,7 @@ export function FeastRegister({ slug, theme, onBack, onExit, onDone }: {
           const ng = normGender(c.gender);
           const genderOk = !ng || ng === "open" || ng === "common" || ng === participantGender;
           const catOk = !c.competitionCategorySlug || c.competitionCategorySlug === participantCatSlug;
-          return genderOk && catOk;
+          return genderOk && catOk && c.cat === "Individual";
         });
         return (
           <div>
@@ -315,22 +315,25 @@ export function FeastRegister({ slug, theme, onBack, onExit, onDone }: {
             )}
             {eligibleComps.length === 0 ? (
               <div className="text-center py-10 rounded-2xl" style={{ background: theme.fill }}>
-                <p className="text-[14px] font-semibold mb-1" style={{ color: theme.sub }}>No competitions available</p>
-                <p className="text-[12px]" style={{ color: theme.faint }}>No events match your age group or gender for this feast.</p>
+                <p className="text-[14px] font-semibold mb-1" style={{ color: theme.sub }}>No individual competitions available</p>
+                <p className="text-[12px]" style={{ color: theme.faint }}>No individual events match your age group or gender. You can still continue — join a team competition afterwards from &quot;Register Team&quot;.</p>
               </div>
             ) : eligibleComps.map((c) => {
               const on = picked.includes(c.id);
+              const full = !on && (shakhaCounts[c.id] ?? 0) >= MAX_SHAKHA_PER_COMPETITION;
               const genderColor = c.gender === "boys" ? "#3B82F6" : c.gender === "girls" ? "#EC4899" : null;
               return (
                 <GlassPanel
                   key={c.id}
                   theme={theme}
-                  pressable
-                  onClick={() => toggle(c.id)}
+                  pressable={!full}
+                  onClick={() => !full && toggle(c.id)}
                   style={{
                     padding: "12px 14px", marginBottom: 9, display: "flex", alignItems: "center", gap: 12,
                     border: on ? `1px solid ${theme.lavender}` : theme.glass.border,
                     boxShadow: on ? `0 0 0 3px ${theme.purple}2e, ${theme.softShadow}` : theme.softShadow,
+                    opacity: full ? 0.45 : 1,
+                    cursor: full ? "not-allowed" : "pointer",
                   }}
                 >
                   <div className="w-9 h-9 rounded-[10px] flex-shrink-0 flex items-center justify-center" style={{ background: feast.accent + "26" }}>
@@ -348,6 +351,11 @@ export function FeastRegister({ slug, theme, onBack, onExit, onDone }: {
                       {c.competitionCategorySlug && (
                         <span className="text-[10px] font-semibold px-1.5 py-px rounded-full" style={{ background: theme.purple + "1a", color: theme.purple, border: `1px solid ${theme.purple}33` }}>
                           {CATEGORY_LABELS[c.competitionCategorySlug] || c.competitionCategorySlug}
+                        </span>
+                      )}
+                      {full && (
+                        <span className="text-[10px] font-semibold px-1.5 py-px rounded-full" style={{ background: "#fef3c7", color: "#b45309", border: "1px solid #fde68a" }}>
+                          Full for your Shakha
                         </span>
                       )}
                     </div>
@@ -368,7 +376,10 @@ export function FeastRegister({ slug, theme, onBack, onExit, onDone }: {
               <span className="text-[13px]" style={{ color: theme.sub }}>Selected</span>
               <span className="font-bold text-[15px]" style={{ fontFamily: "var(--font-poppins), sans-serif", color: theme.text }}>{picked.length} event{picked.length !== 1 ? "s" : ""}</span>
             </div>
-            <GlowBtn variant="primary" full size="lg" disabled={!step2ok} iconRight="ArrowRight" onClick={() => setStep(2)}>Review Registration</GlowBtn>
+            <GlowBtn variant="primary" full size="lg" iconRight="ArrowRight" onClick={() => setStep(2)}>Review Registration</GlowBtn>
+            {picked.length === 0 && (
+              <p className="text-center text-[11.5px] mt-2.5" style={{ color: theme.faint }}>No individual events selected — you can still register and add them to a team later.</p>
+            )}
           </div>
         );
       })()}
@@ -393,13 +404,17 @@ export function FeastRegister({ slug, theme, onBack, onExit, onDone }: {
             ))}
             <div className="mt-3">
               <div className="text-[12.5px] mb-2" style={{ color: theme.faint }}>Competitions ({picked.length})</div>
-              <div className="flex flex-wrap gap-[7px]">
-                {picked.map((id) => (
-                  <span key={id} className="font-semibold text-[11.5px] px-[11px] py-1.5 rounded-full" style={{ fontFamily: "var(--font-poppins), sans-serif", color: theme.text, background: theme.purple + "2e", border: `1px solid ${theme.purple}55` }}>
-                    {feast.competitions.find((c) => c.id === id)?.name}
-                  </span>
-                ))}
-              </div>
+              {picked.length === 0 ? (
+                <p className="text-[12px]" style={{ color: theme.faint }}>None — you can add them to a team afterwards.</p>
+              ) : (
+                <div className="flex flex-wrap gap-[7px]">
+                  {picked.map((id) => (
+                    <span key={id} className="font-semibold text-[11.5px] px-[11px] py-1.5 rounded-full" style={{ fontFamily: "var(--font-poppins), sans-serif", color: theme.text, background: theme.purple + "2e", border: `1px solid ${theme.purple}55` }}>
+                      {feast.competitions.find((c) => c.id === id)?.name}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </GlassPanel>
           {serverError && (

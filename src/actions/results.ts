@@ -94,6 +94,166 @@ export async function getLeaderboard(
   return { data: rows };
 }
 
+// ── Overall leaderboard — gross sum of every shakha's points across ALL feasts ──
+
+export async function getOverallLeaderboard(): Promise<{ data?: LeaderboardRow[]; error?: string }> {
+  const admin = getSupabaseAdmin();
+
+  const [{ data: shakhas }, { data: standings }] = await Promise.all([
+    admin.from("shakhas").select("id, name").order("name"),
+    admin
+      .from("shakha_feast_standings")
+      .select(`
+        shakha_id, grand_total,
+        sub_junior_points, junior_points, senior_points,
+        super_senior_points, elder_points,
+        first_place_count, second_place_count, third_place_count,
+        a_grade_count, b_grade_count, c_grade_count
+      `),
+  ]);
+
+  if (!shakhas?.length) return { data: [] };
+
+  const SUM_KEYS = [
+    "grand_total", "sub_junior_points", "junior_points", "senior_points",
+    "super_senior_points", "elder_points",
+    "first_place_count", "second_place_count", "third_place_count",
+    "a_grade_count", "b_grade_count", "c_grade_count",
+  ] as const;
+
+  const sums = new Map<string, Record<string, number>>();
+  for (const s of standings ?? []) {
+    const id = s.shakha_id as string;
+    const acc = sums.get(id) ?? Object.fromEntries(SUM_KEYS.map((k) => [k, 0]));
+    for (const key of SUM_KEYS) acc[key] += (s as Record<string, number>)[key] ?? 0;
+    sums.set(id, acc);
+  }
+
+  const rows: LeaderboardRow[] = shakhas.map((sh) => {
+    const s = sums.get(sh.id as string);
+    return {
+      shakhaId: sh.id as string,
+      name: sh.name as string,
+      rank: 0,
+      points: s?.grand_total ?? 0,
+      subJunior: s?.sub_junior_points ?? 0,
+      junior: s?.junior_points ?? 0,
+      senior: s?.senior_points ?? 0,
+      superSenior: s?.super_senior_points ?? 0,
+      elder: s?.elder_points ?? 0,
+      firstCount: s?.first_place_count ?? 0,
+      secondCount: s?.second_place_count ?? 0,
+      thirdCount: s?.third_place_count ?? 0,
+      aGrade: s?.a_grade_count ?? 0,
+      bGrade: s?.b_grade_count ?? 0,
+      cGrade: s?.c_grade_count ?? 0,
+    };
+  });
+
+  rows.sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
+  rows.forEach((r, i) => { r.rank = i + 1; });
+
+  return { data: rows };
+}
+
+// ── Admin standings — same shakha_feast_standings table, but read via the
+// service-role client. shakha_feast_standings has no RLS policy at all, so
+// anon/authenticated (what the admin page's client-side supabase calls use)
+// silently return zero rows instead of an error — these two actions are
+// what the admin Standings page should call instead of querying directly. ──
+
+export interface AdminStandingRow {
+  rank: number;
+  shakhaId: string;
+  shakhaName: string;
+  subJunior: number;
+  junior: number;
+  senior: number;
+  superSenior: number;
+  elder: number;
+  team: number;
+  grandTotal: number;
+  firstCount: number;
+  secondCount: number;
+  thirdCount: number;
+  aGrade: number;
+  bGrade: number;
+  cGrade: number;
+}
+
+const STANDINGS_SELECT = `
+  rank, shakha_id,
+  sub_junior_points, junior_points, senior_points, super_senior_points, elder_points, team_points,
+  grand_total,
+  first_place_count, second_place_count, third_place_count,
+  a_grade_count, b_grade_count, c_grade_count,
+  shakha:shakhas(name)
+`;
+
+function toAdminStandingRow(s: Record<string, unknown>): AdminStandingRow {
+  const shakha = (Array.isArray(s.shakha) ? s.shakha[0] : s.shakha) as { name: string } | null;
+  return {
+    rank: (s.rank as number) ?? 0,
+    shakhaId: s.shakha_id as string,
+    shakhaName: shakha?.name ?? "—",
+    subJunior: (s.sub_junior_points as number) ?? 0,
+    junior: (s.junior_points as number) ?? 0,
+    senior: (s.senior_points as number) ?? 0,
+    superSenior: (s.super_senior_points as number) ?? 0,
+    elder: (s.elder_points as number) ?? 0,
+    team: (s.team_points as number) ?? 0,
+    grandTotal: (s.grand_total as number) ?? 0,
+    firstCount: (s.first_place_count as number) ?? 0,
+    secondCount: (s.second_place_count as number) ?? 0,
+    thirdCount: (s.third_place_count as number) ?? 0,
+    aGrade: (s.a_grade_count as number) ?? 0,
+    bGrade: (s.b_grade_count as number) ?? 0,
+    cGrade: (s.c_grade_count as number) ?? 0,
+  };
+}
+
+export async function getFeastStandings(feastId: string): Promise<{ data?: AdminStandingRow[]; error?: string }> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("shakha_feast_standings")
+    .select(STANDINGS_SELECT)
+    .eq("feast_id", feastId)
+    .order("rank");
+  if (error) return { error: error.message };
+  return { data: (data ?? []).map((s) => toAdminStandingRow(s as Record<string, unknown>)) };
+}
+
+export async function getOverallStandings(): Promise<{ data?: AdminStandingRow[]; error?: string }> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("shakha_feast_standings").select(STANDINGS_SELECT);
+  if (error) return { error: error.message };
+
+  const sums = new Map<string, AdminStandingRow>();
+  for (const raw of data ?? []) {
+    const row = toAdminStandingRow(raw as Record<string, unknown>);
+    const existing = sums.get(row.shakhaId);
+    if (!existing) { sums.set(row.shakhaId, { ...row, rank: 0 }); continue; }
+    existing.subJunior += row.subJunior;
+    existing.junior += row.junior;
+    existing.senior += row.senior;
+    existing.superSenior += row.superSenior;
+    existing.elder += row.elder;
+    existing.team += row.team;
+    existing.grandTotal += row.grandTotal;
+    existing.firstCount += row.firstCount;
+    existing.secondCount += row.secondCount;
+    existing.thirdCount += row.thirdCount;
+    existing.aGrade += row.aGrade;
+    existing.bGrade += row.bGrade;
+    existing.cGrade += row.cGrade;
+  }
+
+  const rows = [...sums.values()].sort((a, b) => b.grandTotal - a.grandTotal || a.shakhaName.localeCompare(b.shakhaName));
+  rows.forEach((r, i) => { r.rank = i + 1; });
+
+  return { data: rows };
+}
+
 // ── Search participants with their published results ──────────────────────
 
 export interface ParticipantResultItem {
@@ -575,7 +735,7 @@ export async function publishResults(
 
   const { error: statusErr } = await admin
     .from("feast_competitions")
-    .update({ result_status: "published" })
+    .update({ result_status: "published", comp_status: "published" })
     .eq("id", feastCompetitionId);
   if (statusErr) return { error: statusErr.message };
 
@@ -610,7 +770,7 @@ export async function unpublishResults(
   // Revert status
   await admin
     .from("feast_competitions")
-    .update({ result_status: "draft" })
+    .update({ result_status: "draft", comp_status: "completed" })
     .eq("id", feastCompetitionId);
 
   return {};
@@ -619,7 +779,7 @@ export async function unpublishResults(
 // ── Rebuild standings from ledger (internal) ───────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function rebuildStandings(feastId: string, admin: any): Promise<string | null> {
+export async function rebuildStandings(feastId: string, admin: any): Promise<string | null> {
   const [{ data: shakhas }, { data: ledger }] = await Promise.all([
     admin.from("shakhas").select("id, name"),
     admin.from("shakha_point_ledger").select("*").eq("feast_id", feastId),
@@ -645,13 +805,18 @@ async function rebuildStandings(feastId: string, admin: any): Promise<string | n
     const pts: Record<string, number> = {
       sub_junior_points: 0, junior_points: 0,
       senior_points: 0, super_senior_points: 0, elder_points: 0,
+      team_points: 0,
     };
     let first = 0, second = 0, third = 0;
     let aGrade = 0, bGrade = 0, cGrade = 0;
 
     for (const e of entries) {
-      const bucket = BUCKETS[e.category_slug as string];
-      if (bucket) pts[bucket] += (e.total_points as number) ?? 0;
+      if (e.category_slug === "team") {
+        pts.team_points += (e.total_points as number) ?? 0;
+      } else {
+        const bucket = BUCKETS[e.category_slug as string];
+        if (bucket) pts[bucket] += (e.total_points as number) ?? 0;
+      }
       if (e.position === 1) first++;
       if (e.position === 2) second++;
       if (e.position === 3) third++;

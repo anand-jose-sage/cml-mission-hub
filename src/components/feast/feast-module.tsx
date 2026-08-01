@@ -13,6 +13,7 @@ export type FeastModuleTutorialStep = "landing" | "details" | "login" | "registe
 const FeastLanding      = dynamic(() => import("./feast-landing").then(m => ({ default: m.FeastLanding })));
 const FeastDetails      = dynamic(() => import("./feast-details").then(m => ({ default: m.FeastDetails })));
 const FeastRegister     = dynamic(() => import("./feast-register").then(m => ({ default: m.FeastRegister })));
+const FeastRegisterTeam = dynamic(() => import("./feast-register-team").then(m => ({ default: m.FeastRegisterTeam })));
 const FeastSuccess      = dynamic(() => import("./feast-success").then(m => ({ default: m.FeastSuccess })));
 const FeastResults      = dynamic(() => import("./feast-results").then(m => ({ default: m.FeastResults })));
 const FeastLeaderboard  = dynamic(() => import("./feast-leaderboard").then(m => ({ default: m.FeastLeaderboard })));
@@ -20,7 +21,7 @@ const FeastParticipants = dynamic(() => import("./feast-participants").then(m =>
 const FeastRegistrations= dynamic(() => import("./feast-registrations").then(m => ({ default: m.FeastRegistrations })));
 const FeastEditRegister = dynamic(() => import("./feast-edit-register").then(m => ({ default: m.FeastEditRegister })));
 
-type Screen = "landing" | "details" | "register" | "success" | "results" | "leaderboard" | "participants" | "registrations" | "edit-registration";
+type Screen = "landing" | "details" | "register" | "register-team" | "success" | "results" | "leaderboard" | "participants" | "registrations" | "edit-registration";
 
 export function FeastModule({
   onExit,
@@ -69,7 +70,7 @@ export function FeastModule({
 
   const navActive = ["landing", "results", "leaderboard", "participants"].includes(screen)
     ? screen
-    : ["details", "register", "success"].includes(screen)
+    : ["details", "register", "register-team", "success"].includes(screen)
       ? "landing"
       : screen;
 
@@ -83,6 +84,9 @@ export function FeastModule({
       break;
     case "register":
       body = <FeastRegister slug={feastSlug} theme={theme} onBack={() => setScreen("details")} onExit={onExit} onDone={(r) => { setRegResult(r); setScreen("success"); }} />;
+      break;
+    case "register-team":
+      body = <FeastRegisterTeam slug={feastSlug} theme={theme} onBack={() => setScreen("details")} onExit={onExit} onDone={() => setScreen("details")} />;
       break;
     case "success":
       body = <FeastSuccess slug={feastSlug} theme={theme} result={regResult} onDone={() => setScreen("details")} onRegisterAnother={() => { setRegResult(null); setScreen("register"); }} />;

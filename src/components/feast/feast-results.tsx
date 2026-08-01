@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Loader2, ChevronDown, Trophy, Search, BookOpen } from "lucide-react";
+import { Loader2, ChevronDown, Trophy, Search, BookOpen, Camera } from "lucide-react";
 import { useFeast, useFeasts } from "@/hooks/use-feast";
 import { getPublishedResults, type PublicResultRow } from "@/actions/results";
+import { getPublishedTeamResults } from "@/actions/team-results";
 import { SHAKHA_COLOR_MAP } from "@/lib/feast-data";
+import { CATEGORY_LABELS } from "@/lib/competition-categories";
 import { FeastTopBar, FeastTabs, type FeastTheme } from "./feast-shared";
+import { PosterGeneratorOverlay, type PosterWinner } from "./poster/poster-generator-overlay";
 
 // ─── Category config ──────────────────────────────────────────────────────────
 
@@ -18,6 +21,9 @@ const CAT_CONFIG = [
 ] as const;
 type CatSlug = typeof CAT_CONFIG[number]["slug"];
 
+const TEAM_TAB = { slug: "team", label: "Team", color: "#EC4899" } as const;
+type TabSlug = CatSlug | "team";
+
 // ─── Position styling ─────────────────────────────────────────────────────────
 
 const POS_STYLE: Record<number, {
@@ -29,19 +35,21 @@ const POS_STYLE: Record<number, {
   3: { bg: "#FFF7ED", border: "#E0936A", text: "#7C2D12", disc: "#D98E5F", numBg: "#5A2C14", numText: "#FDE3C9" },
 };
 
+const MEDAL_EMOJI = ["🥇", "🥈", "🥉"] as const;
+
 function MedalBadge({ pos }: { pos: number }) {
   const m = POS_STYLE[pos];
   if (!m) return null;
   return (
     <div
-      className="shrink-0 rounded-full flex items-center justify-center font-black"
+      className="shrink-0 rounded-full flex items-center justify-center"
       style={{
-        width: 30, height: 30, background: m.disc, color: m.numBg,
-        fontSize: 14, lineHeight: 1, boxShadow: `0 2px 6px ${m.disc}66`,
-        border: `1.5px solid ${m.numBg}33`,
+        width: 34, height: 34, fontSize: 17,
+        background: `linear-gradient(135deg, ${m.disc}, ${m.disc}88)`,
+        boxShadow: `0 0 0 3px ${m.bg}, 0 4px 10px ${m.disc}66`,
       }}
     >
-      {pos}
+      {MEDAL_EMOJI[pos - 1]}
     </div>
   );
 }
@@ -81,19 +89,93 @@ function sortResults(rows: PublicResultRow[]): PublicResultRow[] {
 
 // ─── Result row ───────────────────────────────────────────────────────────────
 
-function ResultRow({ row, index, last, showMedal }: {
-  row: PublicResultRow; index: number; last: boolean; showMedal: boolean;
+function PosterButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center border-none cursor-pointer active:scale-95 transition-transform"
+      style={{ background: "rgba(107,70,255,0.1)" }}
+      aria-label="Generate social poster"
+    >
+      <Camera size={15} color="#6B46FF" />
+    </button>
+  );
+}
+
+function ResultRow({ row, index, last, showMedal, isTeam, competitionName, categoryLabel, feastName, onGeneratePoster }: {
+  row: PublicResultRow; index: number; last: boolean; showMedal: boolean; isTeam: boolean;
+  competitionName: string; categoryLabel: string; feastName: string; onGeneratePoster: (winner: PosterWinner) => void;
 }) {
   const anek: React.CSSProperties = { fontFamily: "var(--font-anek), sans-serif", fontWeight: 700 };
   const pos = row.position !== null && row.position <= 3 ? POS_STYLE[row.position] : null;
   const sc = SHAKHA_COLOR_MAP[row.shakha] ?? "#A78BFA";
   const zebra = index % 2 === 1;
+  const rowBg = pos ? `${pos.border}1A` : zebra ? "rgba(255,255,255,0.4)" : "transparent";
+  const openPoster = () => {
+    if (!row.position || row.position > 3) return;
+    onGeneratePoster({
+      rank: row.position as 1 | 2 | 3,
+      winnerName: row.name,
+      houseName: row.houseName,
+      shakhaName: row.shakha,
+      competitionName,
+      categoryLabel,
+      feastName,
+    });
+  };
+
+  if (isTeam) {
+    const anekRegular: React.CSSProperties = { fontFamily: "var(--font-anek), sans-serif" };
+    const members = row.houseName ? row.houseName.split(", ") : [];
+    return (
+      <div
+        style={{
+          border: "1.5px solid rgba(107,70,255,0.38)",
+          borderRadius: 12,
+          overflow: "hidden",
+          marginTop: index === 0 ? 0 : 8,
+          marginBottom: last ? 0 : 2,
+        }}
+      >
+        {/* Top tier — rank, team name, grade */}
+        <div className="flex items-center gap-3 px-3.5 py-3" style={{ background: rowBg }}>
+          {showMedal && (
+            <div className="shrink-0 w-8 flex justify-center">
+              {pos ? <MedalBadge pos={row.position!} /> : null}
+            </div>
+          )}
+          <p className="flex-1 min-w-0 text-[15px] leading-tight truncate" style={{ color: "#1E1B4B", ...anek }}>{row.name}</p>
+          <div className="shrink-0 flex flex-col items-center gap-0.5">
+            {row.grade
+              ? <GradeChip grade={row.grade} />
+              : <span className="w-8 h-8 flex items-center justify-center text-[14px] text-gray-300">—</span>}
+            <span className="text-[10px] font-semibold" style={{ color: "#9CA3AF", ...anekRegular }}>{row.totalPoints} pts</span>
+          </div>
+        </div>
+        {/* Bottom tier — members + shakha */}
+        <div className="flex items-center justify-between gap-3 px-3.5 py-2 flex-wrap" style={{ background: "rgba(107,70,255,0.05)" }}>
+          <p className="text-[12.5px] min-w-0" style={{ color: "#6B7280", ...anekRegular }}>
+            <span style={{ color: "#9CA3AF" }}>Members </span>
+            {members.length > 0 ? members.join(", ") : "—"}
+          </p>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[15px] leading-none" aria-hidden="true">⛪</span>
+            <span className="text-[16px] leading-none" style={{ color: sc, ...anek }}>{row.shakha}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="flex items-center gap-3 px-3.5 py-3"
       style={{
-        background: pos ? `${pos.border}1A` : zebra ? "rgba(255,255,255,0.4)" : "transparent",
-        borderBottom: last ? "none" : "1px solid rgba(107,70,255,0.07)",
+        background: rowBg,
+        border: "1.5px solid rgba(107,70,255,0.38)",
+        borderRadius: 12,
+        marginTop: index === 0 ? 0 : 8,
+        marginBottom: last ? 0 : 2,
       }}
     >
       {/* Medal badge (podium only) */}
@@ -108,29 +190,35 @@ function ResultRow({ row, index, last, showMedal }: {
         <div className="flex items-baseline gap-1.5 min-w-0">
           <p className="text-[15px] leading-tight truncate" style={{ color: "#1E1B4B", ...anek }}>{row.name}</p>
           {row.houseName && (
-            <span className="inline-flex items-baseline gap-1.5 text-[13.5px] font-semibold truncate" style={{ color: "#7C3AED" }}>
+            <span className="inline-flex items-baseline gap-1.5 text-[13.5px] truncate" style={{ color: "#7C3AED", ...anek }}>
               <span style={{ color: "#DDD6FE" }}>|</span>
               {row.houseName}
             </span>
           )}
         </div>
         <div className="flex items-center gap-1.5 mt-1 min-w-0">
-          <span className="text-[13px] shrink-0 leading-none" aria-hidden="true">⛪</span>
-          <span className="text-[13px] font-bold truncate" style={{ color: sc }}>{row.shakha}</span>
+          <span className="text-[15px] shrink-0 leading-none" aria-hidden="true">⛪</span>
+          <span className="text-[16px] leading-none truncate" style={{ color: sc, ...anek }}>{row.shakha}</span>
         </div>
       </div>
 
       {/* Grade (right) */}
-      <div className="shrink-0">
+      <div className="shrink-0 flex flex-col items-center gap-0.5">
         {row.grade
           ? <GradeChip grade={row.grade} />
           : <span className="w-8 h-8 flex items-center justify-center text-[14px] text-gray-300">—</span>}
+        <span className="text-[10px] font-semibold" style={{ color: "#9CA3AF", fontFamily: "var(--font-anek), sans-serif" }}>{row.totalPoints} pts</span>
       </div>
+
+      {pos && <PosterButton onClick={openPoster} />}
     </div>
   );
 }
 
-function ResultTable({ title, accent, rows }: { title: string; accent: string; rows: PublicResultRow[] }) {
+function ResultTable({ title, accent, rows, isTeam, competitionName, categoryLabel, feastName, onGeneratePoster }: {
+  title: string; accent: string; rows: PublicResultRow[]; isTeam: boolean;
+  competitionName: string; categoryLabel: string; feastName: string; onGeneratePoster: (winner: PosterWinner) => void;
+}) {
   if (rows.length === 0) return null;
   const showMedal = rows.some((r) => r.position !== null && r.position <= 3);
   return (
@@ -146,7 +234,10 @@ function ResultTable({ title, accent, rows }: { title: string; accent: string; r
 
       {/* Rows */}
       {rows.map((r, i) => (
-        <ResultRow key={r.registrationId} row={r} index={i} last={i === rows.length - 1} showMedal={showMedal} />
+        <ResultRow
+          key={r.registrationId} row={r} index={i} last={i === rows.length - 1} showMedal={showMedal} isTeam={isTeam}
+          competitionName={competitionName} categoryLabel={categoryLabel} feastName={feastName} onGeneratePoster={onGeneratePoster}
+        />
       ))}
     </div>
   );
@@ -155,12 +246,15 @@ function ResultTable({ title, accent, rows }: { title: string; accent: string; r
 // ─── Competition card ─────────────────────────────────────────────────────────
 
 function CompCard({
-  comp, catColor,
+  comp, catColor, feastName, onGeneratePoster,
 }: {
-  comp: { id: string; name: string; gender?: string | null; competitionCategorySlug?: string | null; compStatus?: string | null };
+  comp: { id: string; name: string; cat?: "Individual" | "Team"; gender?: string | null; competitionCategorySlug?: string | null; compStatus?: string | null };
   catColor: string;
+  feastName: string;
+  onGeneratePoster: (winner: PosterWinner) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const categoryLabel = comp.competitionCategorySlug ? CATEGORY_LABELS[comp.competitionCategorySlug] ?? "" : "";
   const [results, setResults] = useState<PublicResultRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const anek: React.CSSProperties = { fontFamily: "var(--font-anek), sans-serif", fontWeight: 600 };
@@ -171,7 +265,9 @@ function CompCard({
     setOpen(next);
     if (next && results === null) {
       setLoading(true);
-      const res = await getPublishedResults(comp.id);
+      const res = comp.cat === "Team"
+        ? await getPublishedTeamResults(comp.id)
+        : await getPublishedResults(comp.id);
       setResults(res.data ?? []);
       setLoading(false);
     }
@@ -218,8 +314,14 @@ function CompCard({
             <div className="text-center py-5 rounded-xl text-[13px]" style={{ background: `${catColor}10`, color: "#9CA3AF" }}>No results recorded</div>
           ) : (
             <>
-              <ResultTable title="Positions" accent={catColor} rows={sorted.filter(r => r.position !== null)} />
-              <ResultTable title="Grades" accent={catColor} rows={sorted.filter(r => r.position === null && r.grade !== null)} />
+              <ResultTable
+                title="Positions" accent={catColor} rows={sorted.filter(r => r.position !== null)} isTeam={comp.cat === "Team"}
+                competitionName={comp.name} categoryLabel={categoryLabel} feastName={feastName} onGeneratePoster={onGeneratePoster}
+              />
+              <ResultTable
+                title="Grades" accent={catColor} rows={sorted.filter(r => r.position === null && r.grade !== null)} isTeam={comp.cat === "Team"}
+                competitionName={comp.name} categoryLabel={categoryLabel} feastName={feastName} onGeneratePoster={onGeneratePoster}
+              />
             </>
           )}
         </div>
@@ -230,17 +332,28 @@ function CompCard({
 
 // ─── Category tabs + competition list ─────────────────────────────────────────
 
-function ResultsTabs({ competitions }: {
-  competitions: { id: string; name: string; gender?: string | null; competitionCategorySlug?: string | null; compStatus?: string | null }[];
+function ResultsTabs({ competitions, feastName, onGeneratePoster }: {
+  competitions: { id: string; name: string; cat?: "Individual" | "Team"; gender?: string | null; competitionCategorySlug?: string | null; compStatus?: string | null }[];
+  feastName: string;
+  onGeneratePoster: (winner: PosterWinner) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<CatSlug | "">("");
+  const [activeTab, setActiveTab] = useState<TabSlug | "">("");
 
-  const available = CAT_CONFIG.filter(cat => competitions.some(c => c.competitionCategorySlug === cat.slug));
-  const resolved: CatSlug | "" =
-    activeTab && available.some(c => c.slug === activeTab) ? (activeTab as CatSlug) : (available[0]?.slug ?? "");
+  // Team competitions get their own tab — regardless of whether they carry an
+  // age category (e.g. Folk Dance is sub_junior-only) or none at all (e.g.
+  // Group Song is open to every age) — so they never mix into an age tab.
+  const hasTeam = competitions.some(c => c.cat === "Team");
+  const available: { slug: TabSlug; label: string; color: string }[] = [
+    ...CAT_CONFIG.filter(cat => competitions.some(c => c.competitionCategorySlug === cat.slug && c.cat !== "Team")),
+    ...(hasTeam ? [TEAM_TAB] : []),
+  ];
+  const resolved: TabSlug | "" =
+    activeTab && available.some(c => c.slug === activeTab) ? activeTab : (available[0]?.slug ?? "");
 
-  const filtered = competitions.filter(c => c.competitionCategorySlug === resolved);
-  const activeCat = CAT_CONFIG.find(c => c.slug === resolved);
+  const filtered = resolved === "team"
+    ? competitions.filter(c => c.cat === "Team")
+    : competitions.filter(c => c.competitionCategorySlug === resolved && c.cat !== "Team");
+  const activeCat = available.find(c => c.slug === resolved);
 
   if (available.length === 0) {
     return <p className="text-[15px] text-center py-8" style={{ color: "#6B7280" }}>No competitions yet.</p>;
@@ -271,7 +384,9 @@ function ResultsTabs({ competitions }: {
       <div className="mt-3">
         {filtered.length === 0
           ? <p className="text-[15px] text-center py-6" style={{ color: "#9CA3AF" }}>No competitions in this category.</p>
-          : filtered.map(comp => <CompCard key={comp.id} comp={comp} catColor={activeCat?.color ?? "#6B46FF"} />)}
+          : filtered.map(comp => (
+            <CompCard key={comp.id} comp={comp} catColor={activeCat?.color ?? "#6B46FF"} feastName={feastName} onGeneratePoster={onGeneratePoster} />
+          ))}
       </div>
     </div>
   );
@@ -279,7 +394,7 @@ function ResultsTabs({ competitions }: {
 
 // ─── Feast content (competitions for one feast) ───────────────────────────────
 
-function FeastContent({ slug, theme }: { slug: string; theme: FeastTheme }) {
+function FeastContent({ slug, theme, onGeneratePoster }: { slug: string; theme: FeastTheme; onGeneratePoster: (winner: PosterWinner) => void }) {
   const { feast, loading } = useFeast(slug);
 
   if (loading && !feast?.competitions.length) {
@@ -297,7 +412,7 @@ function FeastContent({ slug, theme }: { slug: string; theme: FeastTheme }) {
       <div className="absolute pointer-events-none"
         style={{ bottom: -30, left: -20, width: 120, height: 120, borderRadius: "50%", background: "radial-gradient(circle,rgba(52,211,238,0.18) 0%,transparent 70%)", filter: "blur(18px)" }} />
       <div className="relative">
-        <ResultsTabs competitions={feast.competitions} />
+        <ResultsTabs competitions={feast.competitions} feastName={feast.name} onGeneratePoster={onGeneratePoster} />
       </div>
     </div>
   );
@@ -315,6 +430,7 @@ export function FeastResults({ slug, theme, onBack, onExit, onSearchNav, setFeas
 }) {
   const { feasts, loading: feastsLoading } = useFeasts();
   const [activeSlug, setActiveSlug] = useState(slug);
+  const [posterWinner, setPosterWinner] = useState<PosterWinner | null>(null);
 
   // Auto-select first feast once DB feasts load
   useEffect(() => {
@@ -370,10 +486,14 @@ export function FeastResults({ slug, theme, onBack, onExit, onSearchNav, setFeas
           <Loader2 size={22} className="animate-spin" style={{ color: theme.lavender }} />
         </div>
       ) : (
-        <FeastContent key={activeSlug} slug={activeSlug} theme={theme} />
+        <FeastContent key={activeSlug} slug={activeSlug} theme={theme} onGeneratePoster={setPosterWinner} />
       )}
 
       <div className="h-6" />
+
+      {posterWinner && (
+        <PosterGeneratorOverlay winner={posterWinner} onClose={() => setPosterWinner(null)} />
+      )}
     </div>
   );
 }

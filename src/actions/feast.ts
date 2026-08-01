@@ -5,6 +5,49 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getRegPrefix } from "@/lib/feast-data";
 import { getCategorySlug } from "@/lib/competition-categories";
 
+// A Shakha may only field MAX_SHAKHA_PER_COMPETITION participants in any single
+// individual competition (team/group competitions are unrelated — those go
+// through registerTeam() in team.ts and allow up to 7).
+const MAX_SHAKHA_PER_COMPETITION = 2;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function findFullCompetitionsForShakha(
+  client: any,
+  feastCompetitionIds: string[],
+  shakhaId: string | null,
+  excludeParticipantId?: string
+): Promise<string[]> {
+  if (!shakhaId || feastCompetitionIds.length === 0) return [];
+
+  const { data: regs } = await client
+    .from("participant_registrations")
+    .select("feast_competition_id, participant_id")
+    .in("feast_competition_id", feastCompetitionIds);
+
+  if (!regs?.length) return [];
+
+  const participantIds = [...new Set(regs.map((r: { participant_id: string }) => r.participant_id))]
+    .filter((id) => id !== excludeParticipantId);
+  if (participantIds.length === 0) return [];
+
+  const { data: parts } = await client
+    .from("participants")
+    .select("id")
+    .in("id", participantIds)
+    .eq("shakha_id", shakhaId);
+
+  const shakhaParticipantIds = new Set((parts ?? []).map((p: { id: string }) => p.id));
+
+  const counts: Record<string, number> = {};
+  for (const r of regs as { feast_competition_id: string; participant_id: string }[]) {
+    if (r.participant_id === excludeParticipantId) continue;
+    if (!shakhaParticipantIds.has(r.participant_id)) continue;
+    counts[r.feast_competition_id] = (counts[r.feast_competition_id] ?? 0) + 1;
+  }
+
+  return feastCompetitionIds.filter((id) => (counts[id] ?? 0) >= MAX_SHAKHA_PER_COMPETITION);
+}
+
 export interface RegInput {
   feastSlug: string;
   shakhaId: string | null;
@@ -45,6 +88,12 @@ export async function registerParticipant(input: RegInput): Promise<RegOutput | 
       return { error: "Feast not found." };
     }
 
+    // A Shakha may only field 2 participants per individual competition
+    const fullComps = await findFullCompetitionsForShakha(supabase, input.feastCompetitionIds, input.shakhaId);
+    if (fullComps.length > 0) {
+      return { error: "Your Shakha already has 2 participants in one of the selected competitions. Please deselect it and choose another." };
+    }
+
     // Resolve competition category from DOB
     const catSlug = getCategorySlug(input.dateOfBirth);
     let competitionCategoryId: string | null = null;
@@ -58,7 +107,7 @@ export async function registerParticipant(input: RegInput): Promise<RegOutput | 
     }
 
     // Atomic per-feast counter (starts at 1111). See migration-reg-numbers.sql.
-    const prefix = getRegPrefix(input.feastSlug);
+    const prefix = getRegPrefix(input.feastSlug, feastRow.id as string);
     const { data: nextNum, error: numErr } = await supabase.rpc("next_reg_number", { p_feast_id: feastRow.id });
     if (numErr || nextNum == null) {
       console.error("[registerParticipant] next_reg_number:", numErr?.message);
@@ -126,6 +175,11 @@ export interface AdminRegInput {
 export async function createParticipantAdmin(input: AdminRegInput): Promise<{ error?: string }> {
   const admin = getSupabaseAdmin();
   try {
+    const fullComps = await findFullCompetitionsForShakha(admin, input.feastCompetitionIds, input.shakhaId || null);
+    if (fullComps.length > 0) {
+      return { error: "This Shakha already has 2 participants in one of the selected competitions." };
+    }
+
     const catSlug = getCategorySlug(input.dateOfBirth);
     let competitionCategoryId: string | null = null;
     if (catSlug) {
@@ -153,7 +207,7 @@ export async function createParticipantAdmin(input: AdminRegInput): Promise<{ er
       console.error("[createParticipantAdmin] next_reg_number:", numErr?.message);
       return { error: "Could not allocate a registration number." };
     }
-    const regNo = `${getRegPrefix(feastRow.slug as string)}-${nextNum}`;
+    const regNo = `${getRegPrefix(feastRow.slug as string, input.feastId)}-${nextNum}`;
 
     const { data: participant, error: pErr } = await admin
       .from("participants")
@@ -206,6 +260,19 @@ export interface UpdateInput {
 export async function updateParticipant(input: UpdateInput): Promise<{ error?: string }> {
   const admin = getSupabaseAdmin();
   try {
+    const { data: existing } = await admin
+      .from("participants")
+      .select("shakha_id")
+      .eq("id", input.participantId)
+      .maybeSingle();
+
+    const fullComps = await findFullCompetitionsForShakha(
+      admin, input.feastCompetitionIds, existing?.shakha_id ?? null, input.participantId
+    );
+    if (fullComps.length > 0) {
+      return { error: "This Shakha already has 2 participants in one of the selected competitions." };
+    }
+
     // Resolve competition category from DOB
     const catSlug = getCategorySlug(input.dateOfBirth);
     let competitionCategoryId: string | null = null;

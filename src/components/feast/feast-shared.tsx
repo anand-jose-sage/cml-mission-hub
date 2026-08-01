@@ -6,7 +6,7 @@ import {
   Trophy, Sparkles, ArrowLeft, ArrowRight, LogOut, ChevronRight,
   ChevronDown, Clock, MapPin, Check, Ticket, Medal, Search, X,
   PenTool, Palette, FileText, BookOpen, Mic, Users, Film, Image,
-  ClipboardList, UserPlus, Lock, LogIn,
+  ClipboardList, UserPlus, Lock, LogIn, Camera, Upload, Download,
 } from "lucide-react";
 import type { CMLTheme } from "@/lib/theme";
 import type { Feast } from "@/lib/feast-data";
@@ -16,7 +16,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; color?: stri
   Trophy, Sparkles, ArrowLeft, ArrowRight, LogOut, ChevronRight,
   ChevronDown, Clock, MapPin, Check, Ticket, Medal, Search, X,
   PenTool, Palette, FileText, BookOpen, Mic, Users, Film, Image,
-  ClipboardList, UserPlus, Lock, LogIn,
+  ClipboardList, UserPlus, Lock, LogIn, Camera, Upload, Download,
 };
 
 export function FeastIcon({ name, size = 20, color, className }: { name: string; size?: number; color?: string; className?: string }) {
@@ -150,6 +150,41 @@ export function GlowBtn({
       {children}
       {iconRight && <FeastIcon name={iconRight} size={fonts[size] + 2} color={iconColor} />}
     </button>
+  );
+}
+
+export function StepDots({ step, labels, theme }: { step: number; labels: string[]; theme: FeastTheme }) {
+  return (
+    <div className="flex items-center gap-1.5 mb-[18px]">
+      {labels.map((l, i) => {
+        const done = i < step;
+        const active = i === step;
+        return (
+          <div key={i} className="contents">
+            <div className="flex items-center gap-[7px]">
+              <div
+                className="w-[26px] h-[26px] rounded-full flex items-center justify-center flex-shrink-0 font-bold text-[12px]"
+                style={{
+                  fontFamily: "var(--font-poppins), sans-serif",
+                  background: done || active ? "linear-gradient(135deg, #6B46FF, #A78BFA)" : theme.fillStrong,
+                  color: done || active ? "#fff" : theme.faint,
+                  boxShadow: active ? "0 6px 16px rgba(107,70,255,0.4)" : "none",
+                }}
+              >
+                {done ? <Check size={14} color="#fff" /> : i + 1}
+              </div>
+              <span
+                className="text-[11.5px]"
+                style={{ fontWeight: active ? 700 : 500, color: active ? theme.text : theme.faint, fontFamily: "var(--font-poppins), sans-serif" }}
+              >
+                {l}
+              </span>
+            </div>
+            {i < labels.length - 1 && <div className="flex-1 h-0.5 rounded" style={{ background: i < step ? theme.lavender : theme.track }} />}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

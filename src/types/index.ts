@@ -233,6 +233,43 @@ export interface GroupTeam {
   created_at: string;
 }
 
+export interface TeamRegistration {
+  id: string;
+  feast_id: string;
+  feast_competition_id: string;
+  shakha_id: string;
+  team_name: string;
+  created_at: string;
+  updated_at: string;
+  shakha?: Shakha;
+  feast_competition?: FeastCompetition;
+  members?: TeamRegistrationMember[];
+}
+
+export interface TeamRegistrationMember {
+  id: string;
+  team_registration_id: string;
+  participant_id: string;
+  feast_competition_id: string;
+  created_at: string;
+  participant?: Participant;
+}
+
+export interface TeamResult {
+  id: string;
+  feast_competition_id: string;
+  team_registration_id: string;
+  score: number;
+  grade: "A" | "B" | "C" | null;
+  grade_points: number;
+  position: number | null;
+  position_points: number;
+  total_points: number;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // ============================================================
 // ANNUAL PLAN (Pravarthana Margarekha) — key-value JSONB content
 // ============================================================

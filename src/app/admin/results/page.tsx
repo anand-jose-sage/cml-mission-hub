@@ -176,11 +176,16 @@ export default function ResultsAdminPage() {
     if (!feastId) return;
     supabase
       .from("feast_competitions")
-      .select("id, max_score, result_status, display_order, competition:competitions(name, gender, competition_category:competition_categories(name))")
+      .select("id, max_score, result_status, display_order, competition:competitions(name, type, gender, competition_category:competition_categories(name))")
       .eq("feast_id", feastId)
       .order("display_order")
       .then(({ data }) => {
-        const opts: CompOption[] = (data ?? []).map((fc) => {
+        const opts: CompOption[] = (data ?? [])
+          .filter((fc) => {
+            const comp = (Array.isArray(fc.competition) ? fc.competition[0] : fc.competition) as Record<string, unknown> | null;
+            return comp?.type !== "group";
+          })
+          .map((fc) => {
           const comp = (Array.isArray(fc.competition) ? fc.competition[0] : fc.competition) as Record<string, unknown> | null;
           const cat = comp ? (Array.isArray(comp.competition_category) ? (comp.competition_category as unknown[])[0] : comp.competition_category) as Record<string, unknown> | null : null;
           const name = (comp?.name as string) ?? "Unknown";

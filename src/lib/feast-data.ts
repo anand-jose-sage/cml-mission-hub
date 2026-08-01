@@ -128,12 +128,25 @@ const NAMES = [
 ];
 
 const PREFIX: Record<string, string> = {
+  // Real DB slugs (confirmed in production) — keep both these and the
+  // originally-guessed hyphenated variants so neither shape breaks.
+  "literature_2026": "LF26",
   "literature-feast-2026": "LF26",
+  "arts_fest_2026": "AF26",
   "arts-feast-2026": "AF26",
 };
 
-export function getRegPrefix(slug: string) {
-  return PREFIX[slug] || "REG";
+// registration_number is UNIQUE across the whole `participants` table (not
+// scoped per feast), so every feast needs a prefix that no other feast can
+// ever produce. A shared constant fallback ("REG") is what caused two
+// feasts' independently-numbered counters (both starting at 1111) to
+// collide once their ranges overlapped. For any slug not in the map above,
+// derive the prefix from the feast's own UUID — collision-proof by
+// construction, no manual map maintenance needed for future feasts.
+export function getRegPrefix(slug: string, feastId?: string) {
+  if (PREFIX[slug]) return PREFIX[slug];
+  if (feastId) return `F${feastId.replace(/-/g, "").slice(0, 4).toUpperCase()}`;
+  return "REG";
 }
 
 export function resultsFor(compId: string) {

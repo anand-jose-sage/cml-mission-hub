@@ -24,18 +24,12 @@ import { useMyRegistrationsTutorial } from "@/app/(tutorial)/help/tutorials/my-r
 import { useEditRegistrationTutorial } from "@/app/(tutorial)/help/tutorials/edit-registration/_hooks/use-edit-registration-tutorial";
 import { useDeleteRegistrationTutorial } from "@/app/(tutorial)/help/tutorials/delete-registration/_hooks/use-delete-registration-tutorial";
 
-// Temporary: hide the "Feast Portal" home-page card from Sun 19 Jul 2026, 11 PM IST onward.
-// The Feast Portal feature itself is untouched — still reachable via the "Feast" quick-access
-// tile. Bump/remove this cutoff to bring the card back.
-const FEAST_PORTAL_HIDE_AT = new Date("2026-07-19T23:00:00+05:30").getTime();
-
 export default function HomePage() {
   const theme = useMemo(() => buildTheme("aurora-glass", "dusk", 28), []);
   const [tab, setTab] = useState("home");
   const [sel, setSel] = useState<number | null>(null); // null = all week
   const [noticeDetailOpen, setNoticeDetailOpen] = useState(false);
   const [inFeastInternal, setInFeastInternal] = useState(false);
-  const [showFeastPortalCard, setShowFeastPortalCard] = useState(() => Date.now() < FEAST_PORTAL_HIDE_AT);
   const tutorial = useTutorialPrelude();
   const myRegTutorial = useMyRegistrationsTutorial();
   const editRegTutorial = useEditRegistrationTutorial();
@@ -60,15 +54,6 @@ export default function HomePage() {
       scrollRef.current.scrollTop = 0;
     }
   }, [tab]);
-
-  // Auto-hide the Feast Portal card if the cutoff passes while the page stays open.
-  useEffect(() => {
-    if (!showFeastPortalCard) return;
-    const msUntilHide = FEAST_PORTAL_HIDE_AT - Date.now();
-    if (msUntilHide <= 0) { setShowFeastPortalCard(false); return; }
-    const t = setTimeout(() => setShowFeastPortalCard(false), msUntilHide);
-    return () => clearTimeout(t);
-  }, [showFeastPortalCard]);
 
   const handleNoticeDetail = useCallback((open: boolean) => {
     setNoticeDetailOpen(open);
@@ -152,7 +137,7 @@ export default function HomePage() {
               <TopHeader theme={theme} />
               <HeroEvent theme={theme} />
 
-              {showFeastPortalCard && <FeastPortalCard onEnter={() => setInFeast(true)} />}
+              <FeastPortalCard onEnter={() => setInFeast(true)} />
 
               {/* Quick access — soft 3D shortcuts */}
               <QuickAccess

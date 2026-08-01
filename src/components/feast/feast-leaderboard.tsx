@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Loader2, Trophy, ChevronDown } from "lucide-react";
-import { getLeaderboard, type LeaderboardRow } from "@/actions/results";
+import { getLeaderboard, getOverallLeaderboard, type LeaderboardRow } from "@/actions/results";
 import { useFeasts } from "@/hooks/use-feast";
 import { SHAKHA_COLOR_MAP } from "@/lib/feast-data";
 import { FeastTopBar, FeastTabs, type FeastTheme } from "./feast-shared";
@@ -257,6 +257,7 @@ export function FeastLeaderboard({ slug, theme, onBack, onExit, setFeastSlug }: 
 }) {
   const { feasts, loading: feastsLoading } = useFeasts();
   const [activeSlug, setActiveSlug] = useState(slug);
+  const [mode, setMode] = useState<"feast" | "overall">("feast");
   const [rows, setRows] = useState<LeaderboardRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [animated, setAnimated] = useState(false);
@@ -269,10 +270,35 @@ export function FeastLeaderboard({ slug, theme, onBack, onExit, setFeastSlug }: 
     }
   }, [feasts]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load the overall (all-feast) leaderboard whenever that mode is active.
+  useEffect(() => {
+    if (mode !== "overall") return;
+
+    setLoading(true);
+    setRows([]);
+    setAnimated(false);
+    if (animTimer.current) clearTimeout(animTimer.current);
+
+    getOverallLeaderboard()
+      .then(({ data, error }) => {
+        if (error) console.error("[overall-leaderboard]", error);
+        setRows(data ?? []);
+        setLoading(false);
+        animTimer.current = setTimeout(() => setAnimated(true), 100);
+      })
+      .catch(err => {
+        console.error("[overall-leaderboard]", err);
+        setLoading(false);
+      });
+
+    return () => { if (animTimer.current) clearTimeout(animTimer.current); };
+  }, [mode]);
+
   // Load leaderboard once feasts are loaded AND activeSlug is a confirmed feast.
   // Fetching before the slug is validated would briefly return an empty result
   // (feast-not-found) and flash the "No standings" state before the real data.
   useEffect(() => {
+    if (mode !== "feast") return;
     if (feastsLoading) return;                       // wait for the feast list
     if (!feasts.some(f => f.slug === activeSlug)) {   // slug not (yet) valid
       if (feasts.length === 0) setLoading(false);     // truly no feasts → stop spinner
@@ -297,9 +323,10 @@ export function FeastLeaderboard({ slug, theme, onBack, onExit, setFeastSlug }: 
       });
 
     return () => { if (animTimer.current) clearTimeout(animTimer.current); };
-  }, [activeSlug, feastsLoading, feasts]);
+  }, [activeSlug, feastsLoading, feasts, mode]);
 
   const handlePick = (s: string) => {
+    setMode("feast");
     setActiveSlug(s);
     setFeastSlug(s);
   };
@@ -316,10 +343,34 @@ export function FeastLeaderboard({ slug, theme, onBack, onExit, setFeastSlug }: 
     <div className="px-4">
       <FeastTopBar title="Rankings" onBack={onBack} onExit={onExit} theme={theme} />
 
-      {/* Feast selector from DB */}
-      <FeastTabs feasts={feasts} active={activeSlug} onPick={handlePick} loading={feastsLoading} />
+      {/* This Feast / Overall toggle */}
+      <div className="flex gap-2 mb-3 p-1 rounded-[14px]" style={{ background: "rgba(107,70,255,0.06)" }}>
+        {([["feast", "Feasts"], ["overall", "Overall"]] as const).map(([m, label]) => {
+          const on = mode === m;
+          return (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className="flex-1 py-2 rounded-[11px] font-bold text-[13px] cursor-pointer active:scale-95 transition-transform"
+              style={{
+                fontFamily: "var(--font-poppins), sans-serif",
+                background: on ? "linear-gradient(135deg, #6B46FF, #A78BFA)" : "transparent",
+                color: on ? "#fff" : "#6D5BA6",
+                boxShadow: on ? "0 6px 16px rgba(107,70,255,0.3)" : "none",
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
 
-      {loading || feastsLoading ? (
+      {/* Feast selector from DB — only meaningful in "This Feast" mode */}
+      {mode === "feast" && (
+        <FeastTabs feasts={feasts} active={activeSlug} onPick={handlePick} loading={feastsLoading} />
+      )}
+
+      {loading || (mode === "feast" && feastsLoading) ? (
         <div className="flex justify-center py-16">
           <Loader2 size={22} className="animate-spin" style={{ color: theme.lavender }} />
         </div>

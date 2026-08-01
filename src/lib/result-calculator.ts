@@ -26,24 +26,39 @@ export interface FullResult extends CalcEntry {
   totalPoints: number;
 }
 
+// ── Point scales ───────────────────────────────────────────────────────────
+// Individual competitions use the default (5/3/1) scale for both grade and
+// position points. Group/team competitions use a bigger 10/5/3 scale —
+// pass GROUP_GRADE_POINTS / GROUP_POSITION_POINTS explicitly for those.
+
+export interface GradePointScale { A: number; B: number; C: number; }
+export interface PositionPointScale { first: number; second: number; third: number; }
+
+export const DEFAULT_GRADE_POINTS: GradePointScale = { A: 5, B: 3, C: 1 };
+export const DEFAULT_POSITION_POINTS: PositionPointScale = { first: 5, second: 3, third: 1 };
+
+export const GROUP_GRADE_POINTS: GradePointScale = { A: 10, B: 5, C: 3 };
+export const GROUP_POSITION_POINTS: PositionPointScale = { first: 10, second: 5, third: 3 };
+
 // ── Grade ──────────────────────────────────────────────────────────────────
 
-export function calcGrade(score: number, maxScore: number): GradeResult {
+export function calcGrade(score: number, maxScore: number, points: GradePointScale = DEFAULT_GRADE_POINTS): GradeResult {
   if (maxScore <= 0) return { grade: null, gradePoints: 0 };
   const pct = (score / maxScore) * 100;
-  if (pct >= 80) return { grade: "A", gradePoints: 5 };
-  if (pct >= 60) return { grade: "B", gradePoints: 3 };
-  if (pct >= 40) return { grade: "C", gradePoints: 1 };
+  if (pct >= 80) return { grade: "A", gradePoints: points.A };
+  if (pct >= 60) return { grade: "B", gradePoints: points.B };
+  if (pct >= 40) return { grade: "C", gradePoints: points.C };
   return { grade: null, gradePoints: 0 };
 }
 
 // ── Position ───────────────────────────────────────────────────────────────
 // Standard competition ranking: ties share the same rank.
-// Only 1st (5pts), 2nd (3pts), 3rd (1pt) earn position points.
+// Only 1st, 2nd, 3rd earn position points (scale below).
 // Beyond 3rd: position = null, positionPoints = 0.
 
 export function calcPositions(
-  entries: CalcEntry[]
+  entries: CalcEntry[],
+  points: PositionPointScale = DEFAULT_POSITION_POINTS
 ): Map<string, PositionResult> {
   const sorted = [...entries].sort((a, b) => b.score - a.score);
   const result = new Map<string, PositionResult>();
@@ -54,7 +69,7 @@ export function calcPositions(
       currentPos = i + 1; // advance rank; gaps appear after ties
     }
     const pos: number | null = currentPos <= 3 ? currentPos : null;
-    const positionPoints = pos === 1 ? 5 : pos === 2 ? 3 : pos === 3 ? 1 : 0;
+    const positionPoints = pos === 1 ? points.first : pos === 2 ? points.second : pos === 3 ? points.third : 0;
     result.set(sorted[i].id, { position: pos, positionPoints });
   }
 
@@ -65,11 +80,13 @@ export function calcPositions(
 
 export function calcAllResults(
   entries: CalcEntry[],
-  maxScore: number
+  maxScore: number,
+  gradeScale: GradePointScale = DEFAULT_GRADE_POINTS,
+  positionScale: PositionPointScale = DEFAULT_POSITION_POINTS
 ): FullResult[] {
-  const posMap = calcPositions(entries);
+  const posMap = calcPositions(entries, positionScale);
   return entries.map((e) => {
-    const { grade, gradePoints } = calcGrade(e.score, maxScore);
+    const { grade, gradePoints } = calcGrade(e.score, maxScore, gradeScale);
     const { position, positionPoints } = posMap.get(e.id) ?? {
       position: null,
       positionPoints: 0,
