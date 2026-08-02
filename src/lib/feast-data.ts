@@ -14,6 +14,7 @@ export interface FeastCompetition {
   compStatus?: "upcoming" | "progressing" | "completed" | "published" | null;
   progressPct?: number | null;
   info?: string | null;
+  maxPerShakha?: number;
 }
 
 export interface Feast {

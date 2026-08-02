@@ -5,10 +5,11 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getRegPrefix } from "@/lib/feast-data";
 import { getCategorySlug } from "@/lib/competition-categories";
 
-// A Shakha may only field MAX_SHAKHA_PER_COMPETITION participants in any single
-// individual competition (team/group competitions are unrelated — those go
-// through registerTeam() in team.ts and allow up to 7).
-const MAX_SHAKHA_PER_COMPETITION = 2;
+// A Shakha may only field a limited number of participants in any single individual
+// competition — the limit is per-competition (competitions.max_per_shakha, default 2),
+// not a fixed constant. Team/group competitions are unrelated — those go through
+// registerTeam() in team.ts and allow up to 7.
+const DEFAULT_MAX_PER_SHAKHA = 2;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function findFullCompetitionsForShakha(
@@ -38,6 +39,17 @@ async function findFullCompetitionsForShakha(
 
   const shakhaParticipantIds = new Set((parts ?? []).map((p: { id: string }) => p.id));
 
+  const { data: fcRows } = await client
+    .from("feast_competitions")
+    .select("id, competition:competitions(max_per_shakha)")
+    .in("id", feastCompetitionIds);
+
+  const capMap: Record<string, number> = {};
+  for (const fc of fcRows ?? []) {
+    const comp = Array.isArray(fc.competition) ? fc.competition[0] : fc.competition;
+    capMap[fc.id] = (comp?.max_per_shakha as number) ?? DEFAULT_MAX_PER_SHAKHA;
+  }
+
   const counts: Record<string, number> = {};
   for (const r of regs as { feast_competition_id: string; participant_id: string }[]) {
     if (r.participant_id === excludeParticipantId) continue;
@@ -45,7 +57,7 @@ async function findFullCompetitionsForShakha(
     counts[r.feast_competition_id] = (counts[r.feast_competition_id] ?? 0) + 1;
   }
 
-  return feastCompetitionIds.filter((id) => (counts[id] ?? 0) >= MAX_SHAKHA_PER_COMPETITION);
+  return feastCompetitionIds.filter((id) => (counts[id] ?? 0) >= (capMap[id] ?? DEFAULT_MAX_PER_SHAKHA));
 }
 
 export interface RegInput {
@@ -91,7 +103,7 @@ export async function registerParticipant(input: RegInput): Promise<RegOutput | 
     // A Shakha may only field 2 participants per individual competition
     const fullComps = await findFullCompetitionsForShakha(supabase, input.feastCompetitionIds, input.shakhaId);
     if (fullComps.length > 0) {
-      return { error: "Your Shakha already has 2 participants in one of the selected competitions. Please deselect it and choose another." };
+      return { error: "Your Shakha has reached the registration limit for one of the selected competitions. Please deselect it and choose another." };
     }
 
     // Resolve competition category from DOB
@@ -177,7 +189,7 @@ export async function createParticipantAdmin(input: AdminRegInput): Promise<{ er
   try {
     const fullComps = await findFullCompetitionsForShakha(admin, input.feastCompetitionIds, input.shakhaId || null);
     if (fullComps.length > 0) {
-      return { error: "This Shakha already has 2 participants in one of the selected competitions." };
+      return { error: "This Shakha has reached the registration limit for one of the selected competitions." };
     }
 
     const catSlug = getCategorySlug(input.dateOfBirth);
@@ -270,7 +282,7 @@ export async function updateParticipant(input: UpdateInput): Promise<{ error?: s
       admin, input.feastCompetitionIds, existing?.shakha_id ?? null, input.participantId
     );
     if (fullComps.length > 0) {
-      return { error: "This Shakha already has 2 participants in one of the selected competitions." };
+      return { error: "This Shakha has reached the registration limit for one of the selected competitions." };
     }
 
     // Resolve competition category from DOB

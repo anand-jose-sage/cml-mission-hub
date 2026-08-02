@@ -11,10 +11,11 @@ import {
   GlassPanel, GlowBtn, FeastTopBar, FeastIcon, StepDots, type FeastTheme,
 } from "./feast-shared";
 
-// A Shakha may only field this many participants in any single individual
-// competition. Mirrors MAX_SHAKHA_PER_COMPETITION in src/actions/feast.ts —
-// server-side is the source of truth, this is just for the live UI hint.
-const MAX_SHAKHA_PER_COMPETITION = 2;
+// A Shakha may only field a limited number of participants in any single individual
+// competition — the limit is per-competition (FeastCompetition.maxPerShakha, default
+// 2). Mirrors DEFAULT_MAX_PER_SHAKHA in src/actions/feast.ts — server-side is the
+// source of truth, this is just for the live UI hint.
+const DEFAULT_MAX_PER_SHAKHA = 2;
 
 function TextField({ label, value, onChange, placeholder, theme, type = "text", icon }: {
   label: string; value: string; onChange: (v: string) => void; placeholder: string;
@@ -156,9 +157,11 @@ export function FeastRegister({ slug, theme, onBack, onExit, onDone }: {
   const [picked, setPicked] = useState<string[]>([]);
   const [shakhaCounts, setShakhaCounts] = useState<Record<string, number>>({});
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
-  const toggle = (id: string) => setPicked((p) =>
-    p.includes(id) ? p.filter((x) => x !== id) : p.length >= 2 || (shakhaCounts[id] ?? 0) >= MAX_SHAKHA_PER_COMPETITION ? p : [...p, id]
-  );
+  const toggle = (id: string) => setPicked((p) => {
+    if (p.includes(id)) return p.filter((x) => x !== id);
+    const cap = feast?.competitions.find((c) => c.id === id)?.maxPerShakha ?? DEFAULT_MAX_PER_SHAKHA;
+    return p.length >= 2 || (shakhaCounts[id] ?? 0) >= cap ? p : [...p, id];
+  });
 
   // Load admin's shakha from their profile
   useEffect(() => {
@@ -320,7 +323,8 @@ export function FeastRegister({ slug, theme, onBack, onExit, onDone }: {
               </div>
             ) : eligibleComps.map((c) => {
               const on = picked.includes(c.id);
-              const full = !on && (shakhaCounts[c.id] ?? 0) >= MAX_SHAKHA_PER_COMPETITION;
+              const cap = c.maxPerShakha ?? DEFAULT_MAX_PER_SHAKHA;
+              const full = !on && (shakhaCounts[c.id] ?? 0) >= cap;
               const genderColor = c.gender === "boys" ? "#3B82F6" : c.gender === "girls" ? "#EC4899" : null;
               return (
                 <GlassPanel
@@ -355,7 +359,7 @@ export function FeastRegister({ slug, theme, onBack, onExit, onDone }: {
                       )}
                       {full && (
                         <span className="text-[10px] font-semibold px-1.5 py-px rounded-full" style={{ background: "#fef3c7", color: "#b45309", border: "1px solid #fde68a" }}>
-                          Full for your Shakha
+                          Full for your Shakha (max {cap})
                         </span>
                       )}
                     </div>

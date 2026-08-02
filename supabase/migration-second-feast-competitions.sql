@@ -73,3 +73,13 @@ WHERE c.name IN ('പ്രസംഗം', 'സംഗീതം', 'മിഷൻ �
     WHERE fc.feast_id = '8a448b87-d310-413a-8861-e5399e9992de'
       AND fc.competition_id = c.id
   );
+
+
+  -- 4. നാടോടി നൃത്തം (Folk Dance) — group · sub_junior only · common (no gender split)
+INSERT INTO competitions (name, type, category, description, gender, competition_category_id, icon)
+SELECT 'നാടോടി നൃത്തം', 'group', 'dance', 'നാടോടി നൃത്തം', 'common', cat.id, '💃'
+FROM (SELECT id FROM competition_categories WHERE slug = 'sub_junior') AS cat
+WHERE NOT EXISTS (
+  SELECT 1 FROM competitions c
+  WHERE c.name = 'നാടോടി നൃത്തം' AND c.gender = 'common' AND c.competition_category_id = cat.id
+);
