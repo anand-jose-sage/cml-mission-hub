@@ -51,15 +51,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // onAuthStateChange fires once immediately with the current session (INITIAL_SESSION
     // event) and again on every subsequent auth change — no separate getSession() call
     // needed, and adding one would double-fetch the profile on initial load.
+    //
+    // The callback itself must stay synchronous: GoTrue awaits it as part of its own
+    // initialize() call, and any Supabase query made directly inside it (e.g. fetchProfile)
+    // needs getSession(), which awaits that same initialize() promise — a deadlock that
+    // blocks every other query on the page until reload. Deferring with setTimeout(0) runs
+    // the async work after initialize() has settled. See Supabase's onAuthStateChange docs.
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        const profile = await fetchProfile(session.user.id);
-        setState({ session, profile, loading: false });
-      } else {
-        setState({ session: null, profile: null, loading: false });
-      }
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setTimeout(async () => {
+        if (session?.user) {
+          const profile = await fetchProfile(session.user.id);
+          setState({ session, profile, loading: false });
+        } else {
+          setState({ session: null, profile: null, loading: false });
+        }
+      }, 0);
     });
 
     return () => subscription.unsubscribe();
