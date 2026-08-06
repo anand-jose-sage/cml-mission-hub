@@ -235,10 +235,16 @@ function AdminShell({ children }: { children: React.ReactNode }) {
   const isLoginPage = pathname === "/admin/login";
 
   useEffect(() => {
-    if (!loading && !session && !isLoginPage) {
+    if (loading) return;
+    if (!session && !isLoginPage) {
       router.replace("/admin/login");
+      return;
     }
-  }, [loading, session, isLoginPage, router]);
+    // sa_admin only registers participants/teams via the Feast Portal — no admin panel access.
+    if (session && profile?.role === "sa_admin" && !isLoginPage) {
+      router.replace("/");
+    }
+  }, [loading, session, profile, isLoginPage, router]);
 
   // Close drawer on route change
   useEffect(() => {
@@ -255,7 +261,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!session) return null;
+  if (!session || profile?.role === "sa_admin") return null;
 
   // Current page label for the top bar
   const allItems = NAV_SECTIONS.flatMap((s) => s.items);
