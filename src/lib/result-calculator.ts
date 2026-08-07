@@ -45,8 +45,8 @@ export const GROUP_POSITION_POINTS: PositionPointScale = { first: 10, second: 5,
 export function calcGrade(score: number, maxScore: number, points: GradePointScale = DEFAULT_GRADE_POINTS): GradeResult {
   if (maxScore <= 0) return { grade: null, gradePoints: 0 };
   const pct = (score / maxScore) * 100;
-  if (pct >= 80) return { grade: "A", gradePoints: points.A };
-  if (pct >= 60) return { grade: "B", gradePoints: points.B };
+  if (pct >= 60) return { grade: "A", gradePoints: points.A };
+  if (pct >= 50) return { grade: "B", gradePoints: points.B };
   if (pct >= 40) return { grade: "C", gradePoints: points.C };
   return { grade: null, gradePoints: 0 };
 }
