@@ -3,12 +3,15 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Loader2, Check, Medal, ChevronDown, AlertTriangle,
-  Save, Send, RotateCcw, X,
+  Save, Send, RotateCcw, X, FileDown, FileStack,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { setMaxScore, saveDraftScores, publishResults, unpublishResults, getCompetitionScores } from "@/actions/results";
 import {
-  calcGrade, calcPositions, gradeColor, positionLabel,
+  setMaxScore, saveDraftScores, publishResults, unpublishResults,
+  getCompetitionScores, getScoresForCompetitions,
+} from "@/actions/results";
+import {
+  calcGrade, calcPositions, calcAllResults, positionLabel,
   type Grade,
 } from "@/lib/result-calculator";
 
@@ -19,6 +22,9 @@ interface FeastOption { id: string; name: string; year: string; }
 interface CompOption {
   fcId: string;
   label: string;
+  compName: string;
+  catName: string;
+  gender: string | null;
   maxScore: number | null;
   resultStatus: "draft" | "published";
 }
@@ -140,6 +146,122 @@ function PublishConfirm({
   );
 }
 
+// ─── PDF export ─────────────────────────────────────────────────────────────
+// Print-to-PDF, same pattern as the participation/participants admin pages
+// (open a blank tab, write a standalone HTML document, trigger window.print()).
+
+function escHtml(s: string) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function genderLabel(g: string | null): string {
+  const lower = (g ?? "").toLowerCase();
+  if (lower.startsWith("boy") || lower === "male") return "Boys";
+  if (lower.startsWith("girl") || lower === "female") return "Girls";
+  return "Common";
+}
+
+interface PdfRow {
+  name: string;
+  houseName: string | null;
+  shakhaName: string;
+  grade: Grade;
+  gradePoints: number;
+  position: number | null;
+  positionPoints: number;
+  sortPoints: number; // total points, or -1 when no score was ever entered (sorts last)
+}
+
+/** 1st/2nd/3rd first, then the rest by grade/score (highest first), ties by name. */
+function sortPdfRows(rows: PdfRow[]): PdfRow[] {
+  return [...rows].sort((a, b) => {
+    const posA = a.position ?? 999;
+    const posB = b.position ?? 999;
+    if (posA !== posB) return posA - posB;
+    if (b.sortPoints !== a.sortPoints) return b.sortPoints - a.sortPoints;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function pdfGradeCell(grade: Grade, pts: number): string {
+  if (!grade) return `<span class="none">—</span>`;
+  const { bg } = GRADE_SOLID[grade];
+  return `<span class="pill" style="background:${bg}">Grade ${grade}<b>+${pts} pts</b></span>`;
+}
+
+function pdfPosCell(pos: number | null, pts: number): string {
+  if (!pos) return `<span class="none">—</span>`;
+  const { bg } = POS_COLORS[pos] ?? { bg: "#374151", pts: "#1F2937" };
+  const emoji = POS_EMOJI[pos] ?? "";
+  return `<span class="pill" style="background:${bg}">${emoji} ${positionLabel(pos)}${pts > 0 ? `<b>+${pts} pts</b>` : ""}</span>`;
+}
+
+const PDF_CSS = `
+  @page { size: A4 portrait; margin: 16mm 14mm; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #1e1b4b; margin: 0; }
+  .sheet { border-left: 6px solid #6B46FF; border-right: 6px solid #6B46FF; padding: 0 16px; }
+  .sheet:not(:last-child) { page-break-after: always; }
+  .hdr { text-align: center; margin-bottom: 14px; }
+  .hdr .org1 { font-size: 19px; font-weight: 800; margin: 0; }
+  .hdr .org2 { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #6B46FF; margin: 2px 0 12px; }
+  .hdr .comp { font-size: 18px; font-weight: 800; margin: 4px 0 2px; }
+  .hdr .cat { font-size: 12.5px; font-weight: 600; color: #4B5563; margin: 0; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  thead tr { background: linear-gradient(90deg,#ede9fe,#f5f3ff); }
+  th { border: 1px solid #c4b5fd; padding: 7px 6px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; color: #1e1b4b; text-align: left; }
+  th.c-pos, th.c-grade { text-align: center; }
+  td { border: 1px solid #e5e7eb; padding: 7px 6px; font-size: 12.5px; vertical-align: middle; }
+  tbody tr:nth-child(even) { background: #f8f7ff; }
+  td.pos, td.grade { text-align: center; width: 17%; }
+  td.name { font-weight: 700; }
+  td.house { color: #7C3AED; font-weight: 600; }
+  td.shakha { color: #4B5563; font-weight: 600; }
+  .pill { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; color: #fff; font-weight: 800; font-size: 10.5px; padding: 4px 8px; border-radius: 6px; line-height: 1.3; }
+  .pill b { font-size: 9px; font-weight: 800; }
+  .none { color: #9CA3AF; font-weight: 700; }
+  .empty { text-align: center; color: #9CA3AF; padding: 22px; font-size: 13px; }
+  @media print { .noprint { display: none; } }
+  .noprint { text-align: center; margin: 18px 0; }
+  .noprint button { font-size: 14px; padding: 8px 18px; cursor: pointer; background: #6B46FF; color: #fff; border: none; border-radius: 8px; font-weight: 600; }
+`;
+
+function renderResultSection(compName: string, catLine: string, rows: PdfRow[]): string {
+  const bodyRows = rows.map((r) => `<tr>
+      <td class="pos">${pdfPosCell(r.position, r.positionPoints)}</td>
+      <td class="name">${escHtml(r.name)}</td>
+      <td class="house">${escHtml(r.houseName ?? "—")}</td>
+      <td class="shakha">${escHtml(r.shakhaName)}</td>
+      <td class="grade">${pdfGradeCell(r.grade, r.gradePoints)}</td>
+    </tr>`).join("");
+
+  return `<section class="sheet">
+    <div class="hdr">
+      <p class="org1">Cherupushpa Mission League</p>
+      <p class="org2">Kalpetta Meghala</p>
+      <p class="comp">${escHtml(compName)}</p>
+      ${catLine ? `<p class="cat">${escHtml(catLine)}</p>` : ""}
+    </div>
+    <table>
+      <thead><tr>
+        <th class="c-pos">Position</th><th>Name</th><th>House Name</th><th>Shakha</th><th class="c-grade">Grade</th>
+      </tr></thead>
+      <tbody>${bodyRows || `<tr><td colspan="5" class="empty">No graded results yet</td></tr>`}</tbody>
+    </table>
+  </section>`;
+}
+
+/** Opens a blank tab, writes the given HTML document, and triggers print. Returns false if the pop-up was blocked. */
+function openPrintWindow(html: string): boolean {
+  const w = window.open("", "_blank");
+  if (!w) return false;
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+  setTimeout(() => { w.focus(); w.print(); }, 350);
+  return true;
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function ResultsAdminPage() {
@@ -156,6 +278,7 @@ export default function ResultsAdminPage() {
   const [savingMax, setSavingMax] = useState(false);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [exportingAll, setExportingAll] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
@@ -190,11 +313,14 @@ export default function ResultsAdminPage() {
           const cat = comp ? (Array.isArray(comp.competition_category) ? (comp.competition_category as unknown[])[0] : comp.competition_category) as Record<string, unknown> | null : null;
           const name = (comp?.name as string) ?? "Unknown";
           const catName = (cat?.name as string) ?? "";
-          const gender = (comp?.gender as string) ?? "";
+          const gender = (comp?.gender as string) || null;
           const parts = [name, catName, gender].filter(Boolean);
           return {
             fcId: fc.id as string,
             label: parts.join(" · "),
+            compName: name,
+            catName,
+            gender,
             maxScore: fc.max_score as number | null,
             resultStatus: (fc.result_status as "draft" | "published") ?? "draft",
           };
@@ -327,6 +453,117 @@ export default function ResultsAdminPage() {
     await loadEntries();
   };
 
+  // ── Export the currently selected competition to PDF ──
+  const handleExportPdf = () => {
+    if (!selectedComp || !entries.length) return;
+    const rows: PdfRow[] = entries.map((e) => {
+      const p = previewMap[e.registrationId];
+      return {
+        name: e.name,
+        houseName: e.houseName,
+        shakhaName: e.shakhaName,
+        grade: p?.grade ?? null,
+        gradePoints: p?.gradePoints ?? 0,
+        position: p?.position ?? null,
+        positionPoints: p?.positionPoints ?? 0,
+        sortPoints: p ? p.totalPoints : -1,
+      };
+    });
+    const catLine = [selectedComp.catName, genderLabel(selectedComp.gender)].filter(Boolean).join(" | ");
+    const section = renderResultSection(selectedComp.compName, catLine, sortPdfRows(rows.filter((r) => r.grade !== null)));
+    const html = `<!doctype html><html><head><meta charset="utf-8">
+<title>Results — ${escHtml(selectedComp.compName)}</title>
+<style>${PDF_CSS}</style></head><body>
+  ${section}
+  <div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
+</body></html>`;
+    if (!openPrintWindow(html)) {
+      setMsg({ type: "err", text: "Allow pop-ups to export the results PDF." });
+      setTimeout(() => setMsg(null), 3000);
+    }
+  };
+
+  // ── Export every competition in the feast to one PDF ──
+  const handleExportAll = async () => {
+    if (!compOptions.length) return;
+    setExportingAll(true);
+
+    const fcIds = compOptions.map((c) => c.fcId);
+    const [{ data: regData }, scoresResult] = await Promise.all([
+      supabase
+        .from("participant_registrations")
+        .select("id, feast_competition_id, participant:participants(name, house_name, shakha:shakhas(name))")
+        .in("feast_competition_id", fcIds),
+      getScoresForCompetitions(fcIds),
+    ]);
+    setExportingAll(false);
+
+    if (!regData || scoresResult.error || !scoresResult.data) {
+      setMsg({ type: "err", text: "Failed to load results for export." });
+      setTimeout(() => setMsg(null), 3000);
+      return;
+    }
+
+    const regsByComp = new Map<string, { registrationId: string; name: string; houseName: string | null; shakhaName: string }[]>();
+    for (const r of regData) {
+      const p = (Array.isArray(r.participant) ? r.participant[0] : r.participant) as Record<string, unknown> | null;
+      const sh = p ? (Array.isArray(p.shakha) ? (p.shakha as unknown[])[0] : p.shakha) as Record<string, unknown> | null : null;
+      const fcId = r.feast_competition_id as string;
+      const row = {
+        registrationId: r.id as string,
+        name: (p?.name as string) ?? "—",
+        houseName: (p?.house_name as string | null) ?? null,
+        shakhaName: (sh?.name as string) ?? "—",
+      };
+      const list = regsByComp.get(fcId);
+      if (list) list.push(row); else regsByComp.set(fcId, [row]);
+    }
+
+    const scoresByComp = scoresResult.data;
+    const sections = compOptions.map((c) => {
+      const regs = regsByComp.get(c.fcId) ?? [];
+      const scoreMap: Record<string, number> = {};
+      for (const s of scoresByComp[c.fcId] ?? []) scoreMap[s.registrationId] = s.score;
+
+      const calcEntries = regs
+        .filter((r) => scoreMap[r.registrationId] != null)
+        .map((r) => ({ id: r.registrationId, score: scoreMap[r.registrationId] }));
+      const results = calcAllResults(calcEntries, c.maxScore ?? 0);
+      const resultMap = new Map(results.map((r) => [r.id, r]));
+
+      const rows: PdfRow[] = regs.map((r) => {
+        const res = resultMap.get(r.registrationId);
+        return {
+          name: r.name,
+          houseName: r.houseName,
+          shakhaName: r.shakhaName,
+          grade: res?.grade ?? null,
+          gradePoints: res?.gradePoints ?? 0,
+          position: res?.position ?? null,
+          positionPoints: res?.positionPoints ?? 0,
+          sortPoints: res ? res.totalPoints : -1,
+        };
+      });
+
+      const catLine = [c.catName, genderLabel(c.gender)].filter(Boolean).join(" | ");
+      return renderResultSection(c.compName, catLine, sortPdfRows(rows.filter((r) => r.grade !== null)));
+    }).join("");
+
+    const feast = feasts.find((f) => f.id === feastId);
+    const feastTitle = feast ? `${feast.name} ${feast.year}` : "Results";
+    const html = `<!doctype html><html><head><meta charset="utf-8">
+<title>Results — ${escHtml(feastTitle)}</title>
+<style>${PDF_CSS}</style></head><body>
+  ${sections}
+  <div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
+</body></html>`;
+
+    if (!openPrintWindow(html)) {
+      setMsg({ type: "err", text: "Allow pop-ups to export the results PDF." });
+      setTimeout(() => setMsg(null), 3000);
+    }
+  };
+
   const selectCls = "border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold text-gray-800 outline-none focus:ring-2 focus:ring-purple-200 bg-white";
   const maxScoreReady = maxScore != null && maxScore > 0;
 
@@ -341,13 +578,37 @@ export default function ResultsAdminPage() {
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#6B46FF] to-[#A855F7] flex items-center justify-center shrink-0">
-          <Medal size={17} color="#fff" />
+      <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#6B46FF] to-[#A855F7] flex items-center justify-center shrink-0">
+            <Medal size={17} color="#fff" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Results</h1>
+            <p className="text-xs text-gray-500">Enter scores, preview grades, and publish</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Results</h1>
-          <p className="text-xs text-gray-500">Enter scores, preview grades, and publish</p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportPdf}
+            disabled={!selectedComp || !entries.length}
+            title="Export the selected competition's results as a PDF"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white border-none cursor-pointer disabled:opacity-40 transition-colors"
+            style={{ background: "linear-gradient(135deg,#6B46FF,#A855F7)" }}
+          >
+            <FileDown size={14} />
+            Export PDF
+          </button>
+          <button
+            onClick={handleExportAll}
+            disabled={!compOptions.length || exportingAll}
+            title="Export results for every competition in this feast"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white border-none cursor-pointer disabled:opacity-40 transition-colors"
+            style={{ background: "linear-gradient(135deg,#4C1D95,#6B46FF)" }}
+          >
+            {exportingAll ? <Loader2 size={14} className="animate-spin" /> : <FileStack size={14} />}
+            Export All
+          </button>
         </div>
       </div>
 
