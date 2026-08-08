@@ -29,12 +29,16 @@ export function FeastModule({
   tutorialStep,
   tutorialDetails,
   onTutorialAction,
+  initialScreen,
+  initialSlug,
 }: {
   onExit: () => void;
   parentTheme: CMLTheme;
   tutorialStep?: FeastModuleTutorialStep;
   tutorialDetails?: FeastDetailsTutorial;
   onTutorialAction?: (action: string) => void;
+  initialScreen?: Screen;
+  initialSlug?: string;
 }) {
   const theme = buildFeastTheme(parentTheme);
   const tutorialScreen: Screen | null = tutorialStep === "landing" ? "landing"
@@ -42,13 +46,13 @@ export function FeastModule({
     : tutorialStep === "my-registrations" ? "registrations"
     : tutorialStep === "edit-registration-form" ? "edit-registration"
     : null;
-  const [internalScreen, setInternalScreen] = useState<Screen>("landing");
+  const [internalScreen, setInternalScreen] = useState<Screen>(initialScreen ?? "landing");
   const screen: Screen = tutorialScreen ?? internalScreen;
   const setScreen = (s: Screen) => {
     if (tutorialScreen) return; // tutorial controls screen
     setInternalScreen(s);
   };
-  const [feastSlug, setFeastSlug] = useState("literature_2026");
+  const [feastSlug, setFeastSlug] = useState(initialSlug ?? "literature_2026");
   const [regResult, setRegResult] = useState<RegResult | null>(null);
   const [editParticipantId, setEditParticipantId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLElement>(null);

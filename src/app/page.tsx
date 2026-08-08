@@ -17,6 +17,7 @@ import { NoticeBoard } from "@/components/notices/notice-board";
 import { MediaCenter } from "@/components/media/media-center";
 import { ActivitiesScreen } from "@/components/activities/activities-screen";
 import { FeastPortalCard } from "@/components/feast/feast-portal-card";
+import { LiteratureResultBanner } from "@/components/feast/literature-result-banner";
 import { QuickAccess } from "@/components/home/quick-access";
 import { FeastModule } from "@/components/feast/feast-module";
 import { useTutorialPrelude } from "@/app/(tutorial)/help/tutorials/registration/_hooks/use-tutorial-prelude";
@@ -30,6 +31,7 @@ export default function HomePage() {
   const [sel, setSel] = useState<number | null>(null); // null = all week
   const [noticeDetailOpen, setNoticeDetailOpen] = useState(false);
   const [inFeastInternal, setInFeastInternal] = useState(false);
+  const [feastEntry, setFeastEntry] = useState<{ screen: "results"; slug: string } | null>(null);
   const tutorial = useTutorialPrelude();
   const myRegTutorial = useMyRegistrationsTutorial();
   const editRegTutorial = useEditRegistrationTutorial();
@@ -45,7 +47,15 @@ export default function HomePage() {
       : undefined;
   const inFeast = activeTutorial ? activeTutorial.inFeast : inFeastInternal;
   const setInFeast = (v: boolean) => {
-    if (!activeTutorial) setInFeastInternal(v);
+    if (!activeTutorial) {
+      setInFeastInternal(v);
+      if (!v) setFeastEntry(null);
+    }
+  };
+  const enterFeastResults = () => {
+    if (activeTutorial) return;
+    setFeastEntry({ screen: "results", slug: "literature-feast-2026" });
+    setInFeastInternal(true);
   };
   const scrollRef = useRef<HTMLElement>(null);
 
@@ -84,6 +94,8 @@ export default function HomePage() {
           tutorialStep={activeTutorial?.feastStep ?? undefined}
           tutorialDetails={activeTutorial?.feastDetails ?? undefined}
           onTutorialAction={onTutorialAction}
+          initialScreen={feastEntry?.screen}
+          initialSlug={feastEntry?.slug}
         />
       </div>
     );
@@ -138,6 +150,7 @@ export default function HomePage() {
               <HeroEvent theme={theme} />
 
               <FeastPortalCard onEnter={() => setInFeast(true)} />
+              <LiteratureResultBanner onClick={enterFeastResults} />
 
               {/* Quick access — soft 3D shortcuts */}
               <QuickAccess

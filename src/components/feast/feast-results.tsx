@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Loader2, ChevronDown, Trophy, Search, BookOpen, Camera } from "lucide-react";
 import { useFeast, useFeasts } from "@/hooks/use-feast";
 import { getPublishedResults, type PublicResultRow } from "@/actions/results";
@@ -259,6 +259,15 @@ function CompCard({
   const [loading, setLoading] = useState(false);
   const anek: React.CSSProperties = { fontFamily: "var(--font-anek), sans-serif", fontWeight: 600 };
   const isPublished = comp.compStatus === "published";
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [contentHeight, setContentHeight] = useState(0);
+
+  // Measure the panel's real content height instead of guessing a fixed cap —
+  // a hardcoded maxHeight clipped competitions with more participants than it
+  // could fit (overflow-hidden silently cut off the rest of the list).
+  useEffect(() => {
+    if (contentRef.current) setContentHeight(contentRef.current.scrollHeight);
+  }, [open, loading, results, isPublished]);
 
   const toggle = async () => {
     const next = !open;
@@ -304,8 +313,8 @@ function CompCard({
           </p>
         )}
       </button>
-      <div className="overflow-hidden" style={{ maxHeight: open ? 1400 : 0, transition: "max-height 0.32s cubic-bezier(.2,.8,.2,1)" }}>
-        <div className="px-3 pb-3">
+      <div className="overflow-hidden" style={{ maxHeight: open ? contentHeight : 0, transition: "max-height 0.32s cubic-bezier(.2,.8,.2,1)" }}>
+        <div ref={contentRef} className="px-3 pb-3">
           {loading ? (
             <div className="flex justify-center py-6"><Loader2 size={18} className="animate-spin" style={{ color: catColor }} /></div>
           ) : !isPublished ? (
