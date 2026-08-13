@@ -11,6 +11,7 @@ import {
   Loader2,
   Medal,
   UserCheck,
+  ClipboardCheck,
   ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -35,10 +36,12 @@ interface LinkCard {
 
 export default function AdminPage() {
   const { profile } = useAuth();
+  const isMeAdmin = profile?.role === "me_admin";
   const [counts, setCounts] = useState({ content: 0, notices: 0, activities: 0, users: 0 });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isMeAdmin);
 
   useEffect(() => {
+    if (isMeAdmin) return;
     async function fetchCounts() {
       const [c, n, a, u] = await Promise.all([
         supabase.from("content_items").select("id", { count: "exact", head: true }),
@@ -55,7 +58,7 @@ export default function AdminPage() {
       setLoading(false);
     }
     fetchCounts();
-  }, []);
+  }, [isMeAdmin]);
 
   const sections: SectionInfo[] = [
     {
@@ -109,6 +112,23 @@ export default function AdminPage() {
     },
   ];
 
+  const meAdminFeastLinks: LinkCard[] = [
+    {
+      title: "Attendance",
+      description: "Mark attendance & export judging sheet",
+      href: "/admin/participation",
+      icon: ClipboardCheck,
+      color: "#BE185D",
+    },
+    {
+      title: "Participants",
+      description: "View registered participants",
+      href: "/admin/participants",
+      icon: UserCheck,
+      color: "#0891B2",
+    },
+  ];
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-5 sm:py-8">
       {/* Header */}
@@ -127,6 +147,8 @@ export default function AdminPage() {
       </div>
 
       {/* M HUB section */}
+      {!isMeAdmin && (
+      <>
       <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">M Hub</p>
       <div className="grid gap-3 sm:gap-4 grid-cols-2">
         {sections.map((section) => {
@@ -160,11 +182,13 @@ export default function AdminPage() {
           );
         })}
       </div>
+      </>
+      )}
 
       {/* Feast section */}
       <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mt-6 mb-2">Feast</p>
       <div className="grid gap-3 sm:gap-4 grid-cols-2">
-        {feastLinks.map((card) => {
+        {(isMeAdmin ? meAdminFeastLinks : feastLinks).map((card) => {
           const Icon = card.icon;
           return (
             <Link

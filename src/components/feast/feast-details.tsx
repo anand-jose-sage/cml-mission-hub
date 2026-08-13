@@ -617,7 +617,8 @@ export function FeastDetails({ slug, theme, onBack, onExit, go, tutorial }: {
   tutorial?: FeastDetailsTutorial;
 }) {
   const { feast, loading } = useFeast(slug);
-  const { session, loading: authLoading } = useAuth();
+  const { session, profile, loading: authLoading } = useAuth();
+  const isMeAdmin = profile?.role === "me_admin";
   const [showLoginInternal, setShowLoginInternal] = useState(false);
   const showLogin = tutorial ? tutorial.loginOpen : showLoginInternal;
   const setShowLogin = (v: boolean) => {
@@ -675,16 +676,18 @@ export function FeastDetails({ slug, theme, onBack, onExit, go, tutorial }: {
 
       {showAuthBlock && (
         isAuthorized ? (
-          <div data-tour="register-btn">
-            <GlowBtn variant="gold" full size="lg" icon="Ticket" onClick={() => go("register", slug)} style={{ marginBottom: 10 }}>
-              Register Now
-            </GlowBtn>
-            {feast.competitions.some((c) => c.cat === "Team") && (
-              <GlowBtn variant="pink" full size="lg" icon="Users" onClick={() => go("register-team", slug)} style={{ marginBottom: 10 }}>
-                Register Team
+          !isMeAdmin && (
+            <div data-tour="register-btn">
+              <GlowBtn variant="gold" full size="lg" icon="Ticket" onClick={() => go("register", slug)} style={{ marginBottom: 10 }}>
+                Register Now
               </GlowBtn>
-            )}
-          </div>
+              {feast.competitions.some((c) => c.cat === "Team") && (
+                <GlowBtn variant="pink" full size="lg" icon="Users" onClick={() => go("register-team", slug)} style={{ marginBottom: 10 }}>
+                  Register Team
+                </GlowBtn>
+              )}
+            </div>
+          )
         ) : (
           <div data-tour="login-btn">
             <GlowBtn variant="ghost" full size="lg" icon="Lock" onClick={() => setShowLogin(true)} style={{ marginBottom: 10 }}>

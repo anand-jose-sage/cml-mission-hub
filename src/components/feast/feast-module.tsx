@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import type { CMLTheme } from "@/lib/theme";
 import { Blobs } from "@/components/home/blobs";
+import { useAuth } from "@/lib/auth-context";
 import { buildFeastTheme, FeastNav } from "./feast-shared";
 import type { FeastDetailsTutorial } from "./feast-details";
 import type { RegResult } from "./feast-register";
@@ -56,6 +57,14 @@ export function FeastModule({
   const [regResult, setRegResult] = useState<RegResult | null>(null);
   const [editParticipantId, setEditParticipantId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLElement>(null);
+  const { profile } = useAuth();
+
+  // me_admin can browse the Feast Portal but must not register participants/teams.
+  useEffect(() => {
+    if (profile?.role === "me_admin" && (screen === "register" || screen === "register-team")) {
+      setScreen("details");
+    }
+  }, [screen, profile]);
 
   const go = (s: string, slug?: string) => {
     if (slug) setFeastSlug(slug);

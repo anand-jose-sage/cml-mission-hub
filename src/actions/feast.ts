@@ -354,17 +354,84 @@ export async function updateParticipant(input: UpdateInput): Promise<{ error?: s
 export async function setParticipation(
   registrationId: string,
   participated: boolean
+): Promise<{ error?: string; progressPct?: number | null; compStatus?: string }> {
+  const admin = getSupabaseAdmin();
+  try {
+    const { data: updated, error } = await admin
+      .from("participant_registrations")
+      .update({ participated })
+      .eq("id", registrationId)
+      .select("feast_competition_id")
+      .single();
+    if (error) return { error: error.message };
+
+    const fcId = updated?.feast_competition_id as string | undefined;
+    return fcId ? await recalcCompetitionProgress(fcId) : {};
+  } catch (e) {
+    console.error("[setParticipation] unexpected:", e);
+    return { error: "Something went wrong." };
+  }
+}
+
+// Recompute feast_competitions.progress_pct / comp_status live from attendance:
+// progress_pct = (registrations marked participated) / (registrations with a chance_no
+// assigned) * 100. 100% flips the competition to "completed", anything below (as long as
+// chance numbers exist) keeps/moves it to "progressing" (shown publicly as "Live"). A
+// competition whose results are already "published" is left untouched — that record is
+// final and shouldn't shift under an unrelated attendance edit.
+async function recalcCompetitionProgress(
+  feastCompetitionId: string
+): Promise<{ error?: string; progressPct?: number | null; compStatus?: string }> {
+  const admin = getSupabaseAdmin();
+
+  const { data: fc, error: fcError } = await admin
+    .from("feast_competitions")
+    .select("comp_status")
+    .eq("id", feastCompetitionId)
+    .single();
+  if (fcError) return { error: fcError.message };
+  if (fc?.comp_status === "published") return {};
+
+  const { data: regs, error: regsError } = await admin
+    .from("participant_registrations")
+    .select("participated, chance_no")
+    .eq("feast_competition_id", feastCompetitionId);
+  if (regsError) return { error: regsError.message };
+
+  const totalWithChance = (regs ?? []).filter((r) => r.chance_no != null).length;
+  if (totalWithChance === 0) return {};
+
+  const participatedCount = (regs ?? []).filter((r) => r.participated).length;
+  const progressPct = Math.min(100, Math.round((participatedCount / totalWithChance) * 100));
+  const compStatus = progressPct >= 100 ? "completed" : "progressing";
+
+  const { error: updateError } = await admin
+    .from("feast_competitions")
+    .update({ progress_pct: progressPct, comp_status: compStatus })
+    .eq("id", feastCompetitionId);
+  if (updateError) return { error: updateError.message };
+
+  return { progressPct, compStatus };
+}
+
+// Set the draw/lot `chance_no` (1-100, or null to clear) for a single registration.
+export async function setChanceNo(
+  registrationId: string,
+  chanceNo: number | null
 ): Promise<{ error?: string }> {
+  if (chanceNo !== null && (!Number.isInteger(chanceNo) || chanceNo < 1 || chanceNo > 100)) {
+    return { error: "Chance number must be between 1 and 100." };
+  }
   const admin = getSupabaseAdmin();
   try {
     const { error } = await admin
       .from("participant_registrations")
-      .update({ participated })
+      .update({ chance_no: chanceNo })
       .eq("id", registrationId);
     if (error) return { error: error.message };
     return {};
   } catch (e) {
-    console.error("[setParticipation] unexpected:", e);
+    console.error("[setChanceNo] unexpected:", e);
     return { error: "Something went wrong." };
   }
 }

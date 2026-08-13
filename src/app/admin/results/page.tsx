@@ -18,6 +18,7 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FeastOption { id: string; name: string; year: string; }
+interface ShakhaOption { id: string; name: string; }
 
 interface CompOption {
   fcId: string;
@@ -34,6 +35,7 @@ interface EntryRow {
   regNo: string;
   name: string;
   houseName: string | null;
+  shakhaId: string;
   shakhaName: string;
   savedScore: number | null;
 }
@@ -200,8 +202,7 @@ const PDF_CSS = `
   @page { size: A4 portrait; margin: 16mm 14mm; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { font-family: Arial, Helvetica, sans-serif; color: #1e1b4b; margin: 0; }
-  .sheet { border-left: 6px solid #6B46FF; border-right: 6px solid #6B46FF; padding: 0 16px; }
-  .sheet:not(:last-child) { page-break-after: always; }
+  .sheet { border-left: 6px solid #6B46FF; border-right: 6px solid #6B46FF; padding: 0 16px 18px; margin-bottom: 18px; break-inside: avoid; page-break-inside: avoid; }
   .hdr { text-align: center; margin-bottom: 14px; }
   .hdr .org1 { font-size: 19px; font-weight: 800; margin: 0; }
   .hdr .org2 { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #6B46FF; margin: 2px 0 12px; }
@@ -269,6 +270,8 @@ export default function ResultsAdminPage() {
   const [feastId, setFeastId] = useState("");
   const [compOptions, setCompOptions] = useState<CompOption[]>([]);
   const [compId, setCompId] = useState("");
+  const [shakhas, setShakhas] = useState<ShakhaOption[]>([]);
+  const [shakhaFilterId, setShakhaFilterId] = useState("");
 
   const [maxScoreInput, setMaxScoreInput] = useState("");
   const [entries, setEntries] = useState<EntryRow[]>([]);
@@ -286,12 +289,26 @@ export default function ResultsAdminPage() {
   const maxScore = selectedComp?.maxScore ?? null;
   const resultStatus = selectedComp?.resultStatus ?? "draft";
 
+  // Free-text score entry (no number-input spinner) — keep only digits and a single decimal point.
+  const setScore = (registrationId: string, raw: string) => {
+    let v = raw.replace(/[^0-9.]/g, "");
+    const firstDot = v.indexOf(".");
+    if (firstDot !== -1) v = v.slice(0, firstDot + 1) + v.slice(firstDot + 1).replace(/\./g, "");
+    setScores((s) => ({ ...s, [registrationId]: v }));
+  };
+
   // ── Load feasts ──
   useEffect(() => {
     supabase.from("feasts").select("id,name,year").order("start_date")
       .then(({ data }) => {
         if (data?.length) { setFeasts(data); setFeastId(data[0].id); }
       });
+  }, []);
+
+  // ── Load shakhas (for the export filter) ──
+  useEffect(() => {
+    supabase.from("shakhas").select("id,name").order("name")
+      .then(({ data }) => setShakhas(data ?? []));
   }, []);
 
   // ── Load competitions for feast ──
@@ -341,7 +358,7 @@ export default function ResultsAdminPage() {
     const [{ data: regData }, scoresResult] = await Promise.all([
       supabase
         .from("participant_registrations")
-        .select("id, participant:participants(name, registration_number, house_name, shakha:shakhas(name))")
+        .select("id, participant:participants(name, registration_number, house_name, shakha:shakhas(id,name))")
         .eq("feast_competition_id", compId),
       getCompetitionScores(compId),
     ]);
@@ -361,6 +378,7 @@ export default function ResultsAdminPage() {
         regNo: rawRegNo ?? regId.slice(0, 8).toUpperCase(),
         name: (p?.name as string) ?? "—",
         houseName: (p?.house_name as string | null) ?? null,
+        shakhaId: (sh?.id as string) ?? "",
         shakhaName: (sh?.name as string) ?? "—",
         savedScore: savedMap[regId] ?? null,
       };
@@ -456,7 +474,9 @@ export default function ResultsAdminPage() {
   // ── Export the currently selected competition to PDF ──
   const handleExportPdf = () => {
     if (!selectedComp || !entries.length) return;
-    const rows: PdfRow[] = entries.map((e) => {
+    const shakhaName = shakhaFilterId ? shakhas.find((s) => s.id === shakhaFilterId)?.name ?? null : null;
+    const filteredEntries = shakhaFilterId ? entries.filter((e) => e.shakhaId === shakhaFilterId) : entries;
+    const rows: PdfRow[] = filteredEntries.map((e) => {
       const p = previewMap[e.registrationId];
       return {
         name: e.name,
@@ -469,10 +489,10 @@ export default function ResultsAdminPage() {
         sortPoints: p ? p.totalPoints : -1,
       };
     });
-    const catLine = [selectedComp.catName, genderLabel(selectedComp.gender)].filter(Boolean).join(" | ");
+    const catLine = [selectedComp.catName, genderLabel(selectedComp.gender), shakhaName].filter(Boolean).join(" | ");
     const section = renderResultSection(selectedComp.compName, catLine, sortPdfRows(rows.filter((r) => r.grade !== null)));
     const html = `<!doctype html><html><head><meta charset="utf-8">
-<title>Results — ${escHtml(selectedComp.compName)}</title>
+<title>Results — ${escHtml(selectedComp.compName)}${shakhaName ? ` — ${escHtml(shakhaName)}` : ""}</title>
 <style>${PDF_CSS}</style></head><body>
   ${section}
   <div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
@@ -492,7 +512,7 @@ export default function ResultsAdminPage() {
     const [{ data: regData }, scoresResult] = await Promise.all([
       supabase
         .from("participant_registrations")
-        .select("id, feast_competition_id, participant:participants(name, house_name, shakha:shakhas(name))")
+        .select("id, feast_competition_id, participant:participants(name, house_name, shakha:shakhas(id,name))")
         .in("feast_competition_id", fcIds),
       getScoresForCompetitions(fcIds),
     ]);
@@ -504,7 +524,8 @@ export default function ResultsAdminPage() {
       return;
     }
 
-    const regsByComp = new Map<string, { registrationId: string; name: string; houseName: string | null; shakhaName: string }[]>();
+    const shakhaName = shakhaFilterId ? shakhas.find((s) => s.id === shakhaFilterId)?.name ?? null : null;
+    const regsByComp = new Map<string, { registrationId: string; name: string; houseName: string | null; shakhaId: string; shakhaName: string }[]>();
     for (const r of regData) {
       const p = (Array.isArray(r.participant) ? r.participant[0] : r.participant) as Record<string, unknown> | null;
       const sh = p ? (Array.isArray(p.shakha) ? (p.shakha as unknown[])[0] : p.shakha) as Record<string, unknown> | null : null;
@@ -513,6 +534,7 @@ export default function ResultsAdminPage() {
         registrationId: r.id as string,
         name: (p?.name as string) ?? "—",
         houseName: (p?.house_name as string | null) ?? null,
+        shakhaId: (sh?.id as string) ?? "",
         shakhaName: (sh?.name as string) ?? "—",
       };
       const list = regsByComp.get(fcId);
@@ -521,15 +543,21 @@ export default function ResultsAdminPage() {
 
     const scoresByComp = scoresResult.data;
     const sections = compOptions.map((c) => {
-      const regs = regsByComp.get(c.fcId) ?? [];
+      const allRegs = regsByComp.get(c.fcId) ?? [];
       const scoreMap: Record<string, number> = {};
       for (const s of scoresByComp[c.fcId] ?? []) scoreMap[s.registrationId] = s.score;
 
-      const calcEntries = regs
+      // Rank against the FULL competition roster first — a shakha's 1-2
+      // entrants must show their true position across all participants,
+      // not a 1st/2nd relative to just themselves. Filter to the shakha
+      // only when picking which rows to print, after ranking.
+      const calcEntries = allRegs
         .filter((r) => scoreMap[r.registrationId] != null)
         .map((r) => ({ id: r.registrationId, score: scoreMap[r.registrationId] }));
       const results = calcAllResults(calcEntries, c.maxScore ?? 0);
       const resultMap = new Map(results.map((r) => [r.id, r]));
+
+      const regs = shakhaFilterId ? allRegs.filter((r) => r.shakhaId === shakhaFilterId) : allRegs;
 
       const rows: PdfRow[] = regs.map((r) => {
         const res = resultMap.get(r.registrationId);
@@ -544,15 +572,18 @@ export default function ResultsAdminPage() {
           sortPoints: res ? res.totalPoints : -1,
         };
       });
+      const gradedRows = sortPdfRows(rows.filter((r) => r.grade !== null));
+      // Nothing from the selected shakha actually has a grade here — skip the page entirely.
+      if (shakhaFilterId && gradedRows.length === 0) return null;
 
-      const catLine = [c.catName, genderLabel(c.gender)].filter(Boolean).join(" | ");
-      return renderResultSection(c.compName, catLine, sortPdfRows(rows.filter((r) => r.grade !== null)));
-    }).join("");
+      const catLine = [c.catName, genderLabel(c.gender), shakhaName].filter(Boolean).join(" | ");
+      return renderResultSection(c.compName, catLine, gradedRows);
+    }).filter((s): s is string => s !== null).join("");
 
     const feast = feasts.find((f) => f.id === feastId);
     const feastTitle = feast ? `${feast.name} ${feast.year}` : "Results";
     const html = `<!doctype html><html><head><meta charset="utf-8">
-<title>Results — ${escHtml(feastTitle)}</title>
+<title>Results — ${escHtml(feastTitle)}${shakhaName ? ` — ${escHtml(shakhaName)}` : ""}</title>
 <style>${PDF_CSS}</style></head><body>
   ${sections}
   <div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
@@ -588,7 +619,19 @@ export default function ResultsAdminPage() {
             <p className="text-xs text-gray-500">Enter scores, preview grades, and publish</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <select
+              value={shakhaFilterId}
+              onChange={(e) => setShakhaFilterId(e.target.value)}
+              title="Filter exported PDFs to one shakha"
+              className={`${selectCls} pr-8 appearance-none`}
+            >
+              <option value="">All Shakhas</option>
+              {shakhas.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
           <button
             onClick={handleExportPdf}
             disabled={!selectedComp || !entries.length}
@@ -735,15 +778,15 @@ export default function ResultsAdminPage() {
                       </td>
                       <td className="px-3 py-3">
                         <input
-                          type="number" min="0" max={maxScore} step="0.5"
+                          type="text" inputMode="decimal"
                           value={scores[e.registrationId] ?? ""}
-                          onChange={(ev) => setScores((s) => ({ ...s, [e.registrationId]: ev.target.value }))}
+                          onChange={(ev) => setScore(e.registrationId, ev.target.value)}
                           placeholder="—"
                           disabled={resultStatus === "published"}
-                          className="w-20 border-2 rounded-lg px-2 py-1.5 text-[15px] font-black text-center outline-none transition-colors disabled:opacity-50"
-                          style={{ borderColor: "#ddd6fe", color: "#1e1b4b" }}
+                          className="w-20 border-[3px] rounded-lg px-2 py-1.5 text-[15px] font-black text-center outline-none transition-colors disabled:opacity-50"
+                          style={{ borderColor: "#a78bfa", color: "#1e1b4b" }}
                           onFocus={(ev) => (ev.currentTarget.style.borderColor = "#6B46FF")}
-                          onBlur={(ev) => (ev.currentTarget.style.borderColor = "#ddd6fe")}
+                          onBlur={(ev) => (ev.currentTarget.style.borderColor = "#a78bfa")}
                         />
                       </td>
                       <td className="px-3 py-3">
@@ -810,16 +853,16 @@ export default function ResultsAdminPage() {
                   <div className="flex items-center gap-3 px-3.5 py-3 border-t" style={{ background: "#ede9fe", borderColor: "#ddd6fe" }}>
                     <span className="text-[11px] font-black uppercase tracking-widest shrink-0" style={{ color: "#4C1D95" }}>Score</span>
                     <input
-                      type="number" min="0" max={maxScore} step="0.5"
+                      type="text"
                       inputMode="decimal"
                       value={scores[e.registrationId] ?? ""}
-                      onChange={(ev) => setScores((s) => ({ ...s, [e.registrationId]: ev.target.value }))}
+                      onChange={(ev) => setScore(e.registrationId, ev.target.value)}
                       placeholder="—"
                       disabled={resultStatus === "published"}
-                      className="w-20 border-2 rounded-lg px-3 py-2 text-[16px] font-black text-center outline-none transition-colors bg-white disabled:opacity-40"
-                      style={{ borderColor: "#c4b5fd", color: "#1e1b4b" }}
+                      className="w-20 border-[3px] rounded-lg px-3 py-2 text-[16px] font-black text-center outline-none transition-colors bg-white disabled:opacity-40"
+                      style={{ borderColor: "#a78bfa", color: "#1e1b4b" }}
                       onFocus={(ev) => (ev.currentTarget.style.borderColor = "#7C3AED")}
-                      onBlur={(ev) => (ev.currentTarget.style.borderColor = "#c4b5fd")}
+                      onBlur={(ev) => (ev.currentTarget.style.borderColor = "#a78bfa")}
                     />
                     <span className="text-[13px] font-black shrink-0" style={{ color: "#4C1D95" }}>/ {maxScore}</span>
 

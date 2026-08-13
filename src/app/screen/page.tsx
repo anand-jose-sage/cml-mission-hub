@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { Suspense, useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   getLeaderboard,
+  getOverallLeaderboard,
   getScreenData,
   type LeaderboardRow,
   type ScreenData,
@@ -10,6 +12,8 @@ import {
 } from "@/actions/results";
 import { useFeasts } from "@/hooks/use-feast";
 import { SHAKHA_COLOR_MAP } from "@/lib/feast-data";
+import { type DashboardSection, sectionKey, sectionLabel } from "./dashboard-types";
+import { useDashboardRotation } from "./use-dashboard-rotation";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -46,7 +50,6 @@ const CAT_COLOR: Record<string, string> = {
 };
 
 const REFRESH_MS = 20_000;
-const ROTATE_MS = 15_000;
 const TICKER_H = 44; // real viewport px
 
 function shkColor(name: string) {
@@ -63,33 +66,102 @@ function derivedGrade(row: LeaderboardRow): "A" | "B" | "C" | null {
 // ─── Root ───────────────────────────────────────────────────────────────────
 
 export default function ScreenPage() {
+  return (
+    <Suspense fallback={<div style={{ position: "fixed", inset: 0, background: "radial-gradient(120% 120% at 50% 0%, #0a0822, #03020b 72%)" }} />}>
+      <ScreenPageInner />
+    </Suspense>
+  );
+}
+
+function ScreenPageInner() {
   const { feasts, loading: feastsLoading } = useFeasts();
-  const [activeSlug, setActiveSlug] = useState("");
-  const [rows, setRows] = useState<LeaderboardRow[]>([]);
-  const [screen2, setScreen2] = useState<ScreenData | null>(null);
-  const [dataLoading, setDataLoading] = useState(true);
-  const [screenIdx, setScreenIdx] = useState(0);
-  const [subIdx, setSubIdx] = useState(0); // 0=1st/GradeA, 1=2nd/GradeB, 2=3rd/GradeC
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Sections: Overall first, then every feast — grows automatically with no
+  // code change when a feast is added. (Future: append Stage sections here.)
+  const sections = useMemo<DashboardSection[]>(() => [
+    { kind: "overall" },
+    ...feasts.map((f) => ({ kind: "feast" as const, feastSlug: f.slug, feastName: f.name })),
+  ], [feasts]);
+
+  const [overallRows, setOverallRows] = useState<LeaderboardRow[]>([]);
+  const [overallLoading, setOverallLoading] = useState(true);
+  const [feastRows, setFeastRows] = useState<LeaderboardRow[]>([]);
+  const [feastScreenData, setFeastScreenData] = useState<ScreenData | null>(null);
+  const [feastDataLoading, setFeastDataLoading] = useState(true);
   const [scale, setScale] = useState(1);
   const [designH, setDesignH] = useState(DESIGN_H);
   const [clock, setClock] = useState("");
   const particleRef = useRef<HTMLCanvasElement>(null);
   const matrixRef = useRef<HTMLCanvasElement>(null);
 
-  // allScreens = ['rankings', ...competitionIds]
-  const allScreens = useMemo(() => {
-    const comps = screen2?.competitions ?? [];
-    if (!comps.length) return ["rankings"];
-    return ["rankings", ...comps.map((c) => c.competitionId)];
-  }, [screen2]);
-
-  const isRankings = allScreens[screenIdx] === "rankings";
+  const activeFeastCompetitionCount = feastScreenData?.competitions.length ?? 0;
+  const {
+    sectionIdx, screenIdx, subIdx, activeSection, isRankingsScreen, goToSection, goToScreen,
+  } = useDashboardRotation(sections, activeFeastCompetitionCount);
+  const isRankings = isRankingsScreen;
 
   const activeCompetition = useMemo(() => {
-    const s = allScreens[screenIdx];
-    if (s === "rankings") return null;
-    return screen2?.competitions.find((c) => c.competitionId === s) ?? null;
-  }, [allScreens, screenIdx, screen2]);
+    if (activeSection.kind !== "feast" || screenIdx === 0) return null;
+    return feastScreenData?.competitions[screenIdx - 1] ?? null;
+  }, [activeSection, screenIdx, feastScreenData]);
+
+  // Screens for the active section only (Overall always has just "rankings";
+  // a feast has rankings + one entry per published competition) — keeps the
+  // header dot-strip bounded regardless of how many feasts exist.
+  const screensInSection = useMemo(() => {
+    if (activeSection.kind !== "feast") return ["rankings"];
+    const comps = feastScreenData?.competitions ?? [];
+    return ["rankings", ...comps.map((c) => c.competitionId)];
+  }, [activeSection, feastScreenData]);
+
+  // ── Read initial slide from the URL once feasts have loaded (so slugs can
+  // be matched); falls back to the default (Overall) on anything invalid. ──
+  const initialParamsAppliedRef = useRef(false);
+  const pendingCompIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (initialParamsAppliedRef.current || feastsLoading) return;
+    initialParamsAppliedRef.current = true;
+    const sectionParam = searchParams.get("section");
+    const feastParam = searchParams.get("feast");
+    const compParam = searchParams.get("comp");
+    if (sectionParam === "feast" && feastParam) {
+      const idx = sections.findIndex((s) => s.kind === "feast" && s.feastSlug === feastParam);
+      if (idx >= 0) {
+        goToSection(idx);
+        if (compParam) pendingCompIdRef.current = compParam;
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feastsLoading, sections]);
+
+  // Once the deep-linked feast's competition data has loaded, jump straight
+  // to the requested competition (one-time — cleared after use).
+  useEffect(() => {
+    if (!pendingCompIdRef.current || !feastScreenData) return;
+    const idx = feastScreenData.competitions.findIndex((c) => c.competitionId === pendingCompIdRef.current);
+    if (idx >= 0) goToScreen(idx + 1);
+    pendingCompIdRef.current = null;
+  }, [feastScreenData, goToScreen]);
+
+  // Keep the URL in sync with the current section/competition (not subIdx —
+  // that cycles every 5s and isn't a distinct addressable slide) so direct
+  // links and reloads land back on the same slide, without remounting.
+  useEffect(() => {
+    if (!initialParamsAppliedRef.current) return;
+    const params = new URLSearchParams();
+    if (activeSection.kind === "overall") {
+      params.set("section", "overall");
+    } else {
+      params.set("section", "feast");
+      params.set("feast", activeSection.feastSlug);
+      if (activeCompetition) params.set("comp", activeCompetition.competitionId);
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection, screenIdx]);
 
   // Fit 1920-wide canvas to viewport
   useEffect(() => {
@@ -118,59 +190,44 @@ export default function ScreenPage() {
     return () => clearInterval(id);
   }, []);
 
-  // Pick feast
-  useEffect(() => {
-    if (!feasts.length) return;
-    if (feasts.some((f) => f.slug === activeSlug)) return;
-    const active =
-      feasts.find((f) => /ongoing|registration/i.test(f.status ?? "")) ?? feasts[0];
-    if (active) setActiveSlug(active.slug);
-  }, [feasts, activeSlug]);
-
-  // Fetch data
-  const fetchData = useCallback(async (slug: string) => {
-    const [lb, sd] = await Promise.all([
-      getLeaderboard(slug),
-      getScreenData(slug),
-    ]);
-    setRows(lb.data ?? []);
-    setScreen2(sd.data ?? null);
-    setDataLoading(false);
+  // Fetch Overall data — polled unconditionally regardless of active section,
+  // so the moment rotation reaches Overall its data is already fresh.
+  const fetchOverall = useCallback(async () => {
+    const lb = await getOverallLeaderboard();
+    setOverallRows(lb.data ?? []);
+    setOverallLoading(false);
   }, []);
 
   useEffect(() => {
-    if (feastsLoading) return;
-    if (!feasts.some((f) => f.slug === activeSlug)) {
-      if (!feastsLoading) setDataLoading(false);
+    fetchOverall();
+    const id = setInterval(fetchOverall, REFRESH_MS);
+    return () => clearInterval(id);
+  }, [fetchOverall]);
+
+  // Fetch the ACTIVE feast's data only — re-keyed whenever the active feast
+  // changes, so at most one feast (plus Overall) is ever being polled.
+  const activeFeastSlug = activeSection.kind === "feast" ? activeSection.feastSlug : null;
+  useEffect(() => {
+    if (!activeFeastSlug) {
+      setFeastDataLoading(false);
       return;
     }
-    fetchData(activeSlug);
-    const id = setInterval(() => fetchData(activeSlug), REFRESH_MS);
-    return () => clearInterval(id);
-  }, [activeSlug, feastsLoading, feasts, fetchData]);
-
-  // Screen rotation — rankings rotate every ROTATE_MS, competitions cycle sub-positions every SUB_MS
-  const SUB_MS = 5_000;
-  const SUB_COUNT = 3;
-  useEffect(() => {
-    if (allScreens.length <= 1) return;
-    const delay = isRankings ? ROTATE_MS : SUB_MS;
-    const id = setTimeout(() => {
-      if (isRankings) {
-        setSubIdx(0);
-        setScreenIdx((i) => (i + 1) % allScreens.length);
-      } else {
-        const next = subIdx + 1;
-        if (next >= SUB_COUNT) {
-          setSubIdx(0);
-          setScreenIdx((i) => (i + 1) % allScreens.length);
-        } else {
-          setSubIdx(next);
-        }
-      }
-    }, delay);
-    return () => clearTimeout(id);
-  }, [allScreens, allScreens.length, isRankings, screenIdx, subIdx]);
+    let cancelled = false;
+    setFeastDataLoading(true);
+    const fetchFeast = async () => {
+      const [lb, sd] = await Promise.all([
+        getLeaderboard(activeFeastSlug),
+        getScreenData(activeFeastSlug),
+      ]);
+      if (cancelled) return; // active feast changed again before this resolved
+      setFeastRows(lb.data ?? []);
+      setFeastScreenData(sd.data ?? null);
+      setFeastDataLoading(false);
+    };
+    fetchFeast();
+    const id = setInterval(fetchFeast, REFRESH_MS);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [activeFeastSlug]);
 
   // Particle canvas
   useEffect(() => {
@@ -290,18 +347,24 @@ export default function ScreenPage() {
     return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", size); };
   }, []);
 
-  const activeFeast = feasts.find((f) => f.slug === activeSlug);
-  const ranked = [...rows].sort((a, b) => a.rank - b.rank);
+  const activeFeast = activeSection.kind === "feast"
+    ? feasts.find((f) => f.slug === activeSection.feastSlug)
+    : undefined;
+  const activeRows = activeSection.kind === "overall" ? overallRows : feastRows;
+  const ranked = [...activeRows].sort((a, b) => a.rank - b.rank);
   // Show the standings table (all-zero, alphabetical) as soon as shakhas exist —
   // don't wait for any points to be published.
   const hasLb = ranked.length > 0;
-  const hasComps = (screen2?.competitions?.length ?? 0) > 0;
-  const busy = dataLoading || feastsLoading;
+  const hasComps = activeFeastCompetitionCount > 0;
+  const busy = feastsLoading || (activeSection.kind === "overall" ? overallLoading : feastDataLoading);
 
   const headerTitle = isRankings ? "SHAKHA <b>RANKINGS</b>" : "COMPETITION <b>RESULTS</b>";
-  const headerEyebrow = isRankings ? "Live Standings" : activeCompetition
-    ? activeCompetition.categoryName || "Results Declared"
-    : "Results Declared";
+  const headerEyebrow = isRankings
+    ? (activeSection.kind === "overall" ? "Overall Standings — All Feasts" : "Live Standings")
+    : activeCompetition
+      ? activeCompetition.categoryName || "Results Declared"
+      : "Results Declared";
+  const headerFeastName = activeSection.kind === "overall" ? "Overall Standings" : (activeFeast?.name ?? "Feast 2026");
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "radial-gradient(120% 120% at 50% 0%, #0a0822, #03020b 72%)" }}>
@@ -353,14 +416,17 @@ export default function ScreenPage() {
 
         {/* Header — always visible */}
         <ScreenHeader
-          feastName={activeFeast?.name ?? "Feast 2026"}
+          feastName={headerFeastName}
           subtitle="ചെറുപുഷ്‌പ മിഷൻ ലീഗ് കൽപറ്റ"
           title={headerTitle}
           eyebrow={headerEyebrow}
           clock={clock}
-          allScreens={allScreens}
+          sections={sections}
+          sectionIdx={sectionIdx}
+          onNavSection={goToSection}
+          screens={screensInSection}
           screenIdx={screenIdx}
-          onNav={(i) => { setSubIdx(0); setScreenIdx(i); }}
+          onNavScreen={goToScreen}
         />
 
         {/* Screens */}
@@ -460,12 +526,17 @@ export default function ScreenPage() {
 
 // ─── Header ─────────────────────────────────────────────────────────────────
 
-function ScreenHeader({ feastName, subtitle, title, eyebrow, clock, allScreens, screenIdx, onNav }: {
+function ScreenHeader({
+  feastName, subtitle, title, eyebrow, clock,
+  sections, sectionIdx, onNavSection,
+  screens, screenIdx, onNavScreen,
+}: {
   feastName: string; subtitle: string; title: string; eyebrow: string; clock: string;
-  allScreens: string[]; screenIdx: number; onNav: (i: number) => void;
+  sections: DashboardSection[]; sectionIdx: number; onNavSection: (i: number) => void;
+  screens: string[]; screenIdx: number; onNavScreen: (i: number) => void;
 }) {
   const [hh, ss] = clock.split(" ");
-  const n = allScreens.length;
+  const n = screens.length;
   return (
     <div className="sc-hdr">
       <div className="sc-crest">
@@ -483,12 +554,35 @@ function ScreenHeader({ feastName, subtitle, title, eyebrow, clock, allScreens, 
         <div className="sc-hdr-title" dangerouslySetInnerHTML={{ __html: title }} />
       </div>
       <div className="sc-hdr-right">
+        {/* Section pills — Overall / each Feast. Never a Stages pill: `sections`
+            simply won't contain one until that data model exists. */}
+        {sections.length > 1 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {sections.map((s, i) => (
+              <button
+                key={sectionKey(s)}
+                onClick={() => onNavSection(i)}
+                style={{
+                  padding: "4px 12px", borderRadius: 999,
+                  border: i === sectionIdx ? "1px solid rgba(110,242,255,.7)" : "1px solid rgba(255,255,255,.18)",
+                  background: i === sectionIdx ? "linear-gradient(90deg,rgba(110,242,255,.18),rgba(122,108,255,.18))" : "transparent",
+                  color: i === sectionIdx ? "#eafcff" : "#9db0d8",
+                  fontFamily: "var(--font-rajdhani),sans-serif",
+                  fontWeight: 700, fontSize: 12, letterSpacing: "1.5px", textTransform: "uppercase",
+                  cursor: "pointer", whiteSpace: "nowrap",
+                }}
+              >
+                {sectionLabel(s)}
+              </button>
+            ))}
+          </div>
+        )}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {/* Screen nav controls — left of LIVE */}
+          {/* Screen nav controls — left of LIVE, scoped to the active section */}
           {n > 1 && (
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <button
-                onClick={() => onNav((screenIdx - 1 + n) % n)}
+                onClick={() => onNavScreen((screenIdx - 1 + n) % n)}
                 style={{
                   width: 28, height: 28, borderRadius: "50%",
                   border: "1px solid rgba(100,180,255,.4)",
@@ -497,10 +591,10 @@ function ScreenHeader({ feastName, subtitle, title, eyebrow, clock, allScreens, 
                   cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                 }}
               >‹</button>
-              {allScreens.map((s, i) => (
+              {screens.map((s, i) => (
                 <button
                   key={s}
-                  onClick={() => onNav(i)}
+                  onClick={() => onNavScreen(i)}
                   title={s === "rankings" ? "Rankings" : s}
                   style={{
                     width: i === screenIdx ? 22 : 8, height: 8,
@@ -512,7 +606,7 @@ function ScreenHeader({ feastName, subtitle, title, eyebrow, clock, allScreens, 
                 />
               ))}
               <button
-                onClick={() => onNav((screenIdx + 1) % n)}
+                onClick={() => onNavScreen((screenIdx + 1) % n)}
                 style={{
                   width: 28, height: 28, borderRadius: "50%",
                   border: "1px solid rgba(100,180,255,.4)",

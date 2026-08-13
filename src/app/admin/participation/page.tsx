@@ -5,7 +5,7 @@ import {
   Loader2, Search, X, ChevronDown, ClipboardCheck, UserX, FileDown, FileStack, Check,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { setParticipation } from "@/actions/feast";
+import { setParticipation, setChanceNo } from "@/actions/feast";
 import { CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/competition-categories";
 import { getScoreHeadings } from "@/lib/scoresheet-headings";
 import { getCompetitionSubject } from "@/lib/competition-subjects";
@@ -33,6 +33,17 @@ interface EntryRow {
   shakhaId: string;
   catSlug: string | null;
   participated: boolean;
+  chanceNo: number | null;
+}
+
+/** Sort by chance number ascending (nulls last), then by reg number within each tier. */
+function sortByChance(rows: EntryRow[]): EntryRow[] {
+  return [...rows].sort((a, b) => {
+    if (a.chanceNo != null && b.chanceNo != null) return a.chanceNo - b.chanceNo;
+    if (a.chanceNo != null) return -1;
+    if (b.chanceNo != null) return 1;
+    return (a.regNo ?? "").localeCompare(b.regNo ?? "", undefined, { numeric: true });
+  });
 }
 
 // ─── Score-sheet print helpers ─────────────────────────────────────────────────
@@ -179,6 +190,8 @@ export default function ParticipationPage() {
   const [entries,  setEntries]  = useState<EntryRow[]>([]);
   const [loading,  setLoading]  = useState(false);
   const [saving,   setSaving]   = useState<Record<string, boolean>>({});
+  const [savingChance, setSavingChance] = useState<Record<string, boolean>>({});
+  const [savedChance,  setSavedChance]  = useState<Record<string, number | null>>({});
   const [msg,      setMsg]      = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [exportingAll, setExportingAll] = useState(false);
   const [exportingJudge, setExportingJudge] = useState(false);
@@ -232,7 +245,7 @@ export default function ParticipationPage() {
     setLoading(true);
     const { data } = await supabase
       .from("participant_registrations")
-      .select("id, participated, participant:participants(name, registration_number, house_name, shakha:shakhas(id,name), competition_category:competition_categories(slug))")
+      .select("id, participated, chance_no, participant:participants(name, registration_number, house_name, shakha:shakhas(id,name), competition_category:competition_categories(slug))")
       .eq("feast_competition_id", compId);
 
     const rows: EntryRow[] = (data ?? []).map((r) => {
@@ -248,13 +261,14 @@ export default function ParticipationPage() {
         shakhaId:     (sh?.id         as string) ?? "",
         catSlug:      (cat?.slug      as string | null) ?? null,
         participated: Boolean(r.participated),
+        chanceNo:     (r.chance_no as number | null) ?? null,
       };
     });
 
-    // Sort by reg number for a stable, scannable order
-    rows.sort((a, b) => (a.regNo ?? "").localeCompare(b.regNo ?? "", undefined, { numeric: true }));
-
-    setEntries(rows);
+    // Sort by chance number (nulls last), then reg number for a stable, scannable order
+    const sorted = sortByChance(rows);
+    setSavedChance(Object.fromEntries(sorted.map((r) => [r.regId, r.chanceNo])));
+    setEntries(sorted);
     setLoading(false);
   }, [compId]);
 
@@ -286,6 +300,39 @@ export default function ParticipationPage() {
       setMsg({ type: "err", text: res.error });
       setTimeout(() => setMsg(null), 3000);
     }
+  };
+
+  // ── Chance number: edit locally as the user types, save + re-sort on blur ──
+  const editChance = (regId: string, raw: string) => {
+    const digits = raw.replace(/[^0-9]/g, "").slice(0, 3);
+    const next = digits === "" ? null : Number(digits);
+    setEntries((rows) => rows.map((r) => r.regId === regId ? { ...r, chanceNo: next } : r));
+  };
+
+  const commitChance = async (row: EntryRow) => {
+    const prev = savedChance[row.regId] ?? null;
+    const next = row.chanceNo;
+
+    if (next !== null && (next < 1 || next > 100)) {
+      setMsg({ type: "err", text: "Chance number must be between 1 and 100." });
+      setTimeout(() => setMsg(null), 3000);
+      setEntries((rows) => rows.map((r) => r.regId === row.regId ? { ...r, chanceNo: prev } : r));
+      return;
+    }
+    if (next === prev) return;
+
+    setSavingChance((s) => ({ ...s, [row.regId]: true }));
+    const res = await setChanceNo(row.regId, next);
+    setSavingChance((s) => { const c = { ...s }; delete c[row.regId]; return c; });
+
+    if (res.error) {
+      setMsg({ type: "err", text: res.error });
+      setTimeout(() => setMsg(null), 3000);
+      setEntries((rows) => sortByChance(rows.map((r) => r.regId === row.regId ? { ...r, chanceNo: prev } : r)));
+      return;
+    }
+    setSavedChance((s) => ({ ...s, [row.regId]: next }));
+    setEntries((rows) => sortByChance(rows));
   };
 
   // ── PDF (print) export — one judge sheet per competition (took-part only), 3 copies each ──
@@ -472,11 +519,11 @@ ${FONT_LINK}
             <table className="w-full text-sm min-w-[620px]">
               <thead style={{ background: "linear-gradient(90deg,#fce7f3,#fdf2f8)" }}>
                 <tr className="border-b-2" style={{ borderColor: "#f9a8d4" }}>
-                  {["Took part", "Reg No", "Participant", "House", "Shakha"].map((h) => (
+                  {["Took part", "Chance #", "Reg No", "Participant", "House", "Shakha"].map((h) => (
                     <th
                       key={h}
-                      className={`px-3 py-3 text-left text-[11px] font-black uppercase tracking-wider ${h === "Took part" ? "" : "whitespace-nowrap"}`}
-                      style={{ color: "#831843", ...(h === "Took part" ? { width: 70 } : {}) }}
+                      className={`px-3 py-3 text-left text-[11px] font-black uppercase tracking-wider ${h === "Took part" || h === "Chance #" ? "" : "whitespace-nowrap"}`}
+                      style={{ color: "#831843", ...(h === "Took part" || h === "Chance #" ? { width: 70 } : {}) }}
                     >{h}</th>
                   ))}
                 </tr>
@@ -494,6 +541,14 @@ ${FONT_LINK}
                     >
                       <td className="px-3 py-3" style={{ width: 70 }}>
                         <Checkbox checked={e.participated} busy={!!saving[e.regId]} />
+                      </td>
+                      <td className="px-3 py-3" style={{ width: 70 }} onClick={(ev) => ev.stopPropagation()}>
+                        <ChanceInput
+                          value={e.chanceNo}
+                          busy={!!savingChance[e.regId]}
+                          onChange={(v) => editChance(e.regId, v)}
+                          onBlur={() => commitChance(e)}
+                        />
                       </td>
                       <td className="px-3 py-3">
                         <span className="inline-block font-mono text-[13px] font-black px-2.5 py-1 rounded-lg tracking-wide text-white" style={{ background: "#831843" }}>
@@ -551,6 +606,14 @@ ${FONT_LINK}
                         {CATEGORY_LABELS[e.catSlug] ?? e.catSlug}
                       </span>
                     )}
+                    <div className="shrink-0" onClick={(ev) => ev.stopPropagation()}>
+                      <ChanceInput
+                        value={e.chanceNo}
+                        busy={!!savingChance[e.regId]}
+                        onChange={(v) => editChance(e.regId, v)}
+                        onBlur={() => commitChance(e)}
+                      />
+                    </div>
                   </div>
                 </div>
               );
@@ -577,5 +640,36 @@ function Checkbox({ checked, busy }: { checked: boolean; busy: boolean }) {
         ? <Loader2 size={13} className="animate-spin" color={checked ? "#fff" : "#BE185D"} />
         : checked ? <Check size={15} color="#fff" strokeWidth={3} /> : null}
     </span>
+  );
+}
+
+// ─── Chance number input ────────────────────────────────────────────────────
+
+function ChanceInput({ value, busy, onChange, onBlur }: {
+  value: number | null;
+  busy: boolean;
+  onChange: (raw: string) => void;
+  onBlur: () => void;
+}) {
+  return (
+    <div className="relative inline-block">
+      <input
+        type="text"
+        inputMode="numeric"
+        maxLength={3}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        placeholder="—"
+        disabled={busy}
+        className="w-12 text-center border-2 rounded-lg px-1 py-1.5 text-sm font-bold outline-none transition-colors bg-white text-gray-800 disabled:opacity-50"
+        style={{ borderColor: "#f472b6" }}
+        onFocus={(ev) => (ev.currentTarget.style.borderColor = "#BE185D")}
+        onBlurCapture={(ev) => (ev.currentTarget.style.borderColor = "#f472b6")}
+      />
+      {busy && (
+        <Loader2 size={11} className="animate-spin absolute -right-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+      )}
+    </div>
   );
 }

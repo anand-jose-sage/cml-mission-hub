@@ -76,8 +76,32 @@ const BOTTOM_NAV: NavItem[] = [
   { href: "/admin/results",      label: "Results",      icon: Medal },
 ];
 
+// me_admin gets a minimal slice of the panel: dashboard + attendance/participants/standings.
+const ME_ADMIN_NAV_SECTIONS: NavSection[] = [
+  {
+    items: [
+      { href: "/admin",              label: "Dashboard",    icon: LayoutDashboard, color: "#6B46FF" },
+      { href: "/admin/participants", label: "Participants", icon: UserCheck,       color: "#0891B2" },
+      { href: "/admin/participation", label: "Attendance",  icon: ClipboardCheck,  color: "#BE185D" },
+      { href: "/admin/standings",    label: "Standings",    icon: Trophy,          color: "#7C3AED" },
+    ],
+  },
+];
+
+const ME_ADMIN_BOTTOM_NAV: NavItem[] = [
+  { href: "/admin",              label: "Dashboard",    icon: LayoutDashboard },
+  { href: "/admin/participants", label: "Participants", icon: UserCheck },
+  { href: "/admin/participation", label: "Attendance",  icon: ClipboardCheck },
+];
+
+const ME_ADMIN_ALLOWED_PATHS = ["/admin", "/admin/participants", "/admin/participation", "/admin/standings"];
+
 function isActive(href: string, pathname: string) {
   return href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
+}
+
+function isPathAllowedForMeAdmin(pathname: string) {
+  return ME_ADMIN_ALLOWED_PATHS.some((p) => (p === "/admin" ? pathname === "/admin" : pathname.startsWith(p)));
 }
 
 // ─── Sidebar nav link (desktop) ───────────────────────────────────────────────
@@ -105,12 +129,14 @@ function MobileDrawer({
   onClose,
   pathname,
   profile,
+  navSections,
   onSignOut,
 }: {
   open: boolean;
   onClose: () => void;
   pathname: string;
   profile: { full_name?: string | null; email?: string | null; role: string; shakha?: { name: string } | null } | null;
+  navSections: NavSection[];
   onSignOut: () => void;
 }) {
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -169,7 +195,7 @@ function MobileDrawer({
 
         {/* Scrollable nav list */}
         <div className="overflow-y-auto flex-1 px-4 py-3">
-          {NAV_SECTIONS.map((section, si) => (
+          {navSections.map((section, si) => (
             <div key={si} className={si > 0 ? "mt-4" : ""}>
               {section.label && (
                 <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5 px-1">
@@ -243,8 +269,13 @@ function AdminShell({ children }: { children: React.ReactNode }) {
     // sa_admin only registers participants/teams via the Feast Portal — no admin panel access.
     if (session && profile?.role === "sa_admin" && !isLoginPage) {
       router.replace("/");
+      return;
     }
-  }, [loading, session, profile, isLoginPage, router]);
+    // me_admin gets a minimal slice of the panel — bounce any other route back to the dashboard.
+    if (session && profile?.role === "me_admin" && !isLoginPage && !isPathAllowedForMeAdmin(pathname)) {
+      router.replace("/admin");
+    }
+  }, [loading, session, profile, isLoginPage, pathname, router]);
 
   // Close drawer on route change
   useEffect(() => {
@@ -263,8 +294,12 @@ function AdminShell({ children }: { children: React.ReactNode }) {
 
   if (!session || profile?.role === "sa_admin") return null;
 
+  const isMeAdmin = profile?.role === "me_admin";
+  const navSections = isMeAdmin ? ME_ADMIN_NAV_SECTIONS : NAV_SECTIONS;
+  const bottomNav = isMeAdmin ? ME_ADMIN_BOTTOM_NAV : BOTTOM_NAV;
+
   // Current page label for the top bar
-  const allItems = NAV_SECTIONS.flatMap((s) => s.items);
+  const allItems = navSections.flatMap((s) => s.items);
   const currentItem = allItems.find((i) => isActive(i.href, pathname));
   const pageTitle = currentItem?.label ?? "Admin";
 
@@ -289,7 +324,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 flex flex-col gap-3">
-          {NAV_SECTIONS.map((section, si) => (
+          {navSections.map((section, si) => (
             <div key={si}>
               {section.label && (
                 <p className="px-3 mb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">
@@ -330,7 +365,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
       {/* ── Mobile bottom nav ── */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-100 safe-area-bottom">
         <div className="flex items-stretch h-[58px]">
-          {BOTTOM_NAV.map((item) => {
+          {bottomNav.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href, pathname);
             return (
@@ -374,6 +409,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
         onClose={() => setDrawerOpen(false)}
         pathname={pathname}
         profile={profile}
+        navSections={navSections}
         onSignOut={handleSignOut}
       />
 
