@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { buildTheme } from "@/lib/theme";
 import { TopHeader } from "@/components/home/top-header";
 import { HeroEvent } from "@/components/home/hero-event";
@@ -17,21 +18,21 @@ import { NoticeBoard } from "@/components/notices/notice-board";
 import { MediaCenter } from "@/components/media/media-center";
 import { ActivitiesScreen } from "@/components/activities/activities-screen";
 import { FeastPortalCard } from "@/components/feast/feast-portal-card";
-import { LiteratureResultBanner } from "@/components/feast/literature-result-banner";
 import { QuickAccess } from "@/components/home/quick-access";
 import { FeastModule } from "@/components/feast/feast-module";
+import { LentPortalCard } from "@/components/lent/lent-portal-card";
 import { useTutorialPrelude } from "@/app/(tutorial)/help/tutorials/registration/_hooks/use-tutorial-prelude";
 import { useMyRegistrationsTutorial } from "@/app/(tutorial)/help/tutorials/my-registrations/_hooks/use-my-registrations-tutorial";
 import { useEditRegistrationTutorial } from "@/app/(tutorial)/help/tutorials/edit-registration/_hooks/use-edit-registration-tutorial";
 import { useDeleteRegistrationTutorial } from "@/app/(tutorial)/help/tutorials/delete-registration/_hooks/use-delete-registration-tutorial";
 
 export default function HomePage() {
+  const router = useRouter();
   const theme = useMemo(() => buildTheme("aurora-glass", "dusk", 28), []);
   const [tab, setTab] = useState("home");
   const [sel, setSel] = useState<number | null>(null); // null = all week
   const [noticeDetailOpen, setNoticeDetailOpen] = useState(false);
   const [inFeastInternal, setInFeastInternal] = useState(false);
-  const [feastEntry, setFeastEntry] = useState<{ screen: "results"; slug: string } | null>(null);
   const tutorial = useTutorialPrelude();
   const myRegTutorial = useMyRegistrationsTutorial();
   const editRegTutorial = useEditRegistrationTutorial();
@@ -49,13 +50,7 @@ export default function HomePage() {
   const setInFeast = (v: boolean) => {
     if (!activeTutorial) {
       setInFeastInternal(v);
-      if (!v) setFeastEntry(null);
     }
-  };
-  const enterFeastResults = () => {
-    if (activeTutorial) return;
-    setFeastEntry({ screen: "results", slug: "literature-feast-2026" });
-    setInFeastInternal(true);
   };
   const scrollRef = useRef<HTMLElement>(null);
 
@@ -94,8 +89,6 @@ export default function HomePage() {
           tutorialStep={activeTutorial?.feastStep ?? undefined}
           tutorialDetails={activeTutorial?.feastDetails ?? undefined}
           onTutorialAction={onTutorialAction}
-          initialScreen={feastEntry?.screen}
-          initialSlug={feastEntry?.slug}
         />
       </div>
     );
@@ -150,7 +143,7 @@ export default function HomePage() {
               <HeroEvent theme={theme} />
 
               <FeastPortalCard onEnter={() => setInFeast(true)} />
-              <LiteratureResultBanner onClick={enterFeastResults} />
+              <LentPortalCard onEnter={() => router.push("/lent")} />
 
               {/* Quick access — soft 3D shortcuts */}
               <QuickAccess

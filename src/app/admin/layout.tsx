@@ -13,6 +13,7 @@ import {
   UserCheck,
   ClipboardCheck,
   BookOpen,
+  ShieldCheck,
   Layers,
   Medal,
   Users2,
@@ -47,6 +48,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/admin/notices",    label: "Notices",    icon: Bell,        color: "#B45309" },
       { href: "/admin/activities", label: "Activities", icon: CalendarDays, color: "#15803D" },
       { href: "/admin/plan",       label: "Annual Plan", icon: BookOpen,    color: "#B0892F" },
+      { href: "/admin/lent",       label: "St. Michael's Lent", icon: ShieldCheck, color: "#7C2D12" },
     ],
   },
   {

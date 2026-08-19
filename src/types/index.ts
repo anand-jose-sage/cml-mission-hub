@@ -320,6 +320,60 @@ export interface PlanMonth {
 
 export interface PlanContent { meta: PlanMeta | null; months: PlanMonth[]; }
 
+// ============================================================
+// ST. MICHAEL'S LENT — 40-day devotional (key-value JSONB), 2026
+// (Aug 19 - Oct 3, the Franciscan "St. Michael's Lent" custom, not the
+// Ash-Wednesday-to-Easter universal Lent — see lent-dates.ts)
+// ============================================================
+export interface LentPhase {
+  index: number;      // 1-5
+  dayStart: number;   // first day number in this phase (inclusive)
+  dayEnd: number;     // last day number in this phase (inclusive)
+  labelEn: string;    // e.g. "Lord, protect me"
+  labelMl: string;
+}
+
+export interface LentMeta {
+  org: string;
+  titleEn: string;
+  titleMl: string;
+  yearLabel: string;
+  heroTaglineEn: string;
+  heroTaglineMl: string;
+  heroBodyEn: string;
+  heroBodyMl: string;
+  ctaLabelEn: string;
+  ctaLabelMl: string;
+  progressLabelEn: string;   // trailing word after "⚔️ 4/40"
+  progressLabelMl: string;
+  phases: LentPhase[];
+  prayerToMichaelEn: string; // the classic "Prayer to St. Michael" — same text every day, shown as the closing piece of the activity step
+  prayerToMichaelMl: string;
+}
+
+export interface LentReading { text: string; reference: string; }
+export interface LentPosterQuote { label: string; text: string; reference: string; }
+
+// One language's worth of a day's content — reused for both `en` and `ml`.
+export interface LentDayContent {
+  themeTitle: string;
+  reading: LentReading;
+  reflection: string;         // short devotional insight on the reading (1-2 sentences)
+  prayer: string;
+  activity: string;          // Day 40's activity includes its closing declaration verbatim
+  reflectionQuestion: string; // the private-journal step's prompt question
+  posterQuote: LentPosterQuote;
+}
+
+export interface LentDay {
+  day: number;                // 1-40
+  emoji: string;               // e.g. "🌿", "🛡️", "⚔️" — language-neutral
+  en: LentDayContent;
+  ml: LentDayContent;
+}
+
+export interface LentContent { meta: LentMeta | null; days: LentDay[]; }
+
 export interface Database {
   public: {
     Tables: {
