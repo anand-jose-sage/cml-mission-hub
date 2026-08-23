@@ -24,8 +24,8 @@ interface RegRow {
   participant: ParticipantRow | null;
 }
 
-// Edit registrations locked after July 19 2026 4:00 PM IST (10:30 AM UTC)
-const EDIT_DEADLINE = new Date("2026-07-19T10:30:00Z");
+// Edit registrations locked after Aug 27 2026 5:00 PM IST (11:30 AM UTC)
+const EDIT_DEADLINE = new Date("2026-08-27T11:30:00Z");
 const isEditLocked = () => new Date() >= EDIT_DEADLINE;
 
 // ---------- helpers ----------
