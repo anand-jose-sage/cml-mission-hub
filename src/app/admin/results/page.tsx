@@ -11,7 +11,11 @@ import {
   getCompetitionScores, getScoresForCompetitions,
 } from "@/actions/results";
 import {
+  getTeamCompetitionScores, saveDraftTeamScores, publishTeamResults, unpublishTeamResults,
+} from "@/actions/team-results";
+import {
   calcGrade, calcPositions, calcAllResults, positionLabel,
+  DEFAULT_GRADE_POINTS, DEFAULT_POSITION_POINTS, GROUP_GRADE_POINTS, GROUP_POSITION_POINTS,
   type Grade,
 } from "@/lib/result-calculator";
 
@@ -28,6 +32,7 @@ interface CompOption {
   gender: string | null;
   maxScore: number | null;
   resultStatus: "draft" | "published";
+  type: "individual" | "group";
 }
 
 interface EntryRow {
@@ -37,6 +42,14 @@ interface EntryRow {
   houseName: string | null;
   shakhaId: string;
   shakhaName: string;
+  savedScore: number | null;
+}
+
+interface TeamEntryRow {
+  teamRegistrationId: string;
+  teamName: string;
+  shakhaName: string;
+  memberNames: string[];
   savedScore: number | null;
 }
 
@@ -96,16 +109,18 @@ function PublishConfirm({
   onConfirm,
   onCancel,
   busy,
+  isGroup,
 }: {
   onConfirm: () => void;
   onCancel: () => void;
   busy: boolean;
+  isGroup: boolean;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
         <div className="flex items-start justify-between mb-4">
-          <h3 className="font-bold text-[17px] text-gray-900">Publish Results?</h3>
+          <h3 className="font-bold text-[17px] text-gray-900">Publish {isGroup ? "Team " : ""}Results?</h3>
           <button onClick={onCancel} className="border-none bg-transparent cursor-pointer p-1">
             <X size={18} color="#9ca3af" />
           </button>
@@ -113,7 +128,7 @@ function PublishConfirm({
         <p className="text-sm text-gray-500 mb-3">This will:</p>
         <ul className="space-y-2 mb-6">
           {[
-            "Calculate grades for all participants",
+            `Calculate grades for all ${isGroup ? "teams" : "participants"}`,
             "Calculate positions (ties share same rank)",
             "Calculate grade + position points",
             "Write to the point ledger",
@@ -275,6 +290,7 @@ export default function ResultsAdminPage() {
 
   const [maxScoreInput, setMaxScoreInput] = useState("");
   const [entries, setEntries] = useState<EntryRow[]>([]);
+  const [teamEntries, setTeamEntries] = useState<TeamEntryRow[]>([]);
   const [scores, setScores] = useState<Record<string, string>>({});
 
   const [loading, setLoading] = useState(false);
@@ -288,6 +304,7 @@ export default function ResultsAdminPage() {
   const selectedComp = compOptions.find((c) => c.fcId === compId) ?? null;
   const maxScore = selectedComp?.maxScore ?? null;
   const resultStatus = selectedComp?.resultStatus ?? "draft";
+  const isGroup = selectedComp?.type === "group";
 
   // Free-text score entry (no number-input spinner) — keep only digits and a single decimal point.
   const setScore = (registrationId: string, raw: string) => {
@@ -320,26 +337,23 @@ export default function ResultsAdminPage() {
       .eq("feast_id", feastId)
       .order("display_order")
       .then(({ data }) => {
-        const opts: CompOption[] = (data ?? [])
-          .filter((fc) => {
-            const comp = (Array.isArray(fc.competition) ? fc.competition[0] : fc.competition) as Record<string, unknown> | null;
-            return comp?.type !== "group";
-          })
-          .map((fc) => {
+        const opts: CompOption[] = (data ?? []).map((fc) => {
           const comp = (Array.isArray(fc.competition) ? fc.competition[0] : fc.competition) as Record<string, unknown> | null;
           const cat = comp ? (Array.isArray(comp.competition_category) ? (comp.competition_category as unknown[])[0] : comp.competition_category) as Record<string, unknown> | null : null;
           const name = (comp?.name as string) ?? "Unknown";
           const catName = (cat?.name as string) ?? "";
           const gender = (comp?.gender as string) || null;
+          const isGroup = comp?.type === "group";
           const parts = [name, catName, gender].filter(Boolean);
           return {
             fcId: fc.id as string,
-            label: parts.join(" · "),
+            label: (isGroup ? "👥 " : "") + parts.join(" · "),
             compName: name,
             catName,
             gender,
             maxScore: fc.max_score as number | null,
             resultStatus: (fc.result_status as "draft" | "published") ?? "draft",
+            type: (isGroup ? "group" : "individual") as "individual" | "group",
           };
         });
         setCompOptions(opts);
@@ -354,6 +368,54 @@ export default function ResultsAdminPage() {
 
     const comp = compOptions.find((c) => c.fcId === compId);
     setMaxScoreInput(comp?.maxScore != null ? String(comp.maxScore) : "");
+
+    if (comp?.type === "group") {
+      const [{ data: teamData }, scoresResult] = await Promise.all([
+        supabase
+          .from("team_registrations")
+          .select(`
+            id, team_name,
+            shakha:shakhas(name),
+            members:team_registration_members(participant:participants(name))
+          `)
+          .eq("feast_competition_id", compId),
+        getTeamCompetitionScores(compId),
+      ]);
+
+      const savedMap: Record<string, number> = {};
+      for (const r of scoresResult.data ?? []) {
+        savedMap[r.teamRegistrationId] = r.score;
+      }
+
+      const rows: TeamEntryRow[] = (teamData ?? []).map((t) => {
+        const sh = (Array.isArray(t.shakha) ? t.shakha[0] : t.shakha) as Record<string, unknown> | null;
+        const members = (Array.isArray(t.members) ? t.members : []) as Record<string, unknown>[];
+        const memberNames = members
+          .map((m) => {
+            const p = (Array.isArray(m.participant) ? (m.participant as unknown[])[0] : m.participant) as Record<string, unknown> | null;
+            return (p?.name as string) ?? null;
+          })
+          .filter((n): n is string => !!n);
+        const teamId = t.id as string;
+        return {
+          teamRegistrationId: teamId,
+          teamName: t.team_name as string,
+          shakhaName: (sh?.name as string) ?? "—",
+          memberNames,
+          savedScore: savedMap[teamId] ?? null,
+        };
+      });
+
+      setTeamEntries(rows);
+      setEntries([]);
+      const initScores: Record<string, string> = {};
+      for (const row of rows) {
+        if (row.savedScore != null) initScores[row.teamRegistrationId] = String(row.savedScore);
+      }
+      setScores(initScores);
+      setLoading(false);
+      return;
+    }
 
     const [{ data: regData }, scoresResult] = await Promise.all([
       supabase
@@ -385,6 +447,7 @@ export default function ResultsAdminPage() {
     });
 
     setEntries(rows);
+    setTeamEntries([]);
     const initScores: Record<string, string> = {};
     for (const row of rows) {
       if (row.savedScore != null) initScores[row.registrationId] = String(row.savedScore);
@@ -398,26 +461,32 @@ export default function ResultsAdminPage() {
   // ── Live preview ──
   const preview = useMemo(() => {
     if (!maxScore) return [];
-    const calcEntries = entries
+    const source: { id: string; savedScore: number | null }[] = isGroup
+      ? teamEntries.map((e) => ({ id: e.teamRegistrationId, savedScore: e.savedScore }))
+      : entries.map((e) => ({ id: e.registrationId, savedScore: e.savedScore }));
+
+    const calcEntries = source
       .map((e) => {
-        const inputVal = scores[e.registrationId];
+        const inputVal = scores[e.id];
         const hasInput = inputVal != null && inputVal !== "";
         const hasSaved = e.savedScore != null;
         // Skip entirely if no score has been entered or saved yet
         if (!hasInput && !hasSaved) return null;
         const score = hasInput ? parseFloat(inputVal) : e.savedScore!;
-        return { id: e.registrationId, score };
+        return { id: e.id, score };
       })
       .filter((e): e is { id: string; score: number } => e !== null && !isNaN(e.score));
 
-    const posMap = calcPositions(calcEntries);
+    const gradeScale = isGroup ? GROUP_GRADE_POINTS : DEFAULT_GRADE_POINTS;
+    const positionScale = isGroup ? GROUP_POSITION_POINTS : DEFAULT_POSITION_POINTS;
+    const posMap = calcPositions(calcEntries, positionScale);
 
     return calcEntries.map((e) => {
-      const { grade, gradePoints } = calcGrade(e.score, maxScore);
+      const { grade, gradePoints } = calcGrade(e.score, maxScore, gradeScale);
       const { position, positionPoints } = posMap.get(e.id) ?? { position: null, positionPoints: 0 };
       return { id: e.id, grade, gradePoints, position, positionPoints, totalPoints: gradePoints + positionPoints };
     });
-  }, [entries, scores, maxScore]);
+  }, [entries, teamEntries, scores, maxScore, isGroup]);
 
   const previewMap = Object.fromEntries(preview.map((p) => [p.id, p]));
 
@@ -436,10 +505,19 @@ export default function ResultsAdminPage() {
 
   const handleSaveDraft = async () => {
     setSaving(true);
-    const scoreRows = entries
-      .filter((e) => scores[e.registrationId] != null && scores[e.registrationId] !== "")
-      .map((e) => ({ registrationId: e.registrationId, score: parseFloat(scores[e.registrationId]) }));
-    const res = await saveDraftScores({ feastCompetitionId: compId, scores: scoreRows });
+    const res = isGroup
+      ? await saveDraftTeamScores({
+          feastCompetitionId: compId,
+          scores: teamEntries
+            .filter((e) => scores[e.teamRegistrationId] != null && scores[e.teamRegistrationId] !== "")
+            .map((e) => ({ teamRegistrationId: e.teamRegistrationId, score: parseFloat(scores[e.teamRegistrationId]) })),
+        })
+      : await saveDraftScores({
+          feastCompetitionId: compId,
+          scores: entries
+            .filter((e) => scores[e.registrationId] != null && scores[e.registrationId] !== "")
+            .map((e) => ({ registrationId: e.registrationId, score: parseFloat(scores[e.registrationId]) })),
+        });
     setSaving(false);
     if (res.error) { setMsg({ type: "err", text: res.error }); return; }
     setMsg({ type: "ok", text: "Scores saved as draft" });
@@ -450,7 +528,7 @@ export default function ResultsAdminPage() {
   const handlePublish = async () => {
     setPublishing(true);
     setShowConfirm(false);
-    const res = await publishResults(compId);
+    const res = isGroup ? await publishTeamResults(compId) : await publishResults(compId);
     setPublishing(false);
     if (res.error) { setMsg({ type: "err", text: res.error }); return; }
     setMsg({ type: "ok", text: "Results published and standings updated!" });
@@ -462,7 +540,7 @@ export default function ResultsAdminPage() {
   const handleUnpublish = async () => {
     if (!feastId) return;
     setPublishing(true);
-    const res = await unpublishResults(compId, feastId);
+    const res = isGroup ? await unpublishTeamResults(compId, feastId) : await unpublishResults(compId, feastId);
     setPublishing(false);
     if (res.error) { setMsg({ type: "err", text: res.error }); return; }
     setMsg({ type: "ok", text: "Reverted to draft" });
@@ -503,12 +581,15 @@ export default function ResultsAdminPage() {
     }
   };
 
-  // ── Export every competition in the feast to one PDF ──
+  // ── Export every individual competition in the feast to one PDF ──
+  // (team competitions aren't supported by this PDF layout yet — excluded here)
+  const individualCompOptions = useMemo(() => compOptions.filter((c) => c.type === "individual"), [compOptions]);
+
   const handleExportAll = async () => {
-    if (!compOptions.length) return;
+    if (!individualCompOptions.length) return;
     setExportingAll(true);
 
-    const fcIds = compOptions.map((c) => c.fcId);
+    const fcIds = individualCompOptions.map((c) => c.fcId);
     const [{ data: regData }, scoresResult] = await Promise.all([
       supabase
         .from("participant_registrations")
@@ -542,7 +623,7 @@ export default function ResultsAdminPage() {
     }
 
     const scoresByComp = scoresResult.data;
-    const sections = compOptions.map((c) => {
+    const sections = individualCompOptions.map((c) => {
       const allRegs = regsByComp.get(c.fcId) ?? [];
       const scoreMap: Record<string, number> = {};
       for (const s of scoresByComp[c.fcId] ?? []) scoreMap[s.registrationId] = s.score;
@@ -605,6 +686,7 @@ export default function ResultsAdminPage() {
           onConfirm={handlePublish}
           onCancel={() => setShowConfirm(false)}
           busy={publishing}
+          isGroup={isGroup}
         />
       )}
 
@@ -616,7 +698,7 @@ export default function ResultsAdminPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-900">Results</h1>
-            <p className="text-xs text-gray-500">Enter scores, preview grades, and publish</p>
+            <p className="text-xs text-gray-500">Enter scores, preview grades, and publish — includes team events</p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -634,8 +716,8 @@ export default function ResultsAdminPage() {
           </div>
           <button
             onClick={handleExportPdf}
-            disabled={!selectedComp || !entries.length}
-            title="Export the selected competition's results as a PDF"
+            disabled={!selectedComp || isGroup || !entries.length}
+            title={isGroup ? "PDF export isn't available for team competitions yet" : "Export the selected competition's results as a PDF"}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white border-none cursor-pointer disabled:opacity-40 transition-colors"
             style={{ background: "linear-gradient(135deg,#6B46FF,#A855F7)" }}
           >
@@ -644,8 +726,8 @@ export default function ResultsAdminPage() {
           </button>
           <button
             onClick={handleExportAll}
-            disabled={!compOptions.length || exportingAll}
-            title="Export results for every competition in this feast"
+            disabled={!individualCompOptions.length || exportingAll}
+            title="Export results for every individual competition in this feast (team events aren't included)"
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white border-none cursor-pointer disabled:opacity-40 transition-colors"
             style={{ background: "linear-gradient(135deg,#4C1D95,#6B46FF)" }}
           >
@@ -676,6 +758,11 @@ export default function ResultsAdminPage() {
               </select>
               <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             </div>
+            {isGroup && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-purple-50 text-purple-700 text-xs font-semibold border border-purple-100 shrink-0">
+                👥 Team Event
+              </span>
+            )}
             {resultStatus === "published" && (
               <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-50 text-green-700 text-xs font-semibold border border-green-100 shrink-0">
                 <Check size={12} /> Published
@@ -739,10 +826,138 @@ export default function ResultsAdminPage() {
         <div className="flex justify-center py-14">
           <Loader2 size={22} className="animate-spin text-gray-300" />
         </div>
-      ) : entries.length === 0 ? (
+      ) : (isGroup ? teamEntries.length === 0 : entries.length === 0) ? (
         <div className="rounded-xl border border-dashed border-gray-200 py-14 text-center text-sm text-gray-400">
-          No participants registered for this competition.
+          {isGroup ? "No teams registered for this competition." : "No participants registered for this competition."}
         </div>
+      ) : (
+        <>
+        {isGroup ? (
+        <>
+          {/* ── Desktop table (team) ── */}
+          <div className="hidden sm:block bg-white rounded-xl overflow-hidden border border-[#1e1b4b] shadow-md mb-4">
+            <table className="w-full text-sm min-w-[760px]">
+              <thead style={{ background: "linear-gradient(90deg,#ede9fe,#f5f3ff)" }}>
+                <tr className="border-b-2" style={{ borderColor: "#c4b5fd" }}>
+                  {["#", "Team", "Shakha", "Members", `Score / ${maxScore}`, "Grade", "Position", "Total"].map((h) => (
+                    <th key={h} className="px-3 py-3 text-left text-[11px] font-black uppercase tracking-wider whitespace-nowrap" style={{ color: "#1e1b4b" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {teamEntries.map((e, i) => {
+                  const p = previewMap[e.teamRegistrationId];
+                  const isEven = i % 2 === 0;
+                  return (
+                    <tr
+                      key={e.teamRegistrationId}
+                      className="border-b transition-colors"
+                      style={{
+                        borderColor: "#e5e7eb",
+                        background: isEven ? "#fff" : "#f8f7ff",
+                      }}
+                      onMouseEnter={(ev) => (ev.currentTarget.style.background = "#ede9fe")}
+                      onMouseLeave={(ev) => (ev.currentTarget.style.background = isEven ? "#fff" : "#f8f7ff")}
+                    >
+                      <td className="px-3 py-3 text-xs font-black" style={{ color: "#4C1D95" }}>{i + 1}</td>
+                      <td className="px-3 py-3">
+                        <p className="font-bold text-[14px] leading-tight" style={{ color: "#1e1b4b" }}>{e.teamName}</p>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <span className="text-[13px] font-semibold" style={{ color: "#4B5563" }}>{e.shakhaName}</span>
+                      </td>
+                      <td className="px-3 py-3 max-w-[220px]">
+                        <p className="text-[12px] leading-snug" style={{ color: "#6B7280" }}>{e.memberNames.join(", ")}</p>
+                      </td>
+                      <td className="px-3 py-3">
+                        <input
+                          type="number" min="0" max={maxScore ?? undefined} step="0.5"
+                          value={scores[e.teamRegistrationId] ?? ""}
+                          onChange={(ev) => setScores((s) => ({ ...s, [e.teamRegistrationId]: ev.target.value }))}
+                          placeholder="—"
+                          disabled={resultStatus === "published"}
+                          className="w-20 border-2 rounded-lg px-2 py-1.5 text-[15px] font-black text-center outline-none transition-colors disabled:opacity-50"
+                          style={{ borderColor: "#ddd6fe", color: "#1e1b4b" }}
+                          onFocus={(ev) => (ev.currentTarget.style.borderColor = "#6B46FF")}
+                          onBlur={(ev) => (ev.currentTarget.style.borderColor = "#ddd6fe")}
+                        />
+                      </td>
+                      <td className="px-3 py-3 text-center"><GradeCell grade={p?.grade ?? null} pts={p?.gradePoints ?? 0} /></td>
+                      <td className="px-3 py-3 text-center"><PosCell pos={p?.position ?? null} pts={p?.positionPoints ?? 0} /></td>
+                      <td className="px-3 py-3">
+                        {p ? (
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span className="font-black text-[20px] leading-none" style={{ color: p.totalPoints > 0 ? "#6B46FF" : "#D1D5DB" }}>{p.totalPoints}</span>
+                            <span className="text-[10px] font-semibold" style={{ color: "#A78BFA" }}>pts</span>
+                          </div>
+                        ) : <span className="text-gray-300 text-sm font-medium">—</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ── Mobile cards (team) ── */}
+          <div className="sm:hidden space-y-2.5 mb-4">
+            {teamEntries.map((e, i) => {
+              const p = previewMap[e.teamRegistrationId];
+              return (
+                <div key={e.teamRegistrationId} className="rounded-xl overflow-hidden" style={{ border: "1.5px solid #ddd6fe", boxShadow: "0 2px 8px rgba(107,70,255,0.08)" }}>
+                  {/* Card header */}
+                  <div className="flex items-center gap-2.5 px-3.5 pt-3 pb-2.5 bg-white">
+                    <span className="text-[13px] font-black font-mono w-5 shrink-0" style={{ color: "#4C1D95" }}>{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[15px] font-black leading-tight truncate" style={{ color: "#1e1b4b" }}>{e.teamName}</p>
+                      <p className="text-[12px] font-bold mt-0.5" style={{ color: "#374151" }}>{e.shakhaName}</p>
+                      <p className="text-[11.5px] mt-1 leading-snug" style={{ color: "#6B7280" }}>{e.memberNames.join(", ")}</p>
+                    </div>
+                    {/* Total points */}
+                    <div className="shrink-0 text-right">
+                      {p ? (
+                        <>
+                          <span className="font-black text-[24px] leading-none" style={{ color: p.totalPoints > 0 ? "#4C1D95" : "#9CA3AF" }}>{p.totalPoints}</span>
+                          <p className="text-[10px] font-black" style={{ color: "#5B21B6" }}>pts</p>
+                        </>
+                      ) : (
+                        <span className="text-[20px] font-black" style={{ color: "#9CA3AF" }}>—</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Score row — dark background */}
+                  <div className="flex items-center gap-3 px-3.5 py-3 border-t" style={{ background: "#ede9fe", borderColor: "#ddd6fe" }}>
+                    <span className="text-[11px] font-black uppercase tracking-widest shrink-0" style={{ color: "#4C1D95" }}>Score</span>
+                    <input
+                      type="number" min="0" max={maxScore ?? undefined} step="0.5"
+                      inputMode="decimal"
+                      value={scores[e.teamRegistrationId] ?? ""}
+                      onChange={(ev) => setScores((s) => ({ ...s, [e.teamRegistrationId]: ev.target.value }))}
+                      placeholder="—"
+                      disabled={resultStatus === "published"}
+                      className="w-20 border-2 rounded-lg px-3 py-2 text-[16px] font-black text-center outline-none transition-colors bg-white disabled:opacity-40"
+                      style={{ borderColor: "#c4b5fd", color: "#1e1b4b" }}
+                      onFocus={(ev) => (ev.currentTarget.style.borderColor = "#7C3AED")}
+                      onBlur={(ev) => (ev.currentTarget.style.borderColor = "#c4b5fd")}
+                    />
+                    <span className="text-[13px] font-black shrink-0" style={{ color: "#4C1D95" }}>/ {maxScore}</span>
+
+                    {/* Live grade + position */}
+                    {p ? (
+                      <div className="flex items-center gap-1.5 ml-auto flex-wrap justify-end">
+                        <GradeCell grade={p.grade ?? null} pts={p.gradePoints} />
+                        <PosCell pos={p.position ?? null} pts={p.positionPoints} />
+                      </div>
+                    ) : (
+                      <span className="ml-auto text-[12px] font-bold" style={{ color: "#6D28D9" }}>enter score</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
       ) : (
         <>
           {/* ── Desktop table ── */}
@@ -880,6 +1095,8 @@ export default function ResultsAdminPage() {
               );
             })}
           </div>
+        </>
+        )}
 
           {/* Grade summary chips */}
           <div className="flex gap-2 mb-5 flex-wrap">
@@ -890,7 +1107,7 @@ export default function ResultsAdminPage() {
                 <div key={g} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-gray-100 shadow-sm">
                   <span className="text-[12px] font-bold px-2.5 py-0.5 rounded-md text-white" style={{ background: bg }}>Grade {g}</span>
                   <span className="font-bold text-[15px] text-gray-800">{count}</span>
-                  <span className="text-gray-400 text-xs">participants</span>
+                  <span className="text-gray-400 text-xs">{isGroup ? "teams" : "participants"}</span>
                 </div>
               );
             })}

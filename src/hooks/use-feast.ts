@@ -224,7 +224,7 @@ export function useFeast(slug: string) {
           .select(`
             id, time_slot, venue, max_slots, stage, scheduled_time,
             comp_status, progress_pct, info,
-            competition:competitions(name, type, category, gender, competition_category_id, icon, max_per_shakha)
+            competition:competitions(name, type, category, gender, competition_category_id, icon, max_per_shakha, max_team_size)
           `)
           .eq("feast_id", feastRow.id)
           .order("display_order"),
@@ -266,6 +266,7 @@ export function useFeast(slug: string) {
           competition_category_id: string | null;
           icon: string | null;
           max_per_shakha: number | null;
+          max_team_size: number | null;
         } | null;
         const staticComp = staticFeast?.competitions.find(
           (sc) => sc.name.toLowerCase() === (c?.name ?? "").toLowerCase()
@@ -287,6 +288,7 @@ export function useFeast(slug: string) {
           progressPct: (fc as Record<string, unknown>).progress_pct as number | null ?? null,
           info: (fc as Record<string, unknown>).info as string | null ?? null,
           maxPerShakha: c?.max_per_shakha ?? 2,
+          maxTeamSize: c?.max_team_size ?? undefined,
         };
       });
 

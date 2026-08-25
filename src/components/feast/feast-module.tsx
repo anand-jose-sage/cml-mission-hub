@@ -21,8 +21,9 @@ const FeastLeaderboard  = dynamic(() => import("./feast-leaderboard").then(m => 
 const FeastParticipants = dynamic(() => import("./feast-participants").then(m => ({ default: m.FeastParticipants })));
 const FeastRegistrations= dynamic(() => import("./feast-registrations").then(m => ({ default: m.FeastRegistrations })));
 const FeastEditRegister = dynamic(() => import("./feast-edit-register").then(m => ({ default: m.FeastEditRegister })));
+const FeastEditTeam     = dynamic(() => import("./feast-edit-team").then(m => ({ default: m.FeastEditTeam })));
 
-type Screen = "landing" | "details" | "register" | "register-team" | "success" | "results" | "leaderboard" | "participants" | "registrations" | "edit-registration";
+type Screen = "landing" | "details" | "register" | "register-team" | "success" | "results" | "leaderboard" | "participants" | "registrations" | "edit-registration" | "edit-team";
 
 export function FeastModule({
   onExit,
@@ -56,6 +57,7 @@ export function FeastModule({
   const [feastSlug, setFeastSlug] = useState(initialSlug ?? "literature_2026");
   const [regResult, setRegResult] = useState<RegResult | null>(null);
   const [editParticipantId, setEditParticipantId] = useState<string | null>(null);
+  const [editTeamId, setEditTeamId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLElement>(null);
   const { profile } = useAuth();
 
@@ -114,10 +116,13 @@ export function FeastModule({
       body = <FeastParticipants slug={feastSlug} theme={theme} onBack={() => setScreen("landing")} onExit={onExit} setFeastSlug={setFeastSlug} />;
       break;
     case "registrations":
-      body = <FeastRegistrations slug={feastSlug} theme={theme} onBack={() => setScreen("details")} onExit={onExit} onEdit={(id) => { setEditParticipantId(id); setScreen("edit-registration"); onTutorialAction?.("edit-tap"); }} />;
+      body = <FeastRegistrations slug={feastSlug} theme={theme} onBack={() => setScreen("details")} onExit={onExit} onEdit={(id) => { setEditParticipantId(id); setScreen("edit-registration"); onTutorialAction?.("edit-tap"); }} onEditTeam={(id) => { setEditTeamId(id); setScreen("edit-team"); }} />;
       break;
     case "edit-registration":
       body = <FeastEditRegister slug={feastSlug} participantId={editParticipantId!} theme={theme} onBack={() => setScreen("registrations")} onDone={() => setScreen("registrations")} onExit={onExit} onTutorialAction={onTutorialAction} />;
+      break;
+    case "edit-team":
+      body = <FeastEditTeam slug={feastSlug} teamId={editTeamId!} theme={theme} onBack={() => setScreen("registrations")} onDone={() => setScreen("registrations")} onExit={onExit} />;
       break;
   }
 

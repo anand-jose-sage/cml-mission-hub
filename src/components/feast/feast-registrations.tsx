@@ -24,6 +24,13 @@ interface RegRow {
   participant: ParticipantRow | null;
 }
 
+interface TeamRow {
+  id: string;
+  feast_competition_id: string;
+  team_name: string;
+  memberNames: string[];
+}
+
 // Edit registrations locked after Aug 27 2026 5:00 PM IST (11:30 AM UTC)
 const EDIT_DEADLINE = new Date("2026-08-27T11:30:00Z");
 const isEditLocked = () => new Date() >= EDIT_DEADLINE;
@@ -244,20 +251,135 @@ function AccordionRow({
   );
 }
 
+function TeamAccordionRow({
+  compName, gender, catSlug, team, idx, theme, onEditTeam,
+}: {
+  compName: string;
+  gender: string | null | undefined;
+  catSlug: string | null | undefined;
+  team: TeamRow | null;
+  idx: number;
+  theme: FeastTheme;
+  onEditTeam: (teamId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ng = normGender(gender);
+  const gStyle = ng ? GENDER_STYLE[ng] : null;
+  const catLabel = catSlug ? CATEGORY_LABELS[catSlug] : null;
+  const catColor = catSlug ? CATEGORY_COLORS[catSlug] : null;
+  const count = team ? 1 : 0;
+
+  const ICON_GRADS = [
+    ["#7C3AED", "#A855F7"],
+    ["#EC4899", "#F472B6"],
+    ["#F59E0B", "#FCD34D"],
+    ["#10B981", "#34D399"],
+    ["#3B82F6", "#60A5FA"],
+  ];
+  const [a, b] = ICON_GRADS[idx % ICON_GRADS.length];
+
+  return (
+    <div
+      className="rounded-2xl mb-3 overflow-hidden"
+      style={{
+        background: theme.glassStrong.background,
+        border: `1px solid ${theme.hairline}`,
+        boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+      }}
+    >
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full border-none cursor-pointer flex items-center gap-3 text-left active:scale-[0.99] transition-transform"
+        style={{ background: "none", padding: "13px 14px" }}
+      >
+        <div
+          className="w-[42px] h-[42px] rounded-[14px] flex items-center justify-center shrink-0 font-bold text-white text-[16px]"
+          style={{ background: `linear-gradient(135deg, ${a}, ${b})`, boxShadow: `0 6px 16px ${a}40`, fontFamily: "var(--font-poppins),sans-serif" }}
+        >
+          {idx + 1}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="font-bold text-[15px] leading-snug" style={{ fontFamily: "var(--font-anek),sans-serif", color: theme.text }}>
+            {compName}
+            {gStyle && (
+              <span style={{ color: gStyle.color }}> · {gStyle.label}</span>
+            )}
+            {catLabel && catColor && (
+              <span style={{ color: catColor }}> · {catLabel}</span>
+            )}
+            <span style={{ color: theme.faint }}> · Team</span>
+          </div>
+        </div>
+
+        <div
+          className="rounded-full px-2.5 py-1 text-[13px] font-black shrink-0 mr-1"
+          style={{ background: count > 0 ? a + "22" : theme.fill, color: count > 0 ? a : theme.faint }}
+        >
+          {count}
+        </div>
+
+        <div
+          className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-transform duration-300"
+          style={{ background: a, boxShadow: `0 2px 8px ${a}66`, transform: open ? "rotate(180deg)" : "none" }}
+        >
+          <ChevronDown size={16} color="#fff" strokeWidth={3} />
+        </div>
+      </button>
+
+      <div
+        className="overflow-hidden transition-all duration-300"
+        style={{ maxHeight: open ? (team ? 120 : 64) : 0 }}
+      >
+        <div style={{ borderTop: `1px solid ${theme.hairline}` }}>
+          {!team ? (
+            <div className="flex flex-col items-center py-5 gap-1.5">
+              <UserX size={22} color={theme.faint} />
+              <p className="text-[12.5px]" style={{ color: theme.faint }}>No team registered from your shakha</p>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 px-4 py-3.5">
+              <div className="flex-1 min-w-0">
+                <div className="text-[14.5px] leading-snug truncate" style={{ fontFamily: "var(--font-anek),sans-serif", fontWeight: 800, color: theme.text }}>
+                  {team.team_name}
+                </div>
+                <p className="text-[12px] mt-1 leading-snug" style={{ fontFamily: "var(--font-anek),sans-serif", fontWeight: 600, color: theme.sub }}>
+                  {team.memberNames.join(", ") || "No members yet"}
+                </p>
+              </div>
+              {!isEditLocked() && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onEditTeam(team.id); }}
+                  className="w-7 h-7 rounded-full flex items-center justify-center border-none cursor-pointer active:scale-95 transition-transform shrink-0"
+                  style={{ background: theme.fillStrong }}
+                >
+                  <Pencil size={13} color={theme.purple} />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------- main ----------
 
-export function FeastRegistrations({ slug, theme, onBack, onExit, onEdit }: {
+export function FeastRegistrations({ slug, theme, onBack, onExit, onEdit, onEditTeam }: {
   slug: string;
   theme: FeastTheme;
   onBack: () => void;
   onExit: () => void;
   onEdit: (participantId: string) => void;
+  onEditTeam: (teamId: string) => void;
 }) {
   const { feast, loading: feastLoading } = useFeast(slug);
   const { session } = useAuth();
   const [myShakhaId, setMyShakhaId] = useState<string | null | undefined>(undefined); // undefined = not yet loaded
   const [myShakhaName, setMyShakhaName] = useState<string | null>(null);
   const [regs, setRegs] = useState<RegRow[]>([]);
+  const [teamRegs, setTeamRegs] = useState<TeamRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -287,25 +409,42 @@ export function FeastRegistrations({ slug, theme, onBack, onExit, onEdit }: {
 
   useEffect(() => {
     if (!feast || myShakhaId === undefined) return; // wait until shakha_id is resolved
-    const ids = feast.competitions.map((c) => c.id);
-    if (ids.length === 0) { setLoading(false); return; }
+    const individualIds = feast.competitions.filter((c) => c.cat !== "Team").map((c) => c.id);
+    const teamIds = feast.competitions.filter((c) => c.cat === "Team").map((c) => c.id);
+    if (individualIds.length === 0 && teamIds.length === 0) { setLoading(false); return; }
 
-    Promise.resolve(
-      supabase
-        .from("participant_registrations")
-        .select(`
-          id,
-          feast_competition_id,
-          participant:participants(
-            id, name, house_name, shakha_id, registration_number, gender,
-            shakha:shakhas(name)
-          )
-        `)
-        .in("feast_competition_id", ids)
-    )
-      .then(({ data }) => {
+    Promise.all([
+      individualIds.length === 0
+        ? Promise.resolve({ data: [] as unknown[] })
+        : Promise.resolve(
+            supabase
+              .from("participant_registrations")
+              .select(`
+                id,
+                feast_competition_id,
+                participant:participants(
+                  id, name, house_name, shakha_id, registration_number, gender,
+                  shakha:shakhas(name)
+                )
+              `)
+              .in("feast_competition_id", individualIds)
+          ),
+      !myShakhaId || teamIds.length === 0
+        ? Promise.resolve({ data: [] as unknown[] })
+        : Promise.resolve(
+            supabase
+              .from("team_registrations")
+              .select(`
+                id, feast_competition_id, team_name,
+                members:team_registration_members(participant:participants(name))
+              `)
+              .eq("shakha_id", myShakhaId)
+              .in("feast_competition_id", teamIds)
+          ),
+    ])
+      .then(([{ data: regData }, { data: teamData }]) => {
         // Normalise: Supabase may return nested joins as arrays — flatten to single objects
-        const all = ((data ?? []) as unknown[]).map((row) => {
+        const all = (regData ?? []).map((row) => {
           const r = row as Record<string, unknown>;
           const p = (Array.isArray(r.participant) ? r.participant[0] : r.participant) as Record<string, unknown> | null;
           if (p) {
@@ -318,6 +457,24 @@ export function FeastRegistrations({ slug, theme, onBack, onExit, onEdit }: {
           ? all.filter((r) => r.participant?.shakha_id === myShakhaId)
           : all;
         setRegs(filtered);
+
+        const teams = (teamData ?? []).map((row) => {
+          const t = row as Record<string, unknown>;
+          const members = (Array.isArray(t.members) ? t.members : []) as Record<string, unknown>[];
+          const memberNames = members
+            .map((m) => {
+              const p = (Array.isArray(m.participant) ? (m.participant as unknown[])[0] : m.participant) as { name: string } | null;
+              return p?.name ?? null;
+            })
+            .filter((n): n is string => !!n);
+          return {
+            id: t.id as string,
+            feast_competition_id: t.feast_competition_id as string,
+            team_name: t.team_name as string,
+            memberNames,
+          };
+        });
+        setTeamRegs(teams);
         setLoading(false);
       })
       .catch(() => {
@@ -400,6 +557,9 @@ export function FeastRegistrations({ slug, theme, onBack, onExit, onEdit }: {
     if (!regsByComp[r.feast_competition_id]) regsByComp[r.feast_competition_id] = [];
     regsByComp[r.feast_competition_id].push(r);
   }
+
+  const teamByComp: Record<string, TeamRow> = {};
+  for (const t of teamRegs) teamByComp[t.feast_competition_id] = t;
 
   const totalRegs = regs.length;
   const shakhaLabel = myShakhaName ?? "Your Shakha";
@@ -545,20 +705,33 @@ export function FeastRegistrations({ slug, theme, onBack, onExit, onEdit }: {
         </div>
       )}
 
-      {feast.competitions.map((c, i) => (
-        <AccordionRow
-          key={c.id}
-          compName={c.name}
-          gender={c.gender}
-          catSlug={c.competitionCategorySlug}
-          regs={regsByComp[c.id] ?? []}
-          idx={i}
-          theme={theme}
-          accent={feast.accent}
-          onEdit={onEdit}
-          isFirstWithRegistrations={i === firstNonEmptyIdx}
-        />
-      ))}
+      {feast.competitions.map((c, i) =>
+        c.cat === "Team" ? (
+          <TeamAccordionRow
+            key={c.id}
+            compName={c.name}
+            gender={c.gender}
+            catSlug={c.competitionCategorySlug}
+            team={teamByComp[c.id] ?? null}
+            idx={i}
+            theme={theme}
+            onEditTeam={onEditTeam}
+          />
+        ) : (
+          <AccordionRow
+            key={c.id}
+            compName={c.name}
+            gender={c.gender}
+            catSlug={c.competitionCategorySlug}
+            regs={regsByComp[c.id] ?? []}
+            idx={i}
+            theme={theme}
+            accent={feast.accent}
+            onEdit={onEdit}
+            isFirstWithRegistrations={i === firstNonEmptyIdx}
+          />
+        )
+      )}
       <div className="h-2" />
     </div>
   );

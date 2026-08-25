@@ -2,11 +2,17 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  Search, Users, Loader2, X, Download, FileDown, Plus, Pencil, Trash2, Save,
+  Search, Users, Users2, Loader2, X, Download, FileDown, Plus, Pencil, Trash2, Save,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getCategorySlug, CATEGORY_LABELS } from "@/lib/competition-categories";
 import { createParticipantAdmin, updateParticipant, deleteParticipant } from "@/actions/feast";
+import { updateTeam, deleteTeam } from "@/actions/team";
+
+// A team's roster is capped at 7 members by default, but a competition can override
+// this via competitions.max_team_size. Mirrors DEFAULT_MAX_TEAM_MEMBERS in
+// src/actions/team.ts — server-side is the source of truth, this is just the UI hint.
+const DEFAULT_MAX_TEAM_MEMBERS = 7;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -19,8 +25,20 @@ interface FeastComp {
     id: string;
     name: string;
     gender: string | null;
+    type: string | null;
     competition_category: { id: string; slug: string; name: string } | null;
+    max_team_size: number | null;
   } | null;
+}
+
+interface TeamRow {
+  id: string;
+  teamName: string;
+  shakhaId: string;
+  shakhaName: string;
+  feastCompetitionId: string;
+  compName: string;
+  memberNames: string[];
 }
 
 interface ParticipantRow {
@@ -324,6 +342,211 @@ function ParticipantPanel({
   );
 }
 
+// ─── Team Edit Slide-over ────────────────────────────────────────────────────
+
+interface EligibleMember { id: string; name: string; houseName: string | null; }
+
+function TeamPanel({
+  team, feastId, maxTeamSize, onClose, onSaved,
+}: {
+  team: TeamRow;
+  feastId: string;
+  maxTeamSize: number;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [teamName, setTeamName] = useState(team.teamName);
+  const [eligible, setEligible] = useState<EligibleMember[]>([]);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Eligible members = this team's own Shakha's participants for the feast, minus
+  // anyone already on a DIFFERENT team for this competition. The current team's own
+  // members stay eligible so they show up pre-picked.
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const [{ data: memberRows }, { data: participants }, { data: otherMemberRows }] = await Promise.all([
+        supabase.from("team_registration_members").select("participant_id").eq("team_registration_id", team.id),
+        supabase.from("participants").select("id, name, house_name").eq("feast_id", feastId).eq("shakha_id", team.shakhaId),
+        supabase.from("team_registration_members").select("participant_id, team_registration_id").eq("feast_competition_id", team.feastCompetitionId),
+      ]);
+      const takenByOthers = new Set(
+        (otherMemberRows ?? [])
+          .filter((r) => r.team_registration_id !== team.id)
+          .map((r) => r.participant_id as string)
+      );
+      setEligible(
+        (participants ?? [])
+          .filter((p) => !takenByOthers.has(p.id))
+          .map((p) => ({ id: p.id, name: p.name, houseName: p.house_name ?? null }))
+      );
+      setPicked((memberRows ?? []).map((m) => m.participant_id as string));
+      setLoading(false);
+    })();
+  }, [team.id, team.shakhaId, team.feastCompetitionId, feastId]);
+
+  const toggle = (id: string) => setPicked((p) =>
+    p.includes(id) ? p.filter((x) => x !== id) : p.length >= maxTeamSize ? p : [...p, id]
+  );
+
+  const handleSave = async () => {
+    if (!teamName.trim() || picked.length === 0) {
+      setError("Team name and at least one member are required.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    const result = await updateTeam({ teamId: team.id, teamName: teamName.trim(), participantIds: picked });
+    setSaving(false);
+    if (result.error) { setError(result.error); return; }
+    onSaved();
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    const result = await deleteTeam(team.id);
+    setDeleting(false);
+    if (result.error) { setError(result.error); return; }
+    onSaved();
+  };
+
+  const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-purple-300";
+  const labelCls = "block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide";
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-white h-full flex flex-col shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+          <h2 className="font-bold text-gray-900 text-base">Edit Team</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 border-none bg-transparent cursor-pointer">
+            <X size={18} color="#6b7280" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          <div>
+            <label className={labelCls}>Competition</label>
+            <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
+              <span className="text-sm font-semibold text-gray-900">{team.compName}</span>
+            </div>
+          </div>
+
+          <div>
+            <label className={labelCls}>Shakha</label>
+            <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl" style={{ background: "#f9fafb", border: "1px solid #e5e7eb" }}>
+              <span className="text-sm font-semibold text-gray-900">{team.shakhaName}</span>
+            </div>
+          </div>
+
+          <div>
+            <label className={labelCls}>Team Name</label>
+            <input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="e.g. Charity Warriors" className={inputCls} />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className={labelCls} style={{ marginBottom: 0 }}>Members</label>
+              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${picked.length >= maxTeamSize ? "bg-amber-50 text-amber-600" : "bg-purple-50 text-purple-600"}`}>
+                {picked.length} / {maxTeamSize} selected
+              </span>
+            </div>
+            <p className="text-[11px] text-gray-400 mb-2">Only {team.shakhaName}&apos;s registered participants are eligible.</p>
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 size={18} className="animate-spin text-gray-400" />
+              </div>
+            ) : eligible.length === 0 ? (
+              <p className="text-xs text-gray-400 py-4 text-center border border-dashed border-gray-200 rounded-xl">
+                No eligible participants from this Shakha.
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                {eligible.map((p) => {
+                  const checked = picked.includes(p.id);
+                  return (
+                    <label
+                      key={p.id}
+                      className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors"
+                      style={{
+                        background: checked ? "#f5f3ff" : "#f9fafb",
+                        border: `1px solid ${checked ? "#c4b5fd" : "#e5e7eb"}`,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggle(p.id)}
+                        className="accent-purple-600 w-4 h-4 shrink-0"
+                      />
+                      <span className="text-sm text-gray-900 font-medium">{p.name}</span>
+                      {p.houseName && <span className="text-xs text-gray-400 ml-auto">{p.houseName}</span>}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {error && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">{error}</p>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-gray-100 space-y-2.5 shrink-0">
+          <div className="flex gap-2.5">
+            <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 bg-transparent cursor-pointer">
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || loading}
+              className="flex-1 py-2.5 rounded-xl bg-[#7C3AED] text-white text-sm font-semibold border-none cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2 hover:bg-[#6D28D9] transition-colors"
+            >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              {saving ? "Saving…" : "Save Changes"}
+            </button>
+          </div>
+
+          {!confirmDelete ? (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="w-full py-2.5 rounded-xl text-sm font-medium text-red-500 border border-red-100 bg-red-50 hover:bg-red-100 cursor-pointer transition-colors"
+            >
+              Delete Team Registration
+            </button>
+          ) : (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-center">
+              <p className="text-xs text-red-700 font-semibold mb-2.5">Permanently delete this team?</p>
+              <div className="flex gap-2">
+                <button onClick={() => setConfirmDelete(false)} className="flex-1 py-2 rounded-lg text-xs font-medium border border-gray-200 bg-white cursor-pointer">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="flex-1 py-2 rounded-lg text-xs font-semibold bg-red-500 text-white border-none cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60"
+                >
+                  {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                  {deleting ? "Deleting…" : "Yes, Delete"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ParticipantsAdminPage() {
@@ -362,11 +585,20 @@ export default function ParticipantsAdminPage() {
     if (!feastId) return;
     supabase
       .from("feast_competitions")
-      .select("id, competition:competitions(id,name,gender,competition_category:competition_categories(id,slug,name))")
+      .select("id, competition:competitions(id,name,gender,type,competition_category:competition_categories(id,slug,name),max_team_size)")
       .eq("feast_id", feastId)
       .order("display_order")
       .then(({ data }) => setFeastComps((data ?? []) as unknown as FeastComp[]));
   }, [feastId]);
+
+  const individualFeastComps = useMemo(
+    () => feastComps.filter((fc) => fc.competition?.type !== "group"),
+    [feastComps]
+  );
+  const teamFeastComps = useMemo(
+    () => feastComps.filter((fc) => fc.competition?.type === "group"),
+    [feastComps]
+  );
 
   // Load participants
   const load = useCallback(async () => {
@@ -399,6 +631,68 @@ export default function ParticipantsAdminPage() {
   }, [feastId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Load teams (group-type competitions) for this feast
+  const [teamRows, setTeamRows] = useState<TeamRow[]>([]);
+  const [teamsLoading, setTeamsLoading] = useState(false);
+  const [teamCompFilter, setTeamCompFilter] = useState("");
+  const [editTeam, setEditTeam] = useState<TeamRow | null>(null);
+
+  const loadTeams = useCallback(async () => {
+    if (!feastId) return;
+    setTeamsLoading(true);
+    const { data } = await supabase
+      .from("team_registrations")
+      .select(`
+        id, team_name, feast_competition_id,
+        shakha:shakhas(id,name),
+        members:team_registration_members(participant:participants(name))
+      `)
+      .eq("feast_id", feastId)
+      .order("team_name");
+
+    const compNameById: Record<string, string> = {};
+    for (const fc of teamFeastComps) compNameById[fc.id] = fc.competition?.name ?? "Unknown";
+
+    setTeamRows(
+      (data ?? []).map((t) => {
+        const sh = (Array.isArray(t.shakha) ? t.shakha[0] : t.shakha) as { id: string; name: string } | null;
+        const members = (Array.isArray(t.members) ? t.members : []) as Record<string, unknown>[];
+        const memberNames = members
+          .map((m) => {
+            const p = (Array.isArray(m.participant) ? (m.participant as unknown[])[0] : m.participant) as { name: string } | null;
+            return p?.name ?? null;
+          })
+          .filter((n): n is string => !!n);
+        return {
+          id: t.id as string,
+          teamName: t.team_name as string,
+          shakhaId: sh?.id ?? "",
+          shakhaName: sh?.name ?? "—",
+          feastCompetitionId: t.feast_competition_id as string,
+          compName: compNameById[t.feast_competition_id as string] ?? "Unknown",
+          memberNames,
+        };
+      })
+    );
+    setTeamsLoading(false);
+  }, [feastId, teamFeastComps]);
+
+  useEffect(() => { loadTeams(); }, [loadTeams]);
+
+  const filteredTeams = useMemo(() => teamRows.filter((t) => {
+    if (shakhaFilter && t.shakhaId !== shakhaFilter) return false;
+    if (teamCompFilter && t.feastCompetitionId !== teamCompFilter) return false;
+    if (q.trim()) {
+      const ql = q.trim().toLowerCase();
+      if (
+        !t.teamName.toLowerCase().includes(ql) &&
+        !t.shakhaName.toLowerCase().includes(ql) &&
+        !t.memberNames.some((n) => n.toLowerCase().includes(ql))
+      ) return false;
+    }
+    return true;
+  }), [teamRows, shakhaFilter, teamCompFilter, q]);
 
   const filtered = useMemo(() => rows.filter((r) => {
     if (shakhaFilter && r.shakha?.id !== shakhaFilter) return false;
@@ -433,6 +727,10 @@ export default function ParticipantsAdminPage() {
     setEditRegIds((data ?? []).map((d) => d.feast_competition_id));
     setPanelMode("edit");
   }, []);
+
+  const editTeamMaxSize = editTeam
+    ? teamFeastComps.find((fc) => fc.id === editTeam.feastCompetitionId)?.competition?.max_team_size ?? DEFAULT_MAX_TEAM_MEMBERS
+    : DEFAULT_MAX_TEAM_MEMBERS;
 
   const exportCsv = () => {
     const header = ["Reg No", "Name", "House Name", "Shakha", "Gender", "Category", "Events", "Phone", "Registered"].join(",");
@@ -594,7 +892,7 @@ export default function ParticipantsAdminPage() {
         </select>
         <select value={compFilter} onChange={(e) => setCompFilter(e.target.value)} className={`${selectCls} col-span-2 sm:col-span-2`}>
           <option value="">All Competitions</option>
-          {feastComps.map((fc) => (
+          {individualFeastComps.map((fc) => (
             <option key={fc.id} value={fc.id}>
               {fc.competition?.name}
               {fc.competition?.gender && fc.competition.gender.toLowerCase() !== "common" ? ` · ${fc.competition.gender}` : ""}
@@ -753,17 +1051,143 @@ export default function ParticipantsAdminPage() {
         </div>
       )}
 
+      {/* Team Events */}
+      {teamFeastComps.length > 0 && (
+        <div className="mt-8">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#A855F7] flex items-center justify-center shrink-0">
+                <Users2 size={17} color="#fff" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Team Events</h2>
+                <p className="text-xs text-gray-500">{filteredTeams.length} of {teamRows.length} shown</p>
+              </div>
+            </div>
+            <select value={teamCompFilter} onChange={(e) => setTeamCompFilter(e.target.value)} className={selectCls}>
+              <option value="">All Team Events</option>
+              {teamFeastComps.map((fc) => (
+                <option key={fc.id} value={fc.id}>{fc.competition?.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {teamsLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 size={22} className="animate-spin text-gray-400" />
+            </div>
+          ) : (
+            <>
+              {/* Desktop table */}
+              <div className="hidden sm:block bg-white rounded-xl overflow-hidden border border-[#1e1b4b] shadow-md overflow-x-auto">
+                <table className="w-full text-sm min-w-[680px]">
+                  <thead style={{ background: "linear-gradient(90deg,#ede9fe,#f5f3ff)" }}>
+                    <tr className="border-b-2" style={{ borderColor: "#c4b5fd" }}>
+                      {["Team", "Shakha", "Competition", "Members", ""].map((h) => (
+                        <th key={h} className="px-3 py-3 text-left text-[11px] font-black uppercase tracking-wider whitespace-nowrap" style={{ color: "#1e1b4b" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTeams.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="text-center py-12 text-gray-400 text-sm">No teams found.</td>
+                      </tr>
+                    )}
+                    {filteredTeams.map((t, i) => {
+                      const isEven = i % 2 === 0;
+                      return (
+                        <tr
+                          key={t.id}
+                          className="border-b transition-colors"
+                          style={{ borderColor: "#e5e7eb", background: isEven ? "#fff" : "#f8f7ff" }}
+                          onMouseEnter={(ev) => (ev.currentTarget.style.background = "#ede9fe")}
+                          onMouseLeave={(ev) => (ev.currentTarget.style.background = isEven ? "#fff" : "#f8f7ff")}
+                        >
+                          <td className="px-3 py-3">
+                            <p className="font-bold text-[14px] leading-tight" style={{ color: "#1e1b4b" }}>{t.teamName}</p>
+                          </td>
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <span className="text-[13px] font-semibold" style={{ color: "#374151" }}>{t.shakhaName}</span>
+                          </td>
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <span className="text-[13px] font-semibold" style={{ color: "#5B21B6" }}>{t.compName}</span>
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className="text-[12.5px]" style={{ color: "#6B7280" }}>{t.memberNames.join(", ") || "—"}</span>
+                          </td>
+                          <td className="px-3 py-3">
+                            <button
+                              onClick={() => setEditTeam(t)}
+                              className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-purple-50 border-none bg-transparent cursor-pointer"
+                              title="Edit"
+                            >
+                              <Pencil size={13} color="#7C3AED" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="sm:hidden space-y-2.5">
+                {filteredTeams.length === 0 ? (
+                  <p className="text-center py-10 text-gray-400 text-sm">No teams found.</p>
+                ) : (
+                  filteredTeams.map((t) => (
+                    <div key={t.id} className="rounded-xl overflow-hidden bg-white" style={{ border: "1.5px solid #ddd6fe", boxShadow: "0 2px 8px rgba(107,70,255,0.08)" }}>
+                      <div className="px-3.5 py-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-[15px] font-black leading-tight" style={{ color: "#1e1b4b" }}>{t.teamName}</p>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-[12px] font-bold" style={{ color: "#374151" }}>{t.shakhaName}</span>
+                            <button
+                              onClick={() => setEditTeam(t)}
+                              className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-purple-50 border-none bg-transparent cursor-pointer"
+                              title="Edit"
+                            >
+                              <Pencil size={13} color="#7C3AED" />
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-[12px] font-semibold mt-1" style={{ color: "#5B21B6" }}>{t.compName}</p>
+                        {t.memberNames.length > 0 && (
+                          <p className="text-[12px] mt-1.5 leading-snug" style={{ color: "#6B7280" }}>{t.memberNames.join(", ")}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Slide-over */}
       {panelMode && (
         <ParticipantPanel
           mode={panelMode}
           feastId={feastId}
           shakhas={shakhas}
-          feastComps={feastComps}
+          feastComps={individualFeastComps}
           participant={editRow}
           existingRegIds={editRegIds}
           onClose={() => setPanelMode(null)}
           onSaved={() => { setPanelMode(null); load(); }}
+        />
+      )}
+
+      {editTeam && (
+        <TeamPanel
+          team={editTeam}
+          feastId={feastId}
+          maxTeamSize={editTeamMaxSize}
+          onClose={() => setEditTeam(null)}
+          onSaved={() => { setEditTeam(null); loadTeams(); }}
         />
       )}
     </div>

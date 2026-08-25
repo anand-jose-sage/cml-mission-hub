@@ -11,7 +11,10 @@ import {
 } from "./feast-shared";
 
 const STEP_LABELS = ["Competition", "Members", "Review"];
-const MAX_TEAM_MEMBERS = 7;
+// A team's roster is capped at 7 members by default, but a competition can override
+// this via FeastCompetition.maxTeamSize. Mirrors DEFAULT_MAX_TEAM_MEMBERS in
+// src/actions/team.ts — server-side is the source of truth, this is just the UI hint.
+const DEFAULT_MAX_TEAM_MEMBERS = 7;
 
 interface EligibleParticipant {
   id: string;
@@ -105,8 +108,10 @@ export function FeastRegisterTeam({ slug, theme, onBack, onExit, onDone }: {
     })();
   }, [compId, feastId, adminShakha]);
 
+  const maxTeamMembers = feast?.competitions.find((c) => c.id === compId)?.maxTeamSize ?? DEFAULT_MAX_TEAM_MEMBERS;
+
   const toggle = (id: string) => setPicked((p) =>
-    p.includes(id) ? p.filter((x) => x !== id) : p.length >= MAX_TEAM_MEMBERS ? p : [...p, id]
+    p.includes(id) ? p.filter((x) => x !== id) : p.length >= maxTeamMembers ? p : [...p, id]
   );
 
   const step0ok = !!(compId && teamName.trim());
@@ -225,11 +230,11 @@ export function FeastRegisterTeam({ slug, theme, onBack, onExit, onDone }: {
         <div>
           <div className="flex items-center justify-between mb-3">
             <p className="text-[13px] leading-relaxed" style={{ color: theme.sub }}>
-              Pick up to {MAX_TEAM_MEMBERS} registered participants from your Shakha.
+              Pick up to {maxTeamMembers} registered participants from your Shakha.
             </p>
             <span className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ml-2"
-              style={{ background: picked.length >= MAX_TEAM_MEMBERS ? "#fef3c7" : theme.purple + "1a", color: picked.length >= MAX_TEAM_MEMBERS ? "#b45309" : theme.purple }}>
-              {picked.length} / {MAX_TEAM_MEMBERS}
+              style={{ background: picked.length >= maxTeamMembers ? "#fef3c7" : theme.purple + "1a", color: picked.length >= maxTeamMembers ? "#b45309" : theme.purple }}>
+              {picked.length} / {maxTeamMembers}
             </span>
           </div>
           {loadingEligible ? (

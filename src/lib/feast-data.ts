@@ -15,6 +15,7 @@ export interface FeastCompetition {
   progressPct?: number | null;
   info?: string | null;
   maxPerShakha?: number;
+  maxTeamSize?: number;
 }
 
 export interface Feast {
