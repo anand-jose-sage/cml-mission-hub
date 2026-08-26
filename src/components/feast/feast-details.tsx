@@ -705,6 +705,9 @@ export function FeastDetails({ slug, theme, onBack, onExit, go, tutorial }: {
           onTutorialSubmit={tutorial?.onTutorialSubmit}
         />
       )}
+      <GlowBtn variant="ghost" full icon="Layers" onClick={() => go("stages", slug)} style={{ marginBottom: 10 }}>
+        Competition Stages
+      </GlowBtn>
       <div className="flex gap-2.5 mb-1">
         <GlowBtn variant="ghost" full icon="Medal" onClick={() => go("results", slug)}>Results</GlowBtn>
         {isAuthorized

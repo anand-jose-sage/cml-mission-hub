@@ -6,7 +6,7 @@ import {
   Trophy, Sparkles, ArrowLeft, ArrowRight, LogOut, ChevronRight,
   ChevronDown, Clock, MapPin, Check, Ticket, Medal, Search, X,
   PenTool, Palette, FileText, BookOpen, Mic, Users, Film, Image,
-  ClipboardList, UserPlus, Lock, LogIn, Camera, Upload, Download,
+  ClipboardList, UserPlus, Lock, LogIn, Camera, Upload, Download, Layers,
 } from "lucide-react";
 import type { CMLTheme } from "@/lib/theme";
 import type { Feast } from "@/lib/feast-data";
@@ -16,7 +16,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; color?: stri
   Trophy, Sparkles, ArrowLeft, ArrowRight, LogOut, ChevronRight,
   ChevronDown, Clock, MapPin, Check, Ticket, Medal, Search, X,
   PenTool, Palette, FileText, BookOpen, Mic, Users, Film, Image,
-  ClipboardList, UserPlus, Lock, LogIn, Camera, Upload, Download,
+  ClipboardList, UserPlus, Lock, LogIn, Camera, Upload, Download, Layers,
 };
 
 export function FeastIcon({ name, size = 20, color, className }: { name: string; size?: number; color?: string; className?: string }) {

@@ -155,7 +155,7 @@ function CompCard({
           <label className="block text-xs font-medium text-gray-500 mb-1">Stage</label>
           <input
             type="text"
-            placeholder="e.g. Preliminary, Final…"
+            placeholder="e.g. STAGE 3 — SPEECH B"
             value={form.stage}
             onChange={(e) => set("stage", e.target.value)}
             className={inputCls}
