@@ -136,7 +136,19 @@ function deriveStage(key: string, items: StageCompetition[]): CompetitionStage {
   };
 }
 
-export function useCompetitionStages(slug: string) {
+export interface UseCompetitionStagesOptions {
+  // For an unattended kiosk/big-screen display, which has no OS-level
+  // notion of "focus" and must never go stale — skips the visibility/focus
+  // gate that exists to save a phone's battery and data.
+  alwaysPoll?: boolean;
+  // Override the poll cadence — e.g. a wall display wants the same fast
+  // cadence as the rest of that screen (seconds), not a phone's 5 minutes.
+  intervalMs?: number;
+}
+
+export function useCompetitionStages(slug: string, options?: UseCompetitionStagesOptions) {
+  const alwaysPoll = options?.alwaysPoll ?? false;
+  const pollIntervalMs = options?.intervalMs ?? POLL_MS;
   const [stages, setStages] = useState<CompetitionStage[]>([]);
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const feastIdRef = useRef<string | null>(null);
@@ -213,10 +225,10 @@ export function useCompetitionStages(slug: string) {
     feastIdRef.current = null;
     load(false);
     const interval = setInterval(() => {
-      if (document.visibilityState === "visible" && document.hasFocus()) load(true);
-    }, POLL_MS);
+      if (alwaysPoll || (document.visibilityState === "visible" && document.hasFocus())) load(true);
+    }, pollIntervalMs);
     return () => clearInterval(interval);
-  }, [load]);
+  }, [load, alwaysPoll, pollIntervalMs]);
 
   const totalCount = stages.reduce((sum, s) => sum + s.totalCount, 0);
   const completedCount = stages.reduce((sum, s) => sum + s.completedCount, 0);

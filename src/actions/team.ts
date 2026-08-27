@@ -1,6 +1,7 @@
 "use server";
 
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { recalcCompetitionProgress } from "@/actions/feast";
 
 export interface RegisterTeamInput {
   feastCompetitionId: string;
@@ -219,5 +220,54 @@ export async function deleteTeam(teamId: string): Promise<{ error?: string }> {
   } catch (e) {
     console.error("[deleteTeam] unexpected:", e);
     return { error: "Something went wrong. Please try again." };
+  }
+}
+
+// ─── PARTICIPATION MARKING (team competitions) ──────────────────────────────
+// Mirrors setParticipation / setChanceNo in src/actions/feast.ts, keyed on
+// team_registrations instead of participant_registrations — a team takes
+// part (or not) and draws one chance number as a unit, not per member.
+
+export async function setTeamParticipation(
+  teamRegistrationId: string,
+  participated: boolean
+): Promise<{ error?: string; progressPct?: number | null; compStatus?: string }> {
+  const admin = getSupabaseAdmin();
+  try {
+    const { data: updated, error } = await admin
+      .from("team_registrations")
+      .update({ participated })
+      .eq("id", teamRegistrationId)
+      .select("feast_competition_id")
+      .single();
+    if (error) return { error: error.message };
+
+    const fcId = updated?.feast_competition_id as string | undefined;
+    return fcId ? await recalcCompetitionProgress(fcId) : {};
+  } catch (e) {
+    console.error("[setTeamParticipation] unexpected:", e);
+    return { error: "Something went wrong." };
+  }
+}
+
+// Set the draw/lot `chance_no` (1-999, or null to clear) for a single team.
+export async function setTeamChanceNo(
+  teamRegistrationId: string,
+  chanceNo: number | null
+): Promise<{ error?: string }> {
+  if (chanceNo !== null && (!Number.isInteger(chanceNo) || chanceNo < 1 || chanceNo > 999)) {
+    return { error: "Chance number must be between 1 and 999." };
+  }
+  const admin = getSupabaseAdmin();
+  try {
+    const { error } = await admin
+      .from("team_registrations")
+      .update({ chance_no: chanceNo })
+      .eq("id", teamRegistrationId);
+    if (error) return { error: error.message };
+    return {};
+  } catch (e) {
+    console.error("[setTeamChanceNo] unexpected:", e);
+    return { error: "Something went wrong." };
   }
 }

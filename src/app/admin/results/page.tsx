@@ -38,11 +38,22 @@ interface CompOption {
 interface EntryRow {
   registrationId: string;
   regNo: string;
+  chanceNo: number | null;
   name: string;
   houseName: string | null;
   shakhaId: string;
   shakhaName: string;
   savedScore: number | null;
+}
+
+/** Sort by chance number ascending (nulls last), then by reg number within each tier. */
+function sortByChance(rows: EntryRow[]): EntryRow[] {
+  return [...rows].sort((a, b) => {
+    if (a.chanceNo != null && b.chanceNo != null) return a.chanceNo - b.chanceNo;
+    if (a.chanceNo != null) return -1;
+    if (b.chanceNo != null) return 1;
+    return a.regNo.localeCompare(b.regNo, undefined, { numeric: true });
+  });
 }
 
 interface TeamEntryRow {
@@ -420,7 +431,7 @@ export default function ResultsAdminPage() {
     const [{ data: regData }, scoresResult] = await Promise.all([
       supabase
         .from("participant_registrations")
-        .select("id, participant:participants(name, registration_number, house_name, shakha:shakhas(id,name))")
+        .select("id, chance_no, participant:participants(name, registration_number, house_name, shakha:shakhas(id,name))")
         .eq("feast_competition_id", compId),
       getCompetitionScores(compId),
     ]);
@@ -438,6 +449,7 @@ export default function ResultsAdminPage() {
       return {
         registrationId: regId,
         regNo: rawRegNo ?? regId.slice(0, 8).toUpperCase(),
+        chanceNo: (r.chance_no as number | null) ?? null,
         name: (p?.name as string) ?? "—",
         houseName: (p?.house_name as string | null) ?? null,
         shakhaId: (sh?.id as string) ?? "",
@@ -446,10 +458,11 @@ export default function ResultsAdminPage() {
       };
     });
 
-    setEntries(rows);
+    const sorted = sortByChance(rows);
+    setEntries(sorted);
     setTeamEntries([]);
     const initScores: Record<string, string> = {};
-    for (const row of rows) {
+    for (const row of sorted) {
       if (row.savedScore != null) initScores[row.registrationId] = String(row.savedScore);
     }
     setScores(initScores);
@@ -962,10 +975,10 @@ export default function ResultsAdminPage() {
         <>
           {/* ── Desktop table ── */}
           <div className="hidden sm:block bg-white rounded-xl overflow-hidden border border-[#1e1b4b] shadow-md mb-4">
-            <table className="w-full text-sm min-w-[700px]">
+            <table className="w-full text-sm min-w-[780px]">
               <thead style={{ background: "linear-gradient(90deg,#ede9fe,#f5f3ff)" }}>
                 <tr className="border-b-2" style={{ borderColor: "#c4b5fd" }}>
-                  {["#", "Reg No", `Score / ${maxScore}`, "Participant", "Shakha", "Grade", "Position", "Total"].map((h) => (
+                  {["#", "Reg No", "Chance #", `Score / ${maxScore}`, "Participant", "Shakha", "Grade", "Position", "Total"].map((h) => (
                     <th key={h} className="px-3 py-3 text-left text-[11px] font-black uppercase tracking-wider whitespace-nowrap" style={{ color: "#1e1b4b" }}>{h}</th>
                   ))}
                 </tr>
@@ -989,6 +1002,11 @@ export default function ResultsAdminPage() {
                       <td className="px-3 py-3">
                         <span className="inline-block font-mono text-[13px] font-black px-2.5 py-1 rounded-lg tracking-wide text-white" style={{ background: "#4C1D95" }}>
                           {e.regNo}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span className="text-[14px] font-black" style={{ color: e.chanceNo != null ? "#6B46FF" : "#D1D5DB" }}>
+                          {e.chanceNo ?? "—"}
                         </span>
                       </td>
                       <td className="px-3 py-3">
@@ -1044,10 +1062,15 @@ export default function ResultsAdminPage() {
                       {e.houseName && (
                         <p className="text-[12px] font-black mt-0.5" style={{ color: "#5B21B6" }}>{e.houseName}</p>
                       )}
-                      <div className="flex items-center gap-1.5 mt-1">
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                         <span className="font-mono text-[12px] font-black px-2 py-0.5 rounded-md tracking-wide text-white" style={{ background: "#4C1D95" }}>
                           {e.regNo}
                         </span>
+                        {e.chanceNo != null && (
+                          <span className="font-mono text-[12px] font-black px-2 py-0.5 rounded-md tracking-wide text-white" style={{ background: "#6B46FF" }}>
+                            #{e.chanceNo}
+                          </span>
+                        )}
                         <span className="text-[12px] font-bold" style={{ color: "#374151" }}>{e.shakhaName}</span>
                       </div>
                     </div>

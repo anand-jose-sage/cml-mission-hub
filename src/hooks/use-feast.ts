@@ -131,7 +131,15 @@ export interface ResultUI {
 }
 
 // ── useFeasts ─────────────────────────────────────────────────
-export function useFeasts() {
+export interface UseFeastsOptions {
+  // Re-fetch the feast list on an interval — off by default (mobile callers
+  // fetch once), used by the /screen wall display so a newly added/completed
+  // feast shows up without a manual reload.
+  pollIntervalMs?: number;
+}
+
+export function useFeasts(options?: UseFeastsOptions) {
+  const pollIntervalMs = options?.pollIntervalMs ?? null;
   const [feasts, setFeasts] = useState<FeastUI[]>(isSupabaseConfigured ? [] : Object.values(FEASTS));
   const [loading, setLoading] = useState(isSupabaseConfigured);
 
@@ -139,7 +147,7 @@ export function useFeasts() {
     if (!isSupabaseConfigured) return;
     let cancelled = false;
 
-    (async () => {
+    const load = async () => {
       const { data, error } = await supabase
         .from("feasts")
         .select("*")
@@ -191,10 +199,15 @@ export function useFeasts() {
 
       if (!cancelled) setFeasts(mapped);
       setLoading(false);
-    })().catch(() => setLoading(false));
+    };
 
-    return () => { cancelled = true; };
-  }, []);
+    load().catch(() => setLoading(false));
+    const interval = pollIntervalMs
+      ? setInterval(() => { load().catch((e) => console.error("[useFeasts] poll", e)); }, pollIntervalMs)
+      : null;
+
+    return () => { cancelled = true; if (interval) clearInterval(interval); };
+  }, [pollIntervalMs]);
 
   return { feasts, loading };
 }

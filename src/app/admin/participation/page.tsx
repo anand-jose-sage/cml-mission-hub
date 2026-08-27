@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { setParticipation, setChanceNo } from "@/actions/feast";
+import { setTeamParticipation, setTeamChanceNo } from "@/actions/team";
 import { CATEGORY_LABELS, CATEGORY_COLORS } from "@/lib/competition-categories";
 import { getScoreHeadings } from "@/lib/scoresheet-headings";
 import { getCompetitionSubject } from "@/lib/competition-subjects";
@@ -22,18 +23,20 @@ interface CompOption {
   catName: string;
   gender: string | null;
   catSlug: string | null;
+  isGroup: boolean;
 }
 
 interface EntryRow {
-  regId: string;        // participant_registration id
-  regNo: string | null;
-  name: string;
-  houseName: string | null;
+  regId: string;        // participant_registration id, or team_registration id when isTeam
+  regNo: string | null; // individual: registration number; team: team name (same badge slot)
+  name: string;         // individual: participant name; team: roster (comma-joined member names)
+  houseName: string | null; // individual: house name; team: "N members"
   shakhaName: string;
   shakhaId: string;
   catSlug: string | null;
   participated: boolean;
   chanceNo: number | null;
+  isTeam: boolean;
 }
 
 /** Sort by chance number ascending (nulls last), then by reg number within each tier. */
@@ -197,6 +200,7 @@ export default function ParticipationPage() {
   const [exportingJudge, setExportingJudge] = useState(false);
 
   const selectedFeast = feasts.find((f) => f.id === feastId) ?? null;
+  const selectedComp = comps.find((c) => c.fcId === compId) ?? null;
 
   // ── Load feasts + shakhas ──
   useEffect(() => {
@@ -214,7 +218,7 @@ export default function ParticipationPage() {
     setCompId("");
     supabase
       .from("feast_competitions")
-      .select("id, display_order, competition:competitions(name, gender, competition_category:competition_categories(name,slug))")
+      .select("id, display_order, competition:competitions(name, gender, type, competition_category:competition_categories(name,slug))")
       .eq("feast_id", feastId)
       .order("display_order")
       .then(({ data }) => {
@@ -232,6 +236,7 @@ export default function ParticipationPage() {
             catName,
             gender: gender || null,
             catSlug,
+            isGroup: comp?.type === "group",
           };
         });
         setComps(opts);
@@ -242,35 +247,67 @@ export default function ParticipationPage() {
   // ── Load registrations for competition ──
   const loadEntries = useCallback(async () => {
     if (!compId) { setEntries([]); return; }
+    const comp = comps.find((c) => c.fcId === compId);
     setLoading(true);
-    const { data } = await supabase
-      .from("participant_registrations")
-      .select("id, participated, chance_no, participant:participants(name, registration_number, house_name, shakha:shakhas(id,name), competition_category:competition_categories(slug))")
-      .eq("feast_competition_id", compId);
 
-    const rows: EntryRow[] = (data ?? []).map((r) => {
-      const p   = (Array.isArray(r.participant) ? r.participant[0] : r.participant) as Record<string, unknown> | null;
-      const sh  = p ? (Array.isArray(p.shakha) ? (p.shakha as unknown[])[0] : p.shakha) as Record<string, unknown> | null : null;
-      const cat = p ? (Array.isArray(p.competition_category) ? (p.competition_category as unknown[])[0] : p.competition_category) as Record<string, unknown> | null : null;
-      return {
-        regId:        r.id as string,
-        regNo:        (p?.registration_number as string | null) ?? null,
-        name:         (p?.name        as string) ?? "—",
-        houseName:    (p?.house_name  as string | null) ?? null,
-        shakhaName:   (sh?.name       as string) ?? "—",
-        shakhaId:     (sh?.id         as string) ?? "",
-        catSlug:      (cat?.slug      as string | null) ?? null,
-        participated: Boolean(r.participated),
-        chanceNo:     (r.chance_no as number | null) ?? null,
-      };
-    });
+    let rows: EntryRow[];
+    if (comp?.isGroup) {
+      const { data } = await supabase
+        .from("team_registrations")
+        .select("id, participated, chance_no, team_name, shakha:shakhas(id,name), members:team_registration_members(participant:participants(name))")
+        .eq("feast_competition_id", compId);
+
+      rows = (data ?? []).map((r) => {
+        const sh = (Array.isArray(r.shakha) ? r.shakha[0] : r.shakha) as Record<string, unknown> | null;
+        const members = (r.members ?? []) as { participant: unknown }[];
+        const memberNames = members.map((m) => {
+          const p = (Array.isArray(m.participant) ? m.participant[0] : m.participant) as Record<string, unknown> | null;
+          return (p?.name as string) ?? "—";
+        });
+        return {
+          regId:        r.id as string,
+          regNo:        (r.team_name as string) ?? "—",
+          name:         memberNames.join(", ") || "—",
+          houseName:    `${memberNames.length} member${memberNames.length === 1 ? "" : "s"}`,
+          shakhaName:   (sh?.name as string) ?? "—",
+          shakhaId:     (sh?.id   as string) ?? "",
+          catSlug:      comp.catSlug,
+          participated: Boolean(r.participated),
+          chanceNo:     (r.chance_no as number | null) ?? null,
+          isTeam:       true,
+        };
+      });
+    } else {
+      const { data } = await supabase
+        .from("participant_registrations")
+        .select("id, participated, chance_no, participant:participants(name, registration_number, house_name, shakha:shakhas(id,name), competition_category:competition_categories(slug))")
+        .eq("feast_competition_id", compId);
+
+      rows = (data ?? []).map((r) => {
+        const p   = (Array.isArray(r.participant) ? r.participant[0] : r.participant) as Record<string, unknown> | null;
+        const sh  = p ? (Array.isArray(p.shakha) ? (p.shakha as unknown[])[0] : p.shakha) as Record<string, unknown> | null : null;
+        const cat = p ? (Array.isArray(p.competition_category) ? (p.competition_category as unknown[])[0] : p.competition_category) as Record<string, unknown> | null : null;
+        return {
+          regId:        r.id as string,
+          regNo:        (p?.registration_number as string | null) ?? null,
+          name:         (p?.name        as string) ?? "—",
+          houseName:    (p?.house_name  as string | null) ?? null,
+          shakhaName:   (sh?.name       as string) ?? "—",
+          shakhaId:     (sh?.id         as string) ?? "",
+          catSlug:      (cat?.slug      as string | null) ?? null,
+          participated: Boolean(r.participated),
+          chanceNo:     (r.chance_no as number | null) ?? null,
+          isTeam:       false,
+        };
+      });
+    }
 
     // Sort by chance number (nulls last), then reg number for a stable, scannable order
     const sorted = sortByChance(rows);
     setSavedChance(Object.fromEntries(sorted.map((r) => [r.regId, r.chanceNo])));
     setEntries(sorted);
     setLoading(false);
-  }, [compId]);
+  }, [compId, comps]);
 
   useEffect(() => { loadEntries(); }, [loadEntries]);
 
@@ -292,7 +329,7 @@ export default function ParticipationPage() {
     // optimistic update
     setEntries((rows) => rows.map((r) => r.regId === row.regId ? { ...r, participated: next } : r));
     setSaving((s) => ({ ...s, [row.regId]: true }));
-    const res = await setParticipation(row.regId, next);
+    const res = row.isTeam ? await setTeamParticipation(row.regId, next) : await setParticipation(row.regId, next);
     setSaving((s) => { const c = { ...s }; delete c[row.regId]; return c; });
     if (res.error) {
       // revert
@@ -313,8 +350,8 @@ export default function ParticipationPage() {
     const prev = savedChance[row.regId] ?? null;
     const next = row.chanceNo;
 
-    if (next !== null && (next < 1 || next > 100)) {
-      setMsg({ type: "err", text: "Chance number must be between 1 and 100." });
+    if (next !== null && (next < 1 || next > 999)) {
+      setMsg({ type: "err", text: "Chance number must be between 1 and 999." });
       setTimeout(() => setMsg(null), 3000);
       setEntries((rows) => rows.map((r) => r.regId === row.regId ? { ...r, chanceNo: prev } : r));
       return;
@@ -322,7 +359,7 @@ export default function ParticipationPage() {
     if (next === prev) return;
 
     setSavingChance((s) => ({ ...s, [row.regId]: true }));
-    const res = await setChanceNo(row.regId, next);
+    const res = row.isTeam ? await setTeamChanceNo(row.regId, next) : await setChanceNo(row.regId, next);
     setSavingChance((s) => { const c = { ...s }; delete c[row.regId]; return c; });
 
     if (res.error) {
@@ -519,7 +556,10 @@ ${FONT_LINK}
             <table className="w-full text-sm min-w-[620px]">
               <thead style={{ background: "linear-gradient(90deg,#fce7f3,#fdf2f8)" }}>
                 <tr className="border-b-2" style={{ borderColor: "#f9a8d4" }}>
-                  {["Took part", "Chance #", "Reg No", "Participant", "House", "Shakha"].map((h) => (
+                  {(selectedComp?.isGroup
+                    ? ["Took part", "Chance #", "Team", "Roster", "Members", "Shakha"]
+                    : ["Took part", "Chance #", "Reg No", "Participant", "House", "Shakha"]
+                  ).map((h) => (
                     <th
                       key={h}
                       className={`px-3 py-3 text-left text-[11px] font-black uppercase tracking-wider ${h === "Took part" || h === "Chance #" ? "" : "whitespace-nowrap"}`}

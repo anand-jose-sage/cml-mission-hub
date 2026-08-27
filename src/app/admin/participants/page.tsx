@@ -103,9 +103,13 @@ function ParticipantPanel({
   const availableComps = feastComps.filter((fc) => {
     if (!fc.competition) return false;
     const compCatSlug = fc.competition.competition_category?.slug;
-    const compGender = fc.competition.gender?.toLowerCase();
     if (catSlug && compCatSlug && compCatSlug !== catSlug) return false;
-    if (compGender && compGender !== "common" && form.gender && compGender !== form.gender) return false;
+    // Normalized compare — competitions.gender isn't consistently singular/plural
+    // across feasts ("boy" vs "boys"), so a strict string match silently hid
+    // every gender-specific competition for feasts using the plural form.
+    const compGenderNorm = normGender(fc.competition.gender);
+    const formGenderNorm = form.gender ? normGender(form.gender) : "—";
+    if (compGenderNorm !== "—" && formGenderNorm !== "—" && compGenderNorm !== formGenderNorm) return false;
     return true;
   });
 

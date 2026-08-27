@@ -379,29 +379,39 @@ export async function setParticipation(
 // chance numbers exist) keeps/moves it to "progressing" (shown publicly as "Live"). A
 // competition whose results are already "published" is left untouched — that record is
 // final and shouldn't shift under an unrelated attendance edit.
-async function recalcCompetitionProgress(
+//
+// Sourced from participant_registrations for individual competitions, or
+// team_registrations for group ones — a given feast_competition_id only ever
+// has rows in one of the two, so the competition's own type picks which table
+// to read. Exported so src/actions/team.ts can call it after a team
+// attendance/chance edit.
+export async function recalcCompetitionProgress(
   feastCompetitionId: string
 ): Promise<{ error?: string; progressPct?: number | null; compStatus?: string }> {
   const admin = getSupabaseAdmin();
 
   const { data: fc, error: fcError } = await admin
     .from("feast_competitions")
-    .select("comp_status")
+    .select("comp_status, competition:competitions(type)")
     .eq("id", feastCompetitionId)
     .single();
   if (fcError) return { error: fcError.message };
   if (fc?.comp_status === "published") return {};
 
+  const comp = (Array.isArray(fc?.competition) ? fc.competition[0] : fc?.competition) as { type: string } | null;
+  const table = comp?.type === "group" ? "team_registrations" : "participant_registrations";
+
   const { data: regs, error: regsError } = await admin
-    .from("participant_registrations")
+    .from(table)
     .select("participated, chance_no")
     .eq("feast_competition_id", feastCompetitionId);
   if (regsError) return { error: regsError.message };
 
-  const totalWithChance = (regs ?? []).filter((r) => r.chance_no != null).length;
+  const all = regs ?? [];
+  const totalWithChance = all.filter((r) => r.chance_no != null).length;
   if (totalWithChance === 0) return {};
 
-  const participatedCount = (regs ?? []).filter((r) => r.participated).length;
+  const participatedCount = all.filter((r) => r.participated).length;
   const progressPct = Math.min(100, Math.round((participatedCount / totalWithChance) * 100));
   const compStatus = progressPct >= 100 ? "completed" : "progressing";
 
@@ -414,13 +424,13 @@ async function recalcCompetitionProgress(
   return { progressPct, compStatus };
 }
 
-// Set the draw/lot `chance_no` (1-100, or null to clear) for a single registration.
+// Set the draw/lot `chance_no` (1-999, or null to clear) for a single registration.
 export async function setChanceNo(
   registrationId: string,
   chanceNo: number | null
 ): Promise<{ error?: string }> {
-  if (chanceNo !== null && (!Number.isInteger(chanceNo) || chanceNo < 1 || chanceNo > 100)) {
-    return { error: "Chance number must be between 1 and 100." };
+  if (chanceNo !== null && (!Number.isInteger(chanceNo) || chanceNo < 1 || chanceNo > 999)) {
+    return { error: "Chance number must be between 1 and 999." };
   }
   const admin = getSupabaseAdmin();
   try {

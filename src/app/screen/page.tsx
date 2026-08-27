@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { Suspense, useEffect, useRef, useState, useCallback, useMemo, type CSSProperties } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   getLeaderboard,
@@ -11,9 +11,10 @@ import {
   type CompetitionResult,
 } from "@/actions/results";
 import { useFeasts } from "@/hooks/use-feast";
+import { useCompetitionStages, type CompetitionStage, type RunState } from "@/hooks/use-competition-stages";
 import { SHAKHA_COLOR_MAP } from "@/lib/feast-data";
 import { type DashboardSection, sectionKey, sectionLabel } from "./dashboard-types";
-import { useDashboardRotation } from "./use-dashboard-rotation";
+import { useDashboardRotation, SUB_MS } from "./use-dashboard-rotation";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -24,7 +25,8 @@ const C_CYAN = "#3fe7ff";
 const C_BLUE = "#5b8cff";
 const C_VIOLET = "#7c5cff";
 const C_MAGENTA = "#e84ad6";
-const GOLD_GRAD = `linear-gradient(135deg, #6ef2ff, #36b6ff 38%, #7a6cff 70%, ${C_MAGENTA})`;
+const C_ORANGE = "#ff8a3c";
+const GOLD_GRAD = `linear-gradient(135deg, #6ef2ff, #36b6ff 30%, #7a6cff 55%, ${C_MAGENTA} 80%, ${C_ORANGE})`;
 const HUD_CLIP = (notch = 16) =>
   `polygon(0 ${notch}px, ${notch}px 0, calc(100% - ${notch}px) 0, 100% ${notch}px, 100% calc(100% - ${notch}px), calc(100% - ${notch}px) 100%, ${notch}px 100%, 0 calc(100% - ${notch}px))`;
 
@@ -50,6 +52,16 @@ const CAT_COLOR: Record<string, string> = {
 };
 
 const REFRESH_MS = 20_000;
+const FEASTS_POLL_MS = 5 * 60 * 1000; // feast list itself changes rarely — 5 min is enough
+const ROTATION_SECTIONS_KEY = "cml-screen-rotation-sections";
+
+const ctrlBtnStyle: CSSProperties = {
+  width: 34, height: 34, borderRadius: "50%",
+  border: "1px solid rgba(110,242,255,.4)",
+  background: "rgba(20,16,50,.75)",
+  color: "#eaf3ff", fontSize: 16, lineHeight: 1,
+  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+};
 const TICKER_H = 44; // real viewport px
 
 function shkColor(name: string) {
@@ -74,17 +86,24 @@ export default function ScreenPage() {
 }
 
 function ScreenPageInner() {
-  const { feasts, loading: feastsLoading } = useFeasts();
+  const { feasts, loading: feastsLoading } = useFeasts({ pollIntervalMs: FEASTS_POLL_MS });
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Sections: Overall first, then every feast — grows automatically with no
-  // code change when a feast is added. (Future: append Stage sections here.)
+  // Whichever feast is currently running its multi-stage schedule — the
+  // Stage Board section rides along with this one feast rather than one
+  // being built per feast, since only one is ever live at a time in practice.
+  const stageBoardFeast = feasts.find((f) => f.status !== "Completed") ?? null;
+
+  // Sections: Overall first, every feast, then the live Stage Board (only
+  // once a non-completed feast exists to show it for) — grows automatically
+  // with no code change when a feast is added.
   const sections = useMemo<DashboardSection[]>(() => [
     { kind: "overall" },
     ...feasts.map((f) => ({ kind: "feast" as const, feastSlug: f.slug, feastName: f.name })),
-  ], [feasts]);
+    ...(stageBoardFeast ? [{ kind: "stages" as const, feastSlug: stageBoardFeast.slug, feastName: stageBoardFeast.name }] : []),
+  ], [feasts, stageBoardFeast]);
 
   const [overallRows, setOverallRows] = useState<LeaderboardRow[]>([]);
   const [overallLoading, setOverallLoading] = useState(true);
@@ -98,9 +117,44 @@ function ScreenPageInner() {
   const matrixRef = useRef<HTMLCanvasElement>(null);
 
   const activeFeastCompetitionCount = feastScreenData?.competitions.length ?? 0;
+
+  // Operator controls — pause the rotation, and pick which sections the
+  // auto-rotation is allowed to land on. Both live only in this browser
+  // (localStorage), not synced anywhere, since they're a per-display
+  // preference for whichever screen is plugged in.
+  const [paused, setPaused] = useState(false);
+  const [enabledSectionKeys, setEnabledSectionKeys] = useState<Set<string> | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(ROTATION_SECTIONS_KEY);
+      if (raw) setEnabledSectionKeys(new Set(JSON.parse(raw) as string[]));
+    } catch { /* ignore — falls back to "all sections enabled" */ }
+  }, []);
+
+  const isSectionEnabled = useCallback(
+    // Empty set reads the same as null ("every section") — matches
+    // useDashboardRotation's nextRotationSectionIdx, so unchecking every box
+    // shows all boxes checked again instead of a state the rotation ignores.
+    (s: DashboardSection) => !enabledSectionKeys || enabledSectionKeys.size === 0 || enabledSectionKeys.has(sectionKey(s)),
+    [enabledSectionKeys]
+  );
+
+  const toggleSectionEnabled = useCallback((key: string) => {
+    setEnabledSectionKeys((prev) => {
+      const base = prev ?? new Set(sections.map(sectionKey));
+      const next = new Set(base);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      try { window.localStorage.setItem(ROTATION_SECTIONS_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sections]);
+
   const {
     sectionIdx, screenIdx, subIdx, activeSection, isRankingsScreen, goToSection, goToScreen,
-  } = useDashboardRotation(sections, activeFeastCompetitionCount);
+  } = useDashboardRotation(sections, activeFeastCompetitionCount, paused, enabledSectionKeys);
   const isRankings = isRankingsScreen;
 
   const activeCompetition = useMemo(() => {
@@ -133,6 +187,9 @@ function ScreenPageInner() {
         goToSection(idx);
         if (compParam) pendingCompIdRef.current = compParam;
       }
+    } else if (sectionParam === "stages") {
+      const idx = sections.findIndex((s) => s.kind === "stages");
+      if (idx >= 0) goToSection(idx);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [feastsLoading, sections]);
@@ -154,6 +211,8 @@ function ScreenPageInner() {
     const params = new URLSearchParams();
     if (activeSection.kind === "overall") {
       params.set("section", "overall");
+    } else if (activeSection.kind === "stages") {
+      params.set("section", "stages");
     } else {
       params.set("section", "feast");
       params.set("feast", activeSection.feastSlug);
@@ -352,19 +411,29 @@ function ScreenPageInner() {
     : undefined;
   const activeRows = activeSection.kind === "overall" ? overallRows : feastRows;
   const ranked = [...activeRows].sort((a, b) => a.rank - b.rank);
+  // The bottom ticker is always the grand-total standings, regardless of
+  // which section/feast is currently on screen — `ranked` above is
+  // per-section (correct for the Rankings slide itself), this one isn't.
+  const overallRanked = [...overallRows].sort((a, b) => a.rank - b.rank);
   // Show the standings table (all-zero, alphabetical) as soon as shakhas exist —
   // don't wait for any points to be published.
   const hasLb = ranked.length > 0;
   const hasComps = activeFeastCompetitionCount > 0;
   const busy = feastsLoading || (activeSection.kind === "overall" ? overallLoading : feastDataLoading);
+  const showStagesScreen = activeSection.kind === "stages";
 
-  const headerTitle = isRankings ? "SHAKHA <b>RANKINGS</b>" : "COMPETITION <b>RESULTS</b>";
-  const headerEyebrow = isRankings
-    ? (activeSection.kind === "overall" ? "Overall Standings — All Feasts" : "Live Standings")
-    : activeCompetition
-      ? activeCompetition.categoryName || "Results Declared"
-      : "Results Declared";
-  const headerFeastName = activeSection.kind === "overall" ? "Overall Standings" : (activeFeast?.name ?? "Feast 2026");
+  const headerTitle = showStagesScreen ? "STAGE <b>BOARD</b>"
+    : isRankings ? "SHAKHA <b>RANKINGS</b>" : "COMPETITION <b>RESULTS</b>";
+  const headerEyebrow = showStagesScreen
+    ? "Live Competition Board"
+    : isRankings
+      ? (activeSection.kind === "overall" ? "Overall Standings — All Feasts" : "Live Standings")
+      : activeCompetition
+        ? activeCompetition.categoryName || "Results Declared"
+        : "Results Declared";
+  const headerFeastName = activeSection.kind === "overall" ? "Overall Standings"
+    : showStagesScreen ? activeSection.feastName
+    : (activeFeast?.name ?? "Feast 2026");
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "radial-gradient(120% 120% at 50% 0%, #0a0822, #03020b 72%)" }}>
@@ -392,6 +461,10 @@ function ScreenPageInner() {
           <div className="sc-glass-wash" />
           <div className="sc-glass-facets" />
           <div className="sc-bg-hex" />
+          <div className="sc-shard shard-tl" />
+          <div className="sc-shard shard-tr" />
+          <div className="sc-shard shard-bl" />
+          <div className="sc-shard shard-br" />
           <canvas ref={matrixRef} className="sc-matrix" />
           <div className="sc-beam b1" />
           <div className="sc-beam b2" />
@@ -437,7 +510,7 @@ function ScreenPageInner() {
         ) : (
           <>
             {/* Screen: Rankings */}
-            <div className={`sc-screen ${isRankings ? "active" : ""}`} style={{ paddingTop: 128 }}>
+            <div className={`sc-screen ${isRankings && !showStagesScreen ? "active" : ""}`} style={{ paddingTop: 128 }}>
               {hasLb ? (
                 <Screen1Rankings rows={ranked} />
               ) : (
@@ -446,7 +519,7 @@ function ScreenPageInner() {
             </div>
 
             {/* Screen: Competition result (one per competition) */}
-            <div className={`sc-screen ${!isRankings ? "active" : ""}`} style={{ paddingTop: 118 }}>
+            <div className={`sc-screen ${!isRankings && !showStagesScreen ? "active" : ""}`} style={{ paddingTop: 118 }}>
               {activeCompetition ? (
                 <Screen2Competition comp={activeCompetition} subIdx={subIdx} />
               ) : hasComps ? (
@@ -455,13 +528,20 @@ function ScreenPageInner() {
                 <EmptyState message="No results published yet." />
               )}
             </div>
+
+            {/* Screen: Stage Board — every stage's live status at once */}
+            <div className={`sc-screen ${showStagesScreen ? "active" : ""}`} style={{ paddingTop: 118 }}>
+              {showStagesScreen && <StageBoardScreen feastSlug={activeSection.feastSlug} />}
+            </div>
           </>
         )}
       </div>
 
 
-      {/* ── Ticker — OUTSIDE canvas, always at real viewport bottom ── */}
-      {!busy && hasLb && (
+      {/* ── Ticker — OUTSIDE canvas, always at real viewport bottom.
+          Always the grand-total standings (overallRanked), independent of
+          whichever section/feast is currently on screen. ── */}
+      {!overallLoading && overallRanked.length > 0 && (
         <div style={{
           position: "fixed",
           bottom: 0,
@@ -504,13 +584,13 @@ function ScreenPageInner() {
           {/* Scrolling text */}
           <div style={{ flex: 1, overflow: "hidden" }}>
             <div className="sc-tk-move">
-              {ranked.map((r) => (
+              {overallRanked.map((r) => (
                 <span key={r.shakhaId}>
                   {r.name} <b>{r.points} PTS</b>
                   <span className="sc-cross">✝</span>
                 </span>
               ))}
-              {ranked.map((r) => (
+              {overallRanked.map((r) => (
                 <span key={r.shakhaId + "_2"}>
                   {r.name} <b>{r.points} PTS</b>
                   <span className="sc-cross">✝</span>
@@ -520,6 +600,50 @@ function ScreenPageInner() {
           </div>
         </div>
       )}
+
+      {/* ── Operator controls — OUTSIDE canvas so they stay a fixed physical
+          size in the true top-right corner regardless of the scale factor. ── */}
+      <div style={{ position: "fixed", top: 14, right: 14, zIndex: 2000, display: "flex", gap: 8 }}>
+        <button
+          onClick={() => setPaused((p) => !p)}
+          title={paused ? "Resume rotation" : "Pause rotation"}
+          style={ctrlBtnStyle}
+        >
+          {paused ? "▶" : "⏸"}
+        </button>
+        <button
+          onClick={() => setSettingsOpen((o) => !o)}
+          title="Choose sections to rotate"
+          style={{ ...ctrlBtnStyle, background: settingsOpen ? "rgba(110,242,255,.25)" : ctrlBtnStyle.background }}
+        >
+          ⚙
+        </button>
+        {settingsOpen && (
+          <div style={{
+            position: "absolute", top: 44, right: 0, minWidth: 220,
+            background: "rgba(10,8,30,.96)", border: "1px solid rgba(110,242,255,.35)",
+            borderRadius: 10, padding: "12px 14px", boxShadow: "0 8px 32px rgba(0,0,0,.5)",
+            fontFamily: "var(--font-rajdhani),sans-serif",
+          }}>
+            <div style={{ color: "#9db0d8", fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>
+              Rotate through
+            </div>
+            {sections.map((s) => (
+              <label key={sectionKey(s)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", color: "#eaf3ff", fontSize: 14, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={isSectionEnabled(s)}
+                  onChange={() => toggleSectionEnabled(sectionKey(s))}
+                />
+                {sectionLabel(s)}
+              </label>
+            ))}
+            <div style={{ color: "#6d7db0", fontSize: 11, marginTop: 8, lineHeight: 1.4 }}>
+              Unchecked sections stay reachable via the pills above, just skipped by auto-rotation.
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -861,7 +985,7 @@ function Screen2Competition({ comp, subIdx }: { comp: CompetitionResult; subIdx:
             <div className="sc-col-bar" />
           </div>
           <div style={{ flex: 1, marginTop: 12, minHeight: 0, display: "flex", flexDirection: "column" }}>
-            <GradeColumn key={subIdx} grade={activeGrade} achievers={comp.grades[activeGrade]} expanded />
+            <GradeColumn key={subIdx} grade={activeGrade} achievers={comp.grades[activeGrade]} expanded dwellMs={SUB_MS} />
           </div>
         </div>
       </div>
@@ -1024,14 +1148,54 @@ function GradeColumn({
   grade,
   achievers,
   expanded,
+  dwellMs,
 }: {
   grade: "A" | "B" | "C";
   achievers: { name: string; houseName: string | null; shakha: string }[];
   expanded?: boolean;
+  // How long this grade stays on screen before the sub-cycle moves on —
+  // used to time the auto-scroll so it finishes reading the list right
+  // around when the slide changes, not before or after. Falls back to the
+  // hook's default so a caller that doesn't track rotation can omit it.
+  dwellMs?: number;
 }) {
   const GRADE_COLORS = { A: "#16a34a", B: "#d97706", C: "#7c5cff" };
   const GRADE_LABELS = { A: "DISTINCTION", B: "MERIT", C: "PASS" };
   const color = GRADE_COLORS[grade];
+
+  // Auto-scroll when the achiever list is taller than the column — a stage
+  // with 8+ achievers in one grade would otherwise just get clipped by the
+  // overflow:hidden viewport below. Measures actual overflow after layout,
+  // then eases the list up over most of this slide's dwell time so it comes
+  // to rest near the bottom right as the sub-cycle is about to move on.
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const [scrollOffset, setScrollOffset] = useState(0);
+  const [scrollDurationS, setScrollDurationS] = useState(0);
+
+  // A content signature, not the achievers array itself — feastScreenData is
+  // refetched every 20s (REFRESH_MS) and rebuilds a brand-new array even when
+  // the achiever list hasn't actually changed, which would otherwise restart
+  // this animation mid-scroll on every poll.
+  const achieversKey = achievers.map((a) => `${a.name}|${a.shakha}`).join(",");
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    const list = listRef.current;
+    if (!viewport || !list) return;
+    const overflow = list.scrollHeight - viewport.clientHeight;
+    if (overflow <= 0) { setScrollOffset(0); setScrollDurationS(0); return; }
+
+    const totalMs = dwellMs ?? SUB_MS;
+    const readDelayMs = 900; // let the top of the list sit still for a beat first
+    const settleMs = 500;    // land at the bottom slightly before the slide changes
+    const durationMs = Math.max(1500, totalMs - readDelayMs - settleMs);
+    setScrollDurationS(durationMs / 1000);
+
+    const id = setTimeout(() => setScrollOffset(-overflow), readDelayMs);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [achieversKey, dwellMs]);
 
   return (
     <div
@@ -1068,48 +1232,330 @@ function GradeColumn({
         </div>
       </div>
 
-      {/* Achievers list */}
-      <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", gap: expanded ? 7 : 4 }}>
-        {achievers.length === 0 ? (
-          <div style={{ color: "rgba(150,180,240,.35)", fontSize: 14 }}>No achievers</div>
-        ) : (
-          achievers.map((a, i) => (
-            <div key={i} className="sc-achiever-row" style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: expanded ? "16px 18px" : "5px 9px", borderRadius: 6,
-              background: "rgba(60,80,150,.22)", flexShrink: 0,
-              borderLeft: expanded ? `4px solid ${color}` : undefined,
-              gap: 12,
-              animationDelay: `${i * 0.07}s`,
-            }}>
-              {/* Name + house name block */}
-              <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
-                <div style={{
-                  color: "#fff", fontWeight: 800, fontSize: expanded ? 24 : 13,
-                  fontFamily: "var(--font-anek), var(--font-barlow), sans-serif",
-                  lineHeight: 1.2,
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                }}>{a.name}</div>
-                {expanded && a.houseName && (
-                  <div style={{
-                    fontFamily: "var(--font-rajdhani),sans-serif",
-                    fontSize: 16, fontWeight: 600, color: "rgba(180,200,240,.75)",
-                    lineHeight: 1.2, marginTop: 3,
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  }}>{a.houseName}</div>
-                )}
-              </div>
-              <span style={{
-                fontFamily: "var(--font-rajdhani),sans-serif",
-                fontSize: expanded ? 19 : 12, color: "#eaf3ff", fontWeight: 700,
-                whiteSpace: "nowrap", flexShrink: 0,
-                textShadow: expanded ? "0 0 10px rgba(234,243,255,0.5)" : undefined,
+      {/* Achievers list — outer div is the fixed-height clipping viewport,
+          inner div is what actually scrolls (transform, not scrollTop, so
+          it can ease smoothly via a plain CSS transition). */}
+      <div ref={viewportRef} style={{ flex: 1, overflow: "hidden" }}>
+        <div
+          ref={listRef}
+          style={{
+            display: "flex", flexDirection: "column", gap: expanded ? 7 : 4,
+            transform: `translateY(${scrollOffset}px)`,
+            transition: scrollDurationS > 0 ? `transform ${scrollDurationS}s linear` : undefined,
+          }}
+        >
+          {achievers.length === 0 ? (
+            <div style={{ color: "rgba(150,180,240,.35)", fontSize: 14 }}>No achievers</div>
+          ) : (
+            achievers.map((a, i) => (
+              <div key={i} className="sc-achiever-row" style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: expanded ? "16px 18px" : "5px 9px", borderRadius: 6,
+                background: "rgba(60,80,150,.22)", flexShrink: 0,
+                borderLeft: expanded ? `4px solid ${color}` : undefined,
+                gap: 12,
+                animationDelay: `${i * 0.07}s`,
               }}>
-                {a.shakha}
+                {/* Name + house name block */}
+                <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+                  <div style={{
+                    color: "#fff", fontWeight: 800, fontSize: expanded ? 24 : 13,
+                    fontFamily: "var(--font-anek), var(--font-barlow), sans-serif",
+                    lineHeight: 1.2,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>{a.name}</div>
+                  {expanded && a.houseName && (
+                    <div style={{
+                      fontFamily: "var(--font-rajdhani),sans-serif",
+                      fontSize: 16, fontWeight: 600, color: "rgba(180,200,240,.75)",
+                      lineHeight: 1.2, marginTop: 3,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>{a.houseName}</div>
+                  )}
+                </div>
+                <span style={{
+                  fontFamily: "var(--font-rajdhani),sans-serif",
+                  fontSize: expanded ? 19 : 12, color: "#eaf3ff", fontWeight: 700,
+                  whiteSpace: "nowrap", flexShrink: 0,
+                  textShadow: expanded ? "0 0 10px rgba(234,243,255,0.5)" : undefined,
+                }}>
+                  {a.shakha}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Screen 3 — Stage Board ──────────────────────────────────────────────────
+// Every stage visible at once, in reading order (1 → 8, two per row, four
+// rows) — a wall, not a rotating slide, since the point is glancing across
+// the whole venue's status in one look.
+
+const STAGE_STATUS_COLOR: Record<RunState, string> = {
+  upcoming: C_VIOLET,
+  running: "#ffd24a",
+  completed: "#4ade80",
+};
+
+function StageBoardScreen({ feastSlug }: { feastSlug: string }) {
+  // alwaysPoll: this is an unattended wall display, not a phone — it must
+  // never sit stale just because nothing has "focus". intervalMs matches
+  // this dashboard's own REFRESH_MS cadence, not the mobile app's 5 minutes.
+  const { stages, loading, completedCount, totalCount } = useCompetitionStages(feastSlug, {
+    alwaysPoll: true,
+    intervalMs: REFRESH_MS,
+  });
+
+  // All 8 cards flip together on a shared beat — front shows live progress,
+  // back shows every competition in that stage still to come. Declared
+  // before the loading/empty early-returns below so hook order never
+  // changes between renders (Rules of Hooks).
+  const [flipped, setFlipped] = useState(false);
+  const [flipPaused, setFlipPaused] = useState(false);
+  useEffect(() => {
+    if (flipPaused) return;
+    const id = setInterval(() => setFlipped((f) => !f), FLIP_MS);
+    return () => clearInterval(id);
+  }, [flipPaused]);
+
+  if (loading && stages.length === 0) {
+    return (
+      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div className="sc-spinner" />
+      </div>
+    );
+  }
+
+  if (stages.length === 0) {
+    return <EmptyState message="Stage schedule hasn't been published yet." />;
+  }
+
+  const liveCount = stages.filter((s) => s.status === "running").length;
+
+  return (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", gap: 18 }}>
+      {/* Summary strip */}
+      <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="sc-live" style={liveCount === 0 ? { background: "linear-gradient(135deg,#4b5570,#333c52)", boxShadow: "none" } : undefined}>
+          <i style={liveCount === 0 ? { animation: "none", opacity: 0.6 } : undefined} />
+          {liveCount > 0 ? `${liveCount} STAGE${liveCount > 1 ? "S" : ""} LIVE` : "NO STAGE LIVE"}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div className="sc-font-hud" style={{ fontSize: 22, color: "#9db4ff", letterSpacing: 1 }}>
+            OVERALL <b style={{ color: "#fff" }}>{completedCount}</b> / {totalCount} COMPETITIONS COMPLETED
+          </div>
+          <button
+            onClick={() => setFlipPaused((p) => !p)}
+            title={flipPaused ? "Resume tile flip" : "Pause tile flip"}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "5px 12px", borderRadius: 999,
+              border: "1px solid rgba(110,242,255,.35)",
+              background: flipPaused ? "rgba(110,242,255,.18)" : "rgba(20,16,50,.6)",
+              color: "#eaf3ff", fontFamily: "var(--font-rajdhani),sans-serif",
+              fontWeight: 700, fontSize: 13, letterSpacing: 1, textTransform: "uppercase",
+              cursor: "pointer",
+            }}
+          >
+            {flipPaused ? "▶" : "⏸"} {flipPaused ? "Flip Paused" : "Flip Live"}
+          </button>
+        </div>
+      </div>
+
+      {/* 4 rows × 2 columns, stage 1 first, reading order — each cell is a
+          flip card: front is the race lane (a marker running along the
+          track, one tick dot per competition), back lists every competition
+          in that stage still upcoming. */}
+      <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "repeat(4, 1fr)", gap: 14, minHeight: 0 }}>
+        {stages.map((stage) => <StageLane key={stage.key} stage={stage} flipped={flipped} />)}
+      </div>
+    </div>
+  );
+}
+
+const FLIP_MS = 7000;
+
+function StageLane({ stage, flipped }: { stage: CompetitionStage; flipped: boolean }) {
+  const color = STAGE_STATUS_COLOR[stage.status];
+  const isLive = stage.status === "running";
+  const isDone = stage.status === "completed";
+  const upcoming = stage.competitions.filter((c) => c.status === "upcoming");
+
+  return (
+    <div
+      className="sc-hud"
+      style={{
+        minWidth: 0,
+        minHeight: 0,
+        position: "relative",
+        borderLeft: `4px solid ${color}`,
+        boxShadow: isLive ? `0 0 40px ${color}44, inset 0 0 0 1px ${color}33` : undefined,
+        opacity: isDone ? 0.68 : 1,
+        transition: "opacity .5s, box-shadow .5s",
+      }}
+    >
+      {isLive && <span className="sc-tick tl" style={{ borderColor: color }} />}
+      {isLive && <span className="sc-tick br" style={{ borderColor: color }} />}
+
+      {/* Stage number — a persistent corner badge, not part of the flip, so
+          it reads at a glance from either face instead of only showing up
+          on the front. A solid circle rather than a glow — legible up
+          close and readable across the room alike. */}
+      <div style={{
+        position: "absolute", top: 12, left: 12, zIndex: 3,
+        width: 52, height: 52, borderRadius: "50%", flexShrink: 0,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        background: isDone ? "linear-gradient(135deg,#4ade80,#22c55e)" : `linear-gradient(135deg, ${color}, ${color}cc)`,
+        border: "2px solid rgba(5,4,16,.6)",
+        boxShadow: "0 4px 14px rgba(0,0,0,.45)",
+      }}>
+        <span className="sc-font-disp" style={{ fontSize: 24, fontWeight: 900, color: "#05040f", lineHeight: 1 }}>
+          {isDone ? "✓" : stage.stageNumber}
+        </span>
+      </div>
+
+      <div style={{ position: "relative", width: "100%", height: "100%", perspective: 1400 }}>
+        <div
+          style={{
+            position: "relative", width: "100%", height: "100%",
+            transformStyle: "preserve-3d",
+            transition: "transform .9s cubic-bezier(.4,.15,.2,1)",
+            transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+          }}
+        >
+          {/* Front — live progress lane */}
+          <div style={{
+            position: "absolute", inset: 0, backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
+            display: "flex", flexDirection: "column", justifyContent: "center", gap: 4, padding: "14px 24px 14px 78px",
+          }}>
+            {/* Stage name, then (while live) the competition name — one
+                line. The stage number itself lives in the corner badge now
+                (visible on both faces), so this row starts at the name. */}
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, minWidth: 0 }}>
+              <span className="sc-font-disp" style={{
+                fontSize: 22, fontWeight: 600, color: "rgba(230,235,255,.85)", textTransform: "uppercase", letterSpacing: 0.5,
+                lineHeight: 1.1, flexShrink: 0,
+              }}>
+                {stage.title}{isLive ? "," : ""}
+              </span>
+              {isLive && (
+                <span style={{
+                  fontFamily: "var(--font-anek), var(--font-oswald), sans-serif",
+                  fontWeight: 900, fontSize: 46, lineHeight: 1.05,
+                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0, flex: 1,
+                  background: GOLD_GRAD, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+                }}>
+                  {stage.runningCompetition?.label ?? "—"}
+                </span>
+              )}
+            </div>
+
+            {/* Meta line — counts, schedule, and (a different measure from
+                the stage's completed-competitions track) participant
+                attendance for the running competition itself
+                (feast_competitions.progress_pct). */}
+            <div className="sc-font-hud" style={{ fontSize: 13, color: "rgba(157,180,216,.75)", marginTop: 2, display: "flex", justifyContent: "space-between" }}>
+              <span>{stage.completedCount}/{stage.totalCount}{stage.scheduledTime && !isLive ? ` · ${stage.scheduledTime}` : ""}</span>
+              {isLive && stage.runningCompetition?.itemProgressPct != null && (
+                <span><b style={{ color }}>{stage.runningCompetition.itemProgressPct}%</b> done</span>
+              )}
+            </div>
+
+            {/* Track — filled shimmer + one tick dot per competition + a
+                runner marker riding the leading edge while live */}
+            <div style={{ position: "relative", height: isLive ? 12 : 8, minWidth: 0, flexShrink: 0 }}>
+              <div style={{ position: "absolute", inset: 0, borderRadius: 6, background: "rgba(255,255,255,.07)" }} />
+              <div style={{
+                position: "absolute", top: 0, bottom: 0, left: 0, width: `${stage.progressPct}%`,
+                borderRadius: 6, overflow: "hidden",
+                background: `linear-gradient(90deg, ${color}99, ${color})`,
+                transition: "width .8s cubic-bezier(.22,1,.36,1)",
+              }}>
+                <div className="sc-lane-shimmer" />
+              </div>
+              {stage.competitions.map((c, i) => {
+                const pos = ((i + 0.5) / stage.competitions.length) * 100;
+                const dotColor = c.status === "completed" ? "#4ade80" : c.status === "running" ? "#ffd24a" : "rgba(255,255,255,.3)";
+                return (
+                  <span
+                    key={c.id}
+                    title={c.label}
+                    style={{
+                      position: "absolute", left: `${pos}%`, top: "50%",
+                      transform: "translate(-50%,-50%)",
+                      width: isLive ? 10 : 7, height: isLive ? 10 : 7, borderRadius: "50%",
+                      background: dotColor,
+                      boxShadow: c.status === "running" ? `0 0 12px ${dotColor}` : undefined,
+                      animation: c.status === "running" ? "scBlink 1s steps(1) infinite" : undefined,
+                      border: "1.5px solid rgba(5,4,16,.7)",
+                    }}
+                  />
+                );
+              })}
+              {isLive && (
+                <div style={{
+                  position: "absolute", left: `${stage.progressPct}%`, top: "50%",
+                  transform: "translate(-50%,-50%)", width: 20, height: 20, borderRadius: "50%",
+                  background: color, boxShadow: `0 0 22px ${color}`, animation: "scPulseDot 1.3s ease-in-out infinite",
+                }} />
+              )}
+            </div>
+          </div>
+
+          {/* Back — every competition in this stage still upcoming */}
+          <div style={{
+            position: "absolute", inset: 0, backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
+            transform: "rotateY(180deg)",
+            display: "flex", flexDirection: "column", gap: 6, padding: "14px 22px 14px 78px", overflow: "hidden",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, marginBottom: 2 }}>
+              <span className="sc-font-disp" style={{ fontSize: 24, fontWeight: 700, color: "#fff", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                {stage.title}
+              </span>
+              <span className="sc-font-hud" style={{ fontSize: 19, color: "rgba(157,180,216,.6)", marginLeft: "auto" }}>
+                UPCOMING · {upcoming.length}
               </span>
             </div>
-          ))
-        )}
+            {upcoming.length === 0 ? (
+              <div className="sc-font-hud" style={{ fontSize: 24, color: "rgba(157,180,216,.55)" }}>
+                {isDone ? "All competitions completed" : "Nothing left upcoming"}
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: 14, rowGap: 6, overflow: "hidden" }}>
+                {upcoming.map((c) => {
+                  // Position within the FULL stage running order (not just
+                  // among the still-upcoming ones) — so if items 1-2 already
+                  // ran, the next one up reads "3", not a relabeled "1".
+                  const runningOrder = stage.competitions.findIndex((x) => x.id === c.id) + 1;
+                  return (
+                    <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                      <span style={{
+                        width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        background: color, boxShadow: `0 0 10px ${color}88`,
+                      }}>
+                        <span className="sc-font-disp" style={{ fontSize: 16, fontWeight: 900, color: "#05040f" }}>
+                          {runningOrder}
+                        </span>
+                      </span>
+                      <span style={{
+                        fontFamily: "var(--font-anek), var(--font-rajdhani), sans-serif",
+                        fontSize: 26, color: "rgba(230,235,255,.9)", fontWeight: 600,
+                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      }}>
+                        {c.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1305,6 +1751,61 @@ const CSS = `
             mask: radial-gradient(120% 100% at 50% 40%, #000, transparent 78%);
   }
 
+  /* neon glass shards — four radiating corner panels, echoing the mood-board
+     reference: angular glass plates split cool (cyan-teal, left) vs warm
+     (magenta → orange, right), each rimmed in a gradient border and carrying
+     a faint circuit/scanline texture. Sit mostly off-canvas so only their
+     glowing inner edge reads against the content. */
+  .sc-shard {
+    position: absolute; z-index: 1; pointer-events: none;
+    mix-blend-mode: screen; opacity: .5;
+  }
+  .sc-shard::after {
+    content: ""; position: absolute; inset: 0; padding: 1.5px;
+    clip-path: inherit;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+  }
+  .shard-tl {
+    top: -160px; left: -200px; width: 920px; height: 580px;
+    transform: rotate(-9deg);
+    clip-path: polygon(0 0, 100% 10%, 76% 100%, 0 90%);
+    background:
+      repeating-linear-gradient(90deg, transparent 0 46px, rgba(63,231,255,.30) 46px 47px),
+      repeating-linear-gradient(0deg,  transparent 0 70px, rgba(63,231,255,.20) 70px 71px),
+      linear-gradient(150deg, rgba(63,231,255,.30), transparent 66%);
+  }
+  .shard-tl::after { background: linear-gradient(135deg, #6ef2ff, #3fa0ff); }
+  .shard-tr {
+    top: -160px; right: -200px; width: 920px; height: 580px;
+    transform: rotate(9deg);
+    clip-path: polygon(0 10%, 100% 0, 100% 90%, 24% 100%);
+    background:
+      linear-gradient(60deg,  transparent 49.2%, rgba(232,74,214,.24) 49.6%, rgba(232,74,214,.24) 50.4%, transparent 50.8%),
+      linear-gradient(-60deg, transparent 49.2%, rgba(232,74,214,.24) 49.6%, rgba(232,74,214,.24) 50.4%, transparent 50.8%),
+      linear-gradient(-150deg, rgba(255,138,60,.26), transparent 66%);
+    background-size: 64px 110px, 64px 110px, 100% 100%;
+  }
+  .shard-tr::after { background: linear-gradient(135deg, #e84ad6, ${C_ORANGE}); }
+  .shard-bl {
+    bottom: -160px; left: -200px; width: 880px; height: 540px;
+    transform: rotate(8deg);
+    clip-path: polygon(0 10%, 100% 0, 100% 90%, 16% 100%);
+    background:
+      radial-gradient(120% 100% at 0% 100%, rgba(63,231,255,.30), transparent 62%),
+      repeating-linear-gradient(90deg, transparent 0 52px, rgba(91,140,255,.18) 52px 53px);
+  }
+  .shard-bl::after { background: linear-gradient(135deg, #3fe7ff, #5b8cff); }
+  .shard-br {
+    bottom: -160px; right: -200px; width: 880px; height: 540px;
+    transform: rotate(-8deg);
+    clip-path: polygon(0 0, 100% 10%, 84% 100%, 0 90%);
+    background:
+      radial-gradient(120% 100% at 100% 100%, rgba(255,90,60,.30), transparent 62%),
+      repeating-linear-gradient(90deg, transparent 0 52px, rgba(255,138,60,.20) 52px 53px);
+  }
+  .shard-br::after { background: linear-gradient(135deg, ${C_ORANGE}, #ff3b6b); }
+
   /* scripture rain — screen blend + edge-fade mask */
   .sc-matrix {
     position: absolute; inset: 0; width: 100%; height: 100%;
@@ -1436,7 +1937,7 @@ const CSS = `
   .sc-hud::after {
     content: ""; position: absolute; inset: 0; padding: 1.6px;
     clip-path: ${HUD_CLIP_STR};
-    background: linear-gradient(135deg, #6ef2ff, #5b8cff 28%, #9d6eff 52%, #e84ad6 76%, #6ef2ff 100%);
+    background: linear-gradient(135deg, #6ef2ff, #5b8cff 22%, #9d6eff 42%, #e84ad6 62%, ${C_ORANGE} 82%, #6ef2ff 100%);
     background-size: 300% 300%;
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor; mask-composite: exclude;
@@ -1537,6 +2038,22 @@ const CSS = `
     box-shadow: 0 0 12px #fff; animation: scBlink 1.1s steps(1) infinite; flex-shrink: 0;
   }
   @keyframes scBlink { 50% { opacity: .25; } }
+
+  /* ── Stage Board race lanes ── */
+  .sc-lane-shimmer {
+    position: absolute; inset: 0; width: 55%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent);
+    animation: scLaneShimmer 2.1s linear infinite;
+    mix-blend-mode: overlay;
+  }
+  @keyframes scLaneShimmer {
+    0%   { transform: translateX(-120%); }
+    100% { transform: translateX(220%); }
+  }
+  @keyframes scPulseDot {
+    0%, 100% { transform: translate(-50%,-50%) scale(1); }
+    50%      { transform: translate(-50%,-50%) scale(1.4); }
+  }
   .sc-clock {
     font-family: var(--font-rajdhani), sans-serif;
     font-weight: 600; font-size: 26px; letter-spacing: 2px; color: #eaf3ff;
@@ -1575,7 +2092,7 @@ const CSS = `
   .sc-pod::after {
     content: ""; position: absolute; inset: 0; padding: 1.6px;
     clip-path: ${HUD_CLIP_STR};
-    background: linear-gradient(135deg, #6ef2ff, #5b8cff 28%, #9d6eff 52%, #e84ad6 76%, #6ef2ff 100%);
+    background: linear-gradient(135deg, #6ef2ff, #5b8cff 22%, #9d6eff 42%, #e84ad6 62%, ${C_ORANGE} 82%, #6ef2ff 100%);
     background-size: 300% 300%;
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor; mask-composite: exclude;
