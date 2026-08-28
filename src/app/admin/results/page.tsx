@@ -581,7 +581,7 @@ export default function ResultsAdminPage() {
       };
     });
     const catLine = [selectedComp.catName, genderLabel(selectedComp.gender), shakhaName].filter(Boolean).join(" | ");
-    const section = renderResultSection(selectedComp.compName, catLine, sortPdfRows(rows.filter((r) => r.grade !== null)));
+    const section = renderResultSection(selectedComp.compName, catLine, sortPdfRows(rows.filter((r) => r.grade !== null || r.position !== null)));
     const html = `<!doctype html><html><head><meta charset="utf-8">
 <title>Results — ${escHtml(selectedComp.compName)}${shakhaName ? ` — ${escHtml(shakhaName)}` : ""}</title>
 <style>${PDF_CSS}</style></head><body>
@@ -666,8 +666,8 @@ export default function ResultsAdminPage() {
           sortPoints: res ? res.totalPoints : -1,
         };
       });
-      const gradedRows = sortPdfRows(rows.filter((r) => r.grade !== null));
-      // Nothing from the selected shakha actually has a grade here — skip the page entirely.
+      const gradedRows = sortPdfRows(rows.filter((r) => r.grade !== null || r.position !== null));
+      // Nothing from the selected shakha has a grade or position here — skip the page entirely.
       if (shakhaFilterId && gradedRows.length === 0) return null;
 
       const catLine = [c.catName, genderLabel(c.gender), shakhaName].filter(Boolean).join(" | ");
