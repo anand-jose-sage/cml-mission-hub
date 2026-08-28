@@ -37,7 +37,7 @@ export interface PositionPointScale { first: number; second: number; third: numb
 export const DEFAULT_GRADE_POINTS: GradePointScale = { A: 5, B: 3, C: 1 };
 export const DEFAULT_POSITION_POINTS: PositionPointScale = { first: 5, second: 3, third: 1 };
 
-export const GROUP_GRADE_POINTS: GradePointScale = { A: 10, B: 5, C: 3 };
+export const GROUP_GRADE_POINTS: GradePointScale = { A: 5, B: 3, C: 1 };
 export const GROUP_POSITION_POINTS: PositionPointScale = { first: 10, second: 5, third: 3 };
 
 // ── Grade ──────────────────────────────────────────────────────────────────
