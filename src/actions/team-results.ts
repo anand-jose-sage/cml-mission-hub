@@ -54,6 +54,28 @@ export async function saveDraftTeamScores(input: {
   return {};
 }
 
+// ── Get saved scores for many team competitions at once (bulk PDF export) ──
+
+export async function getScoresForTeamCompetitions(
+  feastCompetitionIds: string[]
+): Promise<{ data?: Record<string, { registrationId: string; score: number }[]>; error?: string }> {
+  if (!feastCompetitionIds.length) return { data: {} };
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("team_results")
+    .select("feast_competition_id, team_registration_id, score")
+    .in("feast_competition_id", feastCompetitionIds);
+  if (error) return { error: error.message };
+
+  const grouped: Record<string, { registrationId: string; score: number }[]> = {};
+  for (const r of data ?? []) {
+    const fcId = r.feast_competition_id as string;
+    const row = { registrationId: r.team_registration_id as string, score: Number(r.score) };
+    (grouped[fcId] ??= []).push(row);
+  }
+  return { data: grouped };
+}
+
 // ── Publish team results ────────────────────────────────────────────────────
 
 export async function publishTeamResults(

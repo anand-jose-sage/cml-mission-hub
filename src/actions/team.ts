@@ -250,13 +250,13 @@ export async function setTeamParticipation(
   }
 }
 
-// Set the draw/lot `chance_no` (1-999, or null to clear) for a single team.
+// Set the draw/lot `chance_no` (1-10000, or null to clear) for a single team.
 export async function setTeamChanceNo(
   teamRegistrationId: string,
   chanceNo: number | null
 ): Promise<{ error?: string }> {
-  if (chanceNo !== null && (!Number.isInteger(chanceNo) || chanceNo < 1 || chanceNo > 999)) {
-    return { error: "Chance number must be between 1 and 999." };
+  if (chanceNo !== null && (!Number.isInteger(chanceNo) || chanceNo < 1 || chanceNo > 10000)) {
+    return { error: "Chance number must be between 1 and 10000." };
   }
   const admin = getSupabaseAdmin();
   try {

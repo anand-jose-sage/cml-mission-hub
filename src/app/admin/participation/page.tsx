@@ -341,7 +341,7 @@ export default function ParticipationPage() {
 
   // ── Chance number: edit locally as the user types, save + re-sort on blur ──
   const editChance = (regId: string, raw: string) => {
-    const digits = raw.replace(/[^0-9]/g, "").slice(0, 3);
+    const digits = raw.replace(/[^0-9]/g, "").slice(0, 5);
     const next = digits === "" ? null : Number(digits);
     setEntries((rows) => rows.map((r) => r.regId === regId ? { ...r, chanceNo: next } : r));
   };
@@ -350,8 +350,8 @@ export default function ParticipationPage() {
     const prev = savedChance[row.regId] ?? null;
     const next = row.chanceNo;
 
-    if (next !== null && (next < 1 || next > 999)) {
-      setMsg({ type: "err", text: "Chance number must be between 1 and 999." });
+    if (next !== null && (next < 1 || next > 10000)) {
+      setMsg({ type: "err", text: "Chance number must be between 1 and 10000." });
       setTimeout(() => setMsg(null), 3000);
       setEntries((rows) => rows.map((r) => r.regId === row.regId ? { ...r, chanceNo: prev } : r));
       return;

@@ -12,6 +12,7 @@ import {
 } from "@/actions/results";
 import {
   getTeamCompetitionScores, saveDraftTeamScores, publishTeamResults, unpublishTeamResults,
+  getScoresForTeamCompetitions,
 } from "@/actions/team-results";
 import {
   calcGrade, calcPositions, calcAllResults, positionLabel,
@@ -189,6 +190,8 @@ function genderLabel(g: string | null): string {
   return "Common";
 }
 
+interface ExportRow { registrationId: string; name: string; houseName: string | null; shakhaId: string; shakhaName: string; }
+
 interface PdfRow {
   name: string;
   houseName: string | null;
@@ -228,17 +231,19 @@ const PDF_CSS = `
   @page { size: A4 portrait; margin: 16mm 14mm; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { font-family: Arial, Helvetica, sans-serif; color: #1e1b4b; margin: 0; }
-  .sheet { border-left: 6px solid #6B46FF; border-right: 6px solid #6B46FF; padding: 0 16px 18px; margin-bottom: 18px; break-inside: avoid; page-break-inside: avoid; }
-  .hdr { text-align: center; margin-bottom: 14px; }
+  .sheet { border-left: 6px solid #6B46FF; border-right: 6px solid #6B46FF; padding: 0 16px 18px; margin-bottom: 18px; }
+  .hdr { text-align: center; margin-bottom: 14px; break-after: avoid; page-break-after: avoid; }
   .hdr .org1 { font-size: 19px; font-weight: 800; margin: 0; }
   .hdr .org2 { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #6B46FF; margin: 2px 0 12px; }
   .hdr .comp { font-size: 18px; font-weight: 800; margin: 4px 0 2px; }
   .hdr .cat { font-size: 12.5px; font-weight: 600; color: #4B5563; margin: 0; }
   table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  thead { display: table-header-group; }
   thead tr { background: linear-gradient(90deg,#ede9fe,#f5f3ff); }
   th { border: 1px solid #c4b5fd; padding: 7px 6px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; color: #1e1b4b; text-align: left; }
   th.c-pos, th.c-grade { text-align: center; }
   td { border: 1px solid #e5e7eb; padding: 7px 6px; font-size: 12.5px; vertical-align: middle; }
+  tbody tr { break-inside: avoid; page-break-inside: avoid; }
   tbody tr:nth-child(even) { background: #f8f7ff; }
   td.pos, td.grade { text-align: center; width: 17%; }
   td.name { font-weight: 700; }
@@ -594,49 +599,100 @@ export default function ResultsAdminPage() {
     }
   };
 
-  // ── Export every individual competition in the feast to one PDF ──
-  // (team competitions aren't supported by this PDF layout yet — excluded here)
-  const individualCompOptions = useMemo(() => compOptions.filter((c) => c.type === "individual"), [compOptions]);
-
+  // ── Export every competition in the feast (individual + team) to one PDF ──
   const handleExportAll = async () => {
-    if (!individualCompOptions.length) return;
+    if (!compOptions.length) return;
     setExportingAll(true);
 
-    const fcIds = individualCompOptions.map((c) => c.fcId);
-    const [{ data: regData }, scoresResult] = await Promise.all([
-      supabase
-        .from("participant_registrations")
-        .select("id, feast_competition_id, participant:participants(name, house_name, shakha:shakhas(id,name))")
-        .in("feast_competition_id", fcIds),
-      getScoresForCompetitions(fcIds),
-    ]);
+    const individualComps = compOptions.filter((c) => c.type === "individual");
+    const groupComps = compOptions.filter((c) => c.type === "group");
+
+    const regsByComp = new Map<string, ExportRow[]>();
+    const scoresByComp: Record<string, { registrationId: string; score: number }[]> = {};
+    let failed = false;
+
+    if (individualComps.length) {
+      const fcIds = individualComps.map((c) => c.fcId);
+      const [{ data: regData }, scoresResult] = await Promise.all([
+        supabase
+          .from("participant_registrations")
+          .select("id, feast_competition_id, participant:participants(name, house_name, shakha:shakhas(id,name))")
+          .in("feast_competition_id", fcIds),
+        getScoresForCompetitions(fcIds),
+      ]);
+      if (!regData || scoresResult.error || !scoresResult.data) {
+        failed = true;
+      } else {
+        for (const r of regData) {
+          const p = (Array.isArray(r.participant) ? r.participant[0] : r.participant) as Record<string, unknown> | null;
+          const sh = p ? (Array.isArray(p.shakha) ? (p.shakha as unknown[])[0] : p.shakha) as Record<string, unknown> | null : null;
+          const fcId = r.feast_competition_id as string;
+          const row: ExportRow = {
+            registrationId: r.id as string,
+            name: (p?.name as string) ?? "—",
+            houseName: (p?.house_name as string | null) ?? null,
+            shakhaId: (sh?.id as string) ?? "",
+            shakhaName: (sh?.name as string) ?? "—",
+          };
+          const list = regsByComp.get(fcId);
+          if (list) list.push(row); else regsByComp.set(fcId, [row]);
+        }
+        Object.assign(scoresByComp, scoresResult.data);
+      }
+    }
+
+    if (groupComps.length && !failed) {
+      const fcIds = groupComps.map((c) => c.fcId);
+      const [{ data: teamData }, scoresResult] = await Promise.all([
+        supabase
+          .from("team_registrations")
+          .select(`
+            id, team_name, feast_competition_id,
+            shakha:shakhas(id,name),
+            members:team_registration_members(participant:participants(name))
+          `)
+          .in("feast_competition_id", fcIds),
+        getScoresForTeamCompetitions(fcIds),
+      ]);
+      if (!teamData || scoresResult.error || !scoresResult.data) {
+        failed = true;
+      } else {
+        for (const t of teamData) {
+          const sh = (Array.isArray(t.shakha) ? t.shakha[0] : t.shakha) as Record<string, unknown> | null;
+          const members = (Array.isArray(t.members) ? t.members : []) as Record<string, unknown>[];
+          const memberNames = members
+            .map((m) => {
+              const p = (Array.isArray(m.participant) ? (m.participant as unknown[])[0] : m.participant) as Record<string, unknown> | null;
+              return (p?.name as string) ?? null;
+            })
+            .filter((n): n is string => !!n)
+            .join(", ");
+          const fcId = t.feast_competition_id as string;
+          const row: ExportRow = {
+            registrationId: t.id as string,
+            name: (t.team_name as string) ?? "—",
+            houseName: memberNames || null,
+            shakhaId: (sh?.id as string) ?? "",
+            shakhaName: (sh?.name as string) ?? "—",
+          };
+          const list = regsByComp.get(fcId);
+          if (list) list.push(row); else regsByComp.set(fcId, [row]);
+        }
+        Object.assign(scoresByComp, scoresResult.data);
+      }
+    }
+
     setExportingAll(false);
 
-    if (!regData || scoresResult.error || !scoresResult.data) {
+    if (failed) {
       setMsg({ type: "err", text: "Failed to load results for export." });
       setTimeout(() => setMsg(null), 3000);
       return;
     }
 
     const shakhaName = shakhaFilterId ? shakhas.find((s) => s.id === shakhaFilterId)?.name ?? null : null;
-    const regsByComp = new Map<string, { registrationId: string; name: string; houseName: string | null; shakhaId: string; shakhaName: string }[]>();
-    for (const r of regData) {
-      const p = (Array.isArray(r.participant) ? r.participant[0] : r.participant) as Record<string, unknown> | null;
-      const sh = p ? (Array.isArray(p.shakha) ? (p.shakha as unknown[])[0] : p.shakha) as Record<string, unknown> | null : null;
-      const fcId = r.feast_competition_id as string;
-      const row = {
-        registrationId: r.id as string,
-        name: (p?.name as string) ?? "—",
-        houseName: (p?.house_name as string | null) ?? null,
-        shakhaId: (sh?.id as string) ?? "",
-        shakhaName: (sh?.name as string) ?? "—",
-      };
-      const list = regsByComp.get(fcId);
-      if (list) list.push(row); else regsByComp.set(fcId, [row]);
-    }
 
-    const scoresByComp = scoresResult.data;
-    const sections = individualCompOptions.map((c) => {
+    const sections = compOptions.map((c) => {
       const allRegs = regsByComp.get(c.fcId) ?? [];
       const scoreMap: Record<string, number> = {};
       for (const s of scoresByComp[c.fcId] ?? []) scoreMap[s.registrationId] = s.score;
@@ -648,7 +704,9 @@ export default function ResultsAdminPage() {
       const calcEntries = allRegs
         .filter((r) => scoreMap[r.registrationId] != null)
         .map((r) => ({ id: r.registrationId, score: scoreMap[r.registrationId] }));
-      const results = calcAllResults(calcEntries, c.maxScore ?? 0);
+      const gradeScale = c.type === "group" ? GROUP_GRADE_POINTS : DEFAULT_GRADE_POINTS;
+      const positionScale = c.type === "group" ? GROUP_POSITION_POINTS : DEFAULT_POSITION_POINTS;
+      const results = calcAllResults(calcEntries, c.maxScore ?? 0, gradeScale, positionScale);
       const resultMap = new Map(results.map((r) => [r.id, r]));
 
       const regs = shakhaFilterId ? allRegs.filter((r) => r.shakhaId === shakhaFilterId) : allRegs;
@@ -739,8 +797,8 @@ export default function ResultsAdminPage() {
           </button>
           <button
             onClick={handleExportAll}
-            disabled={!individualCompOptions.length || exportingAll}
-            title="Export results for every individual competition in this feast (team events aren't included)"
+            disabled={!compOptions.length || exportingAll}
+            title="Export results for every competition in this feast, individual and team"
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white border-none cursor-pointer disabled:opacity-40 transition-colors"
             style={{ background: "linear-gradient(135deg,#4C1D95,#6B46FF)" }}
           >

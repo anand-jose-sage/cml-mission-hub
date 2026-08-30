@@ -52,7 +52,9 @@ export function calcGrade(score: number, maxScore: number, points: GradePointSca
 }
 
 // ── Position ───────────────────────────────────────────────────────────────
-// Standard competition ranking: ties share the same rank.
+// Dense ranking: ties share the same rank, and the next distinct score always
+// takes the very next position number — no position is ever skipped (1,1,2
+// not 1,1,3).
 // Only 1st, 2nd, 3rd earn position points (scale below).
 // Beyond 3rd: position = null, positionPoints = 0.
 
@@ -66,7 +68,7 @@ export function calcPositions(
   let currentPos = 1;
   for (let i = 0; i < sorted.length; i++) {
     if (i > 0 && sorted[i].score < sorted[i - 1].score) {
-      currentPos = i + 1; // advance rank; gaps appear after ties
+      currentPos += 1; // dense ranking: advance by one, no gap after ties
     }
     const pos: number | null = currentPos <= 3 ? currentPos : null;
     const positionPoints = pos === 1 ? points.first : pos === 2 ? points.second : pos === 3 ? points.third : 0;
