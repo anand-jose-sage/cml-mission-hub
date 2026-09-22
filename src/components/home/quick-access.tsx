@@ -38,6 +38,7 @@ export function QuickAccess({ onFeast, onNotices, onMedia, onEvents }: QuickAcce
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: i * 0.06, ease: "easeOut" }}
             onClick={it.onClick}
+            data-tour={it.key === "feast" ? "feast-portal-card" : undefined}
             className="flex flex-col items-center gap-[7px] border-none bg-transparent cursor-pointer active:scale-95 transition-transform"
           >
             <div

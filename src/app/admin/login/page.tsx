@@ -1,14 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Loader2, LogIn, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 export default function AdminLoginPage() {
   const { signIn, loading: authLoading } = useAuth();
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -24,9 +22,9 @@ export default function AdminLoginPage() {
     if (err) {
       setError(err);
       setLoading(false);
-    } else {
-      router.push("/admin");
     }
+    // On success, stay in the "signing in" state — the admin layout's auth effect
+    // redirects to /admin once the session finishes updating (see AdminShell).
   }
 
   if (authLoading) {

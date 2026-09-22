@@ -266,6 +266,13 @@ function AdminShell({ children }: { children: React.ReactNode }) {
       router.replace("/admin/login");
       return;
     }
+    // Once signed in, leave the login page — this is the only place that navigates away
+    // from it, so there's no race with a manual push from the login form while the
+    // session is still settling (see AdminLoginPage.handleSubmit).
+    if (session && isLoginPage) {
+      router.replace("/admin");
+      return;
+    }
     // sa_admin only registers participants/teams via the Feast Portal — no admin panel access.
     if (session && profile?.role === "sa_admin" && !isLoginPage) {
       router.replace("/");

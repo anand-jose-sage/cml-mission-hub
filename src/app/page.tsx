@@ -17,12 +17,10 @@ import { AboutScreen } from "@/components/home/about-screen";
 import { NoticeBoard } from "@/components/notices/notice-board";
 import { MediaCenter } from "@/components/media/media-center";
 import { ActivitiesScreen } from "@/components/activities/activities-screen";
-import { FeastPortalCard } from "@/components/feast/feast-portal-card";
 import { QuickAccess } from "@/components/home/quick-access";
 import { FeastModule } from "@/components/feast/feast-module";
-import { FeastQuickLinks } from "@/components/feast/feast-quick-links";
-import { useFeasts } from "@/hooks/use-feast";
 import { LentPortalCard } from "@/components/lent/lent-portal-card";
+import { NovenaPortalCard } from "@/components/novena/novena-portal-card";
 import { useTutorialPrelude } from "@/app/(tutorial)/help/tutorials/registration/_hooks/use-tutorial-prelude";
 import { useMyRegistrationsTutorial } from "@/app/(tutorial)/help/tutorials/my-registrations/_hooks/use-my-registrations-tutorial";
 import { useEditRegistrationTutorial } from "@/app/(tutorial)/help/tutorials/edit-registration/_hooks/use-edit-registration-tutorial";
@@ -35,9 +33,6 @@ export default function HomePage() {
   const [sel, setSel] = useState<number | null>(null); // null = all week
   const [noticeDetailOpen, setNoticeDetailOpen] = useState(false);
   const [inFeastInternal, setInFeastInternal] = useState(false);
-  const [feastEntry, setFeastEntry] = useState<{ screen: "details" | "results"; slug: string } | null>(null);
-  const { feasts } = useFeasts();
-  const activeFeast = feasts.find((f) => f.status !== "Completed") ?? null;
   const tutorial = useTutorialPrelude();
   const myRegTutorial = useMyRegistrationsTutorial();
   const editRegTutorial = useEditRegistrationTutorial();
@@ -55,12 +50,7 @@ export default function HomePage() {
   const setInFeast = (v: boolean) => {
     if (!activeTutorial) {
       setInFeastInternal(v);
-      if (!v) setFeastEntry(null);
     }
-  };
-  const enterFeast = (screen: "details" | "results", slug: string) => {
-    setFeastEntry({ screen, slug });
-    setInFeast(true);
   };
   const scrollRef = useRef<HTMLElement>(null);
 
@@ -99,8 +89,6 @@ export default function HomePage() {
           tutorialStep={activeTutorial?.feastStep ?? undefined}
           tutorialDetails={activeTutorial?.feastDetails ?? undefined}
           onTutorialAction={onTutorialAction}
-          initialScreen={feastEntry?.screen}
-          initialSlug={feastEntry?.slug}
         />
       </div>
     );
@@ -154,14 +142,7 @@ export default function HomePage() {
               <TopHeader theme={theme} />
               <HeroEvent theme={theme} />
 
-              <FeastPortalCard onEnter={() => setInFeast(true)} />
-              {activeFeast && (
-                <FeastQuickLinks
-                  feastName={activeFeast.name}
-                  onFeast={() => enterFeast("details", activeFeast.slug)}
-                  onResults={() => enterFeast("results", activeFeast.slug)}
-                />
-              )}
+              <NovenaPortalCard onEnter={() => router.push("/novena/st-theresa")} />
               <LentPortalCard onEnter={() => router.push("/lent")} />
 
               {/* Quick access — soft 3D shortcuts */}
