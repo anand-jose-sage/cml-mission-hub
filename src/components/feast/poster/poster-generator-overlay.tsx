@@ -7,6 +7,8 @@ import { GlowBtn } from "../feast-shared";
 import { ResultPoster } from "./result-poster";
 import { PhotoCropper } from "./photo-cropper";
 import { usePosterGenerator } from "./use-poster-generator";
+import { recordStoryVideo, videoMimeType } from "./story-video";
+import { posterFilename, downloadDataUrl } from "./export-poster";
 
 export interface PosterWinner {
   rank: 1 | 2 | 3;
@@ -65,6 +67,46 @@ function ScaledPosterPreview({
 export function PosterGeneratorOverlay({ winner, onClose }: { winner: PosterWinner; onClose: () => void }) {
   const gen = usePosterGenerator(winner.competitionName, winner.winnerName);
   const [dragActive, setDragActive] = useState(false);
+
+  // Animated video (story-video.ts, ported from fest_hub). Built from a
+  // snapshot of the still poster, which stays rendered underneath.
+  const [video, setVideo] = useState<{ url: string; file: File } | null>(null);
+  const [videoProgress, setVideoProgress] = useState<number | null>(null);
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const canRecord = typeof window !== "undefined" && videoMimeType() !== null;
+
+  async function makeVideo() {
+    if (!gen.posterRef.current) return;
+    setVideoError(null);
+    setVideoProgress(0);
+    try {
+      const { blob, ext } = await recordStoryVideo(gen.posterRef.current, setVideoProgress);
+      const name = posterFilename(winner.competitionName, winner.winnerName).replace(/\.png$/, `.${ext}`);
+      setVideo({ url: URL.createObjectURL(blob), file: new File([blob], name, { type: blob.type }) });
+    } catch (e) {
+      setVideoError(e instanceof Error ? e.message : "Couldn't make the video.");
+    } finally {
+      setVideoProgress(null);
+    }
+  }
+
+  function closeVideo() {
+    if (video) URL.revokeObjectURL(video.url);
+    setVideo(null);
+  }
+
+  async function shareVideo() {
+    if (!video) return;
+    if (typeof navigator.canShare === "function" && navigator.canShare({ files: [video.file] })) {
+      try {
+        await navigator.share({ files: [video.file] });
+      } catch (err) {
+        if (!(err instanceof DOMException && err.name === "AbortError")) setVideoError("Couldn't share the video. Download it instead.");
+      }
+    } else {
+      downloadDataUrl(video.url, video.file.name);
+    }
+  }
 
   const handleFiles = useCallback((files: FileList | null) => {
     const file = files?.[0];
@@ -187,6 +229,27 @@ export function PosterGeneratorOverlay({ winner, onClose }: { winner: PosterWinn
                   {gen.isExporting ? <Loader2 size={16} className="animate-spin" /> : "Download"}
                 </GlowBtn>
               </div>
+
+              {canRecord && (
+                <div className="mt-2.5">
+                  <GlowBtn variant="pink" full disabled={videoProgress !== null} onClick={makeVideo}>
+                    {videoProgress !== null ? `Making video… ${Math.round(videoProgress * 100)}%` : "Make Video"}
+                  </GlowBtn>
+                </div>
+              )}
+              {videoError && <p className="text-[12.5px] mt-3 text-center" style={{ color: "#FCA5A5" }}>{videoError}</p>}
+
+              {video && (
+                <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-4 px-4" style={{ background: "rgba(10,8,6,0.9)" }}>
+                  <video src={video.url} controls autoPlay loop playsInline className="rounded-xl" style={{ maxHeight: "70vh", maxWidth: "100%" }} />
+                  <div className="flex gap-2.5 w-full max-w-[340px]">
+                    <GlowBtn variant="ghost" full onClick={closeVideo} style={{ background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.18)" }}>
+                      Close
+                    </GlowBtn>
+                    <GlowBtn variant="gold" full onClick={shareVideo}>Share / Save</GlowBtn>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

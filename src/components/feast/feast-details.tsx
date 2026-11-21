@@ -156,19 +156,21 @@ export function LoginSheet({
 const CAT_CONFIG = [
   { slug: "sub_junior",   label: "Sub Junior",   color: "#34D3EE" },
   { slug: "junior",       label: "Junior",        color: "#22C55E" },
-  { slug: "senior",       label: "Senior",        color: "#6B46FF" },
+  { slug: "senior",       label: "Senior",        color: "#B44CFF" },
   { slug: "super_senior", label: "Super Senior",  color: "#F5A742" },
-  { slug: "elder",        label: "Elder",         color: "#9D99BC" },
+  { slug: "elder",        label: "Elder",         color: "#B8B2E2" },
+  { slug: "poombatta_1",  label: "പൂമ്പാറ്റ 1",    color: "#EC4899" },
+  { slug: "poombatta_2",  label: "പൂമ്പാറ്റ 2",    color: "#F43F5E" },
 ] as const;
 
 type CatSlug = typeof CAT_CONFIG[number]["slug"];
 
 function statusPill(s: string | null | undefined) {
-  if (!s || s === "upcoming")     return { label: "Upcoming",    bg: "rgba(156,163,175,0.18)", color: "#6B7280" };
+  if (!s || s === "upcoming")     return { label: "Upcoming",    bg: "rgba(156,163,175,0.18)", color: "#B8B2E2" };
   if (s === "progressing")        return { label: "Live",        bg: "rgba(251,146,60,0.18)",  color: "#D97706" };
   if (s === "completed")          return { label: "Completed",   bg: "rgba(34,197,94,0.18)",   color: "#16A34A" };
-  if (s === "published")          return { label: "Published",   bg: "rgba(107,70,255,0.18)",  color: "#6B46FF" };
-  return { label: s, bg: "rgba(156,163,175,0.18)", color: "#6B7280" };
+  if (s === "published")          return { label: "Published",   bg: "rgba(180,76,255,0.18)",  color: "#B44CFF" };
+  return { label: s, bg: "rgba(156,163,175,0.18)", color: "#B8B2E2" };
 }
 
 function genderLabel(g: string | null | undefined) {
@@ -185,9 +187,9 @@ const POS_STYLE: Record<number, {
   bg: string; border: string; text: string;
   disc: string; numBg: string; numText: string;
 }> = {
-  1: { bg: "#FFFBEB", border: "#F5C542", text: "#92400E", disc: "#F5C542", numBg: "#6B5200", numText: "#FFF6C8" },
-  2: { bg: "#F9FAFB", border: "#9CA3AF", text: "#374151", disc: "#B9C2CC", numBg: "#475260", numText: "#FFFFFF" },
-  3: { bg: "#FFF7ED", border: "#E0936A", text: "#7C2D12", disc: "#D98E5F", numBg: "#5A2C14", numText: "#FDE3C9" },
+  1: { bg: "rgba(245,197,66,0.14)", border: "#F5C542", text: "#FFD66B", disc: "#F5C542", numBg: "#6B5200", numText: "#FFF6C8" },
+  2: { bg: "#1A0E40", border: "#B8B2E2", text: "#E4E0FA", disc: "#B9C2CC", numBg: "#475260", numText: "#FFFFFF" },
+  3: { bg: "rgba(224,147,106,0.16)", border: "#E0936A", text: "#F4B98A", disc: "#D98E5F", numBg: "#5A2C14", numText: "#FDE3C9" },
 };
 
 const MEDAL_EMOJI = ["🥇", "🥈", "🥉"] as const;
@@ -210,11 +212,11 @@ function MedalBadge({ pos }: { pos: number }) {
 }
 
 const GRADE_STYLE: Record<string, { bg: string }> = {
-  A: { bg: "#16A34A" }, B: { bg: "#D97706" }, C: { bg: "#6B46FF" },
+  A: { bg: "#16A34A" }, B: { bg: "#D97706" }, C: { bg: "#B44CFF" },
 };
 
 function GradeChip({ grade }: { grade: "A" | "B" | "C" }) {
-  const bg = GRADE_STYLE[grade]?.bg ?? "#9CA3AF";
+  const bg = GRADE_STYLE[grade]?.bg ?? "#B8B2E2";
   return (
     <span
       className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[15px] font-black text-white shrink-0"
@@ -232,7 +234,7 @@ function ResultRow({ row, index, last, showMedal, isTeam }: {
   const pos = row.position !== null && row.position <= 3 ? POS_STYLE[row.position] : null;
   const sc = SHAKHA_COLOR_MAP[row.shakha] ?? "#A78BFA";
   const zebra = index % 2 === 1;
-  const rowBg = pos ? `${pos.border}1A` : zebra ? "rgba(255,255,255,0.4)" : "transparent";
+  const rowBg = pos ? `${pos.border}1A` : zebra ? "rgba(30,18,72,0.4)" : "transparent";
 
   if (isTeam) {
     const anekRegular: React.CSSProperties = { fontFamily: "var(--font-anek), sans-serif" };
@@ -240,7 +242,7 @@ function ResultRow({ row, index, last, showMedal, isTeam }: {
     return (
       <div
         style={{
-          border: "1.5px solid rgba(107,70,255,0.38)",
+          border: "1.5px solid rgba(180,76,255,0.38)",
           borderRadius: 12,
           overflow: "hidden",
           marginTop: index === 0 ? 0 : 8,
@@ -254,18 +256,18 @@ function ResultRow({ row, index, last, showMedal, isTeam }: {
               {pos ? <MedalBadge pos={row.position!} /> : null}
             </div>
           )}
-          <p className="flex-1 min-w-0 text-[15px] leading-tight truncate" style={{ color: "#1E1B4B", ...anek }}>{row.name}</p>
+          <p className="flex-1 min-w-0 text-[15px] leading-tight truncate" style={{ color: "#F4F1FF", ...anek }}>{row.name}</p>
           <div className="shrink-0 flex flex-col items-center gap-0.5">
             {row.grade
               ? <GradeChip grade={row.grade} />
-              : <span className="w-8 h-8 flex items-center justify-center text-[14px] text-gray-300">—</span>}
-            <span className="text-[10px] font-semibold" style={{ color: "#9CA3AF", ...anekRegular }}>{row.totalPoints} pts</span>
+              : <span className="w-8 h-8 flex items-center justify-center text-[14px] text-white/30">—</span>}
+            <span className="text-[10px] font-semibold" style={{ color: "#B8B2E2", ...anekRegular }}>{row.totalPoints} pts</span>
           </div>
         </div>
         {/* Bottom tier — members + shakha */}
-        <div className="flex items-center justify-between gap-3 px-3.5 py-2 flex-wrap" style={{ background: "rgba(107,70,255,0.05)" }}>
-          <p className="text-[12.5px] min-w-0" style={{ color: "#6B7280", ...anekRegular }}>
-            <span style={{ color: "#9CA3AF" }}>Members </span>
+        <div className="flex items-center justify-between gap-3 px-3.5 py-2 flex-wrap" style={{ background: "rgba(180,76,255,0.05)" }}>
+          <p className="text-[12.5px] min-w-0" style={{ color: "#B8B2E2", ...anekRegular }}>
+            <span style={{ color: "#B8B2E2" }}>Members </span>
             {members.length > 0 ? members.join(", ") : "—"}
           </p>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -282,7 +284,7 @@ function ResultRow({ row, index, last, showMedal, isTeam }: {
       className="flex items-center gap-3 px-3.5 py-3"
       style={{
         background: rowBg,
-        border: "1.5px solid rgba(107,70,255,0.38)",
+        border: "1.5px solid rgba(180,76,255,0.38)",
         borderRadius: 12,
         marginTop: index === 0 ? 0 : 8,
         marginBottom: last ? 0 : 2,
@@ -298,10 +300,10 @@ function ResultRow({ row, index, last, showMedal, isTeam }: {
       {/* Participant — name | house (line 1) · shakha (line 2) */}
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-1.5 min-w-0">
-          <p className="text-[15px] leading-tight truncate" style={{ color: "#1E1B4B", ...anek }}>{row.name}</p>
+          <p className="text-[15px] leading-tight truncate" style={{ color: "#F4F1FF", ...anek }}>{row.name}</p>
           {row.houseName && (
-            <span className="inline-flex items-baseline gap-1.5 text-[13.5px] truncate" style={{ color: "#7C3AED", ...anek }}>
-              <span style={{ color: "#DDD6FE" }}>|</span>
+            <span className="inline-flex items-baseline gap-1.5 text-[13.5px] truncate" style={{ color: "#E08BFF", ...anek }}>
+              <span style={{ color: "rgba(214,170,255,0.35)" }}>|</span>
               {row.houseName}
             </span>
           )}
@@ -316,8 +318,8 @@ function ResultRow({ row, index, last, showMedal, isTeam }: {
       <div className="shrink-0 flex flex-col items-center gap-0.5">
         {row.grade
           ? <GradeChip grade={row.grade} />
-          : <span className="w-8 h-8 flex items-center justify-center text-[14px] text-gray-300">—</span>}
-        <span className="text-[10px] font-semibold" style={{ color: "#9CA3AF", fontFamily: "var(--font-anek), sans-serif" }}>{row.totalPoints} pts</span>
+          : <span className="w-8 h-8 flex items-center justify-center text-[14px] text-white/30">—</span>}
+        <span className="text-[10px] font-semibold" style={{ color: "#B8B2E2", fontFamily: "var(--font-anek), sans-serif" }}>{row.totalPoints} pts</span>
       </div>
     </div>
   );
@@ -329,7 +331,7 @@ function ResultTable({ title, accent, rows, isTeam }: { title: string; accent: s
   return (
     <div
       className="mb-2.5 rounded-xl overflow-hidden"
-      style={{ border: "1px solid rgba(107,70,255,0.13)", background: "rgba(255,255,255,0.55)", boxShadow: "0 1px 8px rgba(107,70,255,0.05)" }}
+      style={{ border: "1px solid rgba(180,76,255,0.13)", background: "rgba(30,18,72,0.55)", boxShadow: "0 1px 8px rgba(180,76,255,0.05)" }}
     >
       {/* Section title bar */}
       <div className="flex items-center gap-1.5 px-3 py-2" style={{ background: `${accent}14` }}>
@@ -392,12 +394,12 @@ function CompetitionCard({ comp, catColor }: {
     <div
       className="relative overflow-hidden"
       style={{
-        background: "rgba(255,255,255,0.52)",
+        background: "rgba(30,18,72,0.52)",
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
         borderRadius: 16,
-        border: resultsOpen ? `1.5px solid ${catColor}55` : "1px solid rgba(255,255,255,0.7)",
-        boxShadow: resultsOpen ? `0 4px 20px ${catColor}22` : "0 2px 12px rgba(107,70,255,0.06)",
+        border: resultsOpen ? `1.5px solid ${catColor}55` : "1px solid rgba(30,18,72,0.7)",
+        boxShadow: resultsOpen ? `0 4px 20px ${catColor}22` : "0 2px 12px rgba(180,76,255,0.06)",
         marginBottom: 9,
         transition: "border 0.2s, box-shadow 0.2s",
       }}
@@ -413,15 +415,15 @@ function CompetitionCard({ comp, catColor }: {
       >
         {/* Top row */}
         <div className="flex items-start justify-between gap-2 mb-1">
-          <p className="text-[19px] leading-tight flex-1" style={{ color: "#1E1B4B", ...anek }}>{comp.name}</p>
+          <p className="text-[19px] leading-tight flex-1" style={{ color: "#F4F1FF", ...anek }}>{comp.name}</p>
           <div className="flex items-center gap-1.5 shrink-0 mt-1">
             <span className="text-[12px] px-2.5 py-0.5 rounded-full" style={{ background: pill.bg, color: pill.color, ...anek }}>
               {pill.label}
             </span>
             {hasInfo && (
               <span className="w-6 h-6 rounded-full flex items-center justify-center transition-transform duration-300"
-                style={{ background: "rgba(107,70,255,0.1)", transform: infoOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
-                <ChevronDown size={14} color="#6B46FF" />
+                style={{ background: "rgba(180,76,255,0.1)", transform: infoOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
+                <ChevronDown size={14} color="#B44CFF" />
               </span>
             )}
           </div>
@@ -430,15 +432,15 @@ function CompetitionCard({ comp, catColor }: {
         {/* Meta row */}
         <div className="flex items-center gap-2.5 flex-wrap">
           {gen && <span className="text-[17px]" style={{ color: gen.color, ...anek }}>{gen.text}</span>}
-          {comp.stage && <span className="text-[17px]" style={{ color: "#3D3A6B", ...anek }}>{comp.stage}</span>}
+          {comp.stage && <span className="text-[17px]" style={{ color: "#E4E0FA", ...anek }}>{comp.stage}</span>}
           {(comp.scheduledTime || comp.time) && (
-            <span className="inline-flex items-center gap-1.5 text-[17px]" style={{ color: "#3D3A6B", ...anek }}>
-              <Clock size={15} color="#6B46FF" />{comp.scheduledTime || comp.time}
+            <span className="inline-flex items-center gap-1.5 text-[17px]" style={{ color: "#E4E0FA", ...anek }}>
+              <Clock size={15} color="#B44CFF" />{comp.scheduledTime || comp.time}
             </span>
           )}
           {comp.venue && (
-            <span className="inline-flex items-center gap-1.5 text-[17px]" style={{ color: "#3D3A6B", ...anek }}>
-              <MapPin size={15} color="#6B46FF" />{comp.venue}
+            <span className="inline-flex items-center gap-1.5 text-[17px]" style={{ color: "#E4E0FA", ...anek }}>
+              <MapPin size={15} color="#B44CFF" />{comp.venue}
             </span>
           )}
         </div>
@@ -446,7 +448,7 @@ function CompetitionCard({ comp, catColor }: {
         {/* Progress bar */}
         {comp.compStatus === "progressing" && comp.progressPct != null && (
           <div className="mt-2">
-            <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(107,70,255,0.1)" }}>
+            <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(180,76,255,0.1)" }}>
               <div className="h-full rounded-full transition-all duration-700"
                 style={{ width: `${comp.progressPct}%`, background: "linear-gradient(90deg,#F59E0B,#FBBF24)" }} />
             </div>
@@ -461,7 +463,7 @@ function CompetitionCard({ comp, catColor }: {
           style={{ maxHeight: infoOpen ? 400 : 0, transitionDuration: "0.32s", transitionTimingFunction: "cubic-bezier(.2,.8,.2,1)" }}>
           <div className="mx-3 mb-3 px-3.5 py-3 rounded-xl" style={{ background: `${catColor}12`, borderLeft: `3px solid ${catColor}` }}>
             <p className="text-[13px] mb-1.5 uppercase tracking-wider" style={{ color: catColor, fontFamily: "var(--font-anek), sans-serif", fontWeight: 700 }}>Info</p>
-            <p className="text-[16px] leading-relaxed whitespace-pre-line" style={{ color: "#1E1B4B", fontFamily: "var(--font-anek), sans-serif", fontWeight: 500 }}>{comp.info}</p>
+            <p className="text-[16px] leading-relaxed whitespace-pre-line" style={{ color: "#F4F1FF", fontFamily: "var(--font-anek), sans-serif", fontWeight: 500 }}>{comp.info}</p>
           </div>
         </div>
       )}
@@ -475,7 +477,7 @@ function CompetitionCard({ comp, catColor }: {
           <div
             className="w-full py-2 rounded-xl text-[15px] flex items-center justify-center gap-2 transition-all active:scale-[0.97]"
             style={{
-              background: resultsOpen ? catColor : "rgba(107,70,255,0.14)",
+              background: resultsOpen ? catColor : "rgba(180,76,255,0.14)",
               color: resultsOpen ? "#fff" : "#3730a3",
               ...anek,
             }}
@@ -497,7 +499,7 @@ function CompetitionCard({ comp, catColor }: {
                 <Loader2 size={20} className="animate-spin" style={{ color: catColor }} />
               </div>
             ) : results !== null && results.length === 0 ? (
-              <p className="text-center text-[13px] py-5" style={{ color: "#9CA3AF" }}>No published results yet.</p>
+              <p className="text-center text-[13px] py-5" style={{ color: "#B8B2E2" }}>No published results yet.</p>
             ) : (
               <>
                 <ResultTable title="Positions" accent={catColor} rows={(results ?? []).filter(r => r.position !== null)} isTeam={comp.cat === "Team"} />
@@ -533,7 +535,7 @@ function CompetitionTabs({ competitions }: { competitions: FeastCompetition[] })
 
   if (availableCats.length === 0) {
     return (
-      <p className="text-[15px] text-center py-8" style={{ color: "#6B7280" }}>
+      <p className="text-[15px] text-center py-8" style={{ color: "#B8B2E2" }}>
         No competitions yet.
       </p>
     );
@@ -559,20 +561,20 @@ function CompetitionTabs({ competitions }: { competitions: FeastCompetition[] })
                 fontWeight: 800,
                 fontSize: 17,
                 background: isActive
-                  ? `linear-gradient(135deg, #6B46FF, #A78BFA)`
-                  : "rgba(255,255,255,0.45)",
-                color: isActive ? "#fff" : "#4B5563",
+                  ? `linear-gradient(135deg, #B44CFF, #A78BFA)`
+                  : "rgba(30,18,72,0.45)",
+                color: isActive ? "#fff" : "#E4E0FA",
                 border: isActive
                   ? "1.5px solid transparent"
-                  : "1.5px solid rgba(107,70,255,0.15)",
+                  : "1.5px solid rgba(180,76,255,0.15)",
                 boxShadow: isActive
-                  ? "0 4px 14px rgba(107,70,255,0.35)"
+                  ? "0 4px 14px rgba(180,76,255,0.35)"
                   : "0 1px 4px rgba(0,0,0,0.05)",
               }}
             >
               <span
                 className="w-2 h-2 rounded-full shrink-0"
-                style={{ background: isActive ? "rgba(255,255,255,0.7)" : cat.color }}
+                style={{ background: isActive ? "rgba(30,18,72,0.7)" : cat.color }}
               />
               {cat.label}
             </button>
@@ -583,7 +585,7 @@ function CompetitionTabs({ competitions }: { competitions: FeastCompetition[] })
       {/* Cards */}
       <div className="mt-3">
         {filtered.length === 0 ? (
-          <p className="text-[15px] text-center py-6" style={{ color: "#9CA3AF" }}>
+          <p className="text-[15px] text-center py-6" style={{ color: "#B8B2E2" }}>
             No competitions in this category.
           </p>
         ) : (
@@ -591,7 +593,7 @@ function CompetitionTabs({ competitions }: { competitions: FeastCompetition[] })
             <CompetitionCard
               key={comp.id}
               comp={comp}
-              catColor={activeCat?.color ?? "#6B46FF"}
+              catColor={activeCat?.color ?? "#B44CFF"}
             />
           ))
         )}
@@ -648,20 +650,20 @@ export function FeastDetails({ slug, theme, onBack, onExit, go, tutorial }: {
       <div data-tour="feast-info">
       <GlassPanel theme={theme} strong glow={feast.accent} style={{ overflow: "hidden", marginBottom: 16 }}>
         <div className="relative p-[18px]" style={{ background: `linear-gradient(140deg, ${feast.tint[0]}cc, ${feast.tint[1]}cc)` }}>
-          <div className="absolute -top-[30px] -right-5 w-[130px] h-[130px] rounded-full" style={{ background: "rgba(255,255,255,0.2)", filter: "blur(20px)" }} />
+          <div className="absolute -top-[30px] -right-5 w-[130px] h-[130px] rounded-full" style={{ background: "rgba(30,18,72,0.2)", filter: "blur(20px)" }} />
           <div className="relative flex items-center justify-between">
             <StatusPill label={feast.status} color="#fff" />
-            <span className="text-[12px] font-medium" style={{ color: "rgba(255,255,255,0.9)" }}>{feast.date}</span>
+            <span className="text-[12px] font-medium" style={{ color: "rgba(30,18,72,0.9)" }}>{feast.date}</span>
           </div>
           <h2 className="relative font-bold text-[28px] text-white mt-3 mb-2 tracking-tight leading-[1.1]" style={{ fontFamily: "var(--font-anek), sans-serif" }}>
             {feast.name} {feast.year}
           </h2>
           {feast.venue && (
-            <div className="relative inline-flex items-center gap-1.5 text-[12.5px]" style={{ color: "rgba(255,255,255,0.92)" }}>
-              <MapPin size={13} color="rgba(255,255,255,0.92)" /> {feast.venue}
+            <div className="relative inline-flex items-center gap-1.5 text-[12.5px]" style={{ color: "rgba(30,18,72,0.92)" }}>
+              <MapPin size={13} color="rgba(30,18,72,0.92)" /> {feast.venue}
             </div>
           )}
-          <div className="relative flex gap-2 mt-4 p-3 rounded-2xl" style={{ background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255, 255, 255, 0.59)", backdropFilter: "blur(6px)" }}>
+          <div className="relative flex gap-2 mt-4 p-3 rounded-2xl" style={{ background: "rgba(30,18,72,0.14)", border: "1px solid rgba(30, 18, 72, 0.59)", backdropFilter: "blur(6px)" }}>
             <StatBlock value={feast.registrations} label="Registered" color="#fff" theme={theme} />
             <div className="w-px" style={{ background: "rgba(18, 16, 16, 0.25)" }} />
             <StatBlock value={feast.competitions.length} label="Events" color="#fff" theme={theme} />
@@ -724,8 +726,8 @@ export function FeastDetails({ slug, theme, onBack, onExit, go, tutorial }: {
       <div
         className="rounded-[20px] p-3"
         style={{
-          background: "linear-gradient(145deg,#ede9fe,#f5f3ff,#faf5ff,#ede9fe)",
-          border: "1px solid rgba(107,70,255,0.12)",
+          background: "linear-gradient(145deg,#1E1048,#1A0E40,#1A0E40,#1E1048)",
+          border: "1px solid rgba(180,76,255,0.12)",
           position: "relative",
           overflow: "hidden",
         }}

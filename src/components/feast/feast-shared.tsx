@@ -77,6 +77,57 @@ export function buildFeastTheme(parent: CMLTheme): FeastTheme {
   };
 }
 
+// "Nebula Glass" (ported from fest_hub's [data-fp-theme="nebula"]): deep-space
+// indigo with a starfield, frosted glass panels, magenta → electric-blue
+// accents; gold still marks winners. Used by the Results and Rank screens.
+export const NEBULA_PAGE_BG = [
+  "radial-gradient(1.5px 1.5px at 12% 18%, rgba(255,255,255,0.85), transparent)",
+  "radial-gradient(1px 1px at 27% 64%, rgba(255,255,255,0.7), transparent)",
+  "radial-gradient(1.5px 1.5px at 41% 9%, rgba(224,139,255,0.9), transparent)",
+  "radial-gradient(1px 1px at 58% 41%, rgba(255,255,255,0.6), transparent)",
+  "radial-gradient(2px 2px at 69% 82%, rgba(56,189,248,0.8), transparent)",
+  "radial-gradient(1px 1px at 83% 27%, rgba(255,255,255,0.75), transparent)",
+  "radial-gradient(1.5px 1.5px at 92% 58%, rgba(255,63,180,0.8), transparent)",
+  "radial-gradient(1px 1px at 6% 86%, rgba(255,255,255,0.6), transparent)",
+  "radial-gradient(1px 1px at 36% 92%, rgba(255,255,255,0.55), transparent)",
+  "radial-gradient(1.5px 1.5px at 76% 6%, rgba(255,255,255,0.8), transparent)",
+  "linear-gradient(118deg, transparent 0 57%, rgba(255,79,216,0.24) 60%, rgba(124,92,255,0.1) 62%, transparent 65%)",
+  "linear-gradient(124deg, transparent 0 67%, rgba(56,189,248,0.2) 69.5%, transparent 72%)",
+  "linear-gradient(112deg, transparent 0 20%, rgba(155,92,255,0.12) 22%, transparent 24.5%)",
+  "radial-gradient(30% 26% at 68% 56%, rgba(155,92,255,0.26) 0%, rgba(155,92,255,0) 100%)",
+  "radial-gradient(26% 22% at 22% 36%, rgba(255,63,180,0.2) 0%, rgba(255,63,180,0) 100%)",
+  "radial-gradient(55% 38% at 92% 0%, rgba(214,64,255,0.42) 0%, rgba(214,64,255,0) 100%)",
+  "radial-gradient(50% 40% at 0% 100%, rgba(56,120,248,0.34) 0%, rgba(56,120,248,0) 100%)",
+  "radial-gradient(70% 45% at 50% 108%, rgba(255,63,180,0.22) 0%, rgba(255,63,180,0) 100%)",
+  "linear-gradient(165deg, #1E0E4D 0%, #0E0726 48%, #050312 100%)",
+].join(", ");
+
+export const NEBULA_EDGE = "linear-gradient(135deg, rgba(255,79,216,0.55), rgba(155,92,255,0.25) 45%, rgba(56,189,248,0.5))";
+
+export function nebulaTheme(base: FeastTheme): FeastTheme {
+  const glass = { background: "rgba(24,14,60,0.8)", border: "1px solid rgba(214,170,255,0.22)", backdropFilter: "blur(14px)" };
+  return {
+    ...base,
+    text: "#F4F1FF",
+    sub: "#E4E0FA",
+    faint: "#B8B2E2",
+    purple: "#B44CFF",
+    lavender: "#E08BFF",
+    pink: "#FF3FB4",
+    cyan: "#38BDF8",
+    fill: "#150B36",
+    fillStrong: "rgba(180,76,255,0.16)",
+    hairline: "rgba(214,170,255,0.12)",
+    track: "rgba(255,255,255,0.08)",
+    softShadow: "0 16px 36px rgba(0,0,0,0.35), 0 0 18px rgba(180,76,255,0.12)",
+    glass,
+    glassStrong: { ...glass, background: "rgba(30,18,72,0.88)" },
+    pageBg: NEBULA_PAGE_BG,
+    blobs: false,
+    navBg: "rgba(18,9,46,0.78)",
+  };
+}
+
 export function GlassPanel({
   children, theme, strong, glow, style, className = "", onClick, pressable,
 }: {
@@ -127,7 +178,7 @@ export function GlowBtn({
   const variants: Record<string, React.CSSProperties> = {
     primary: { background: "linear-gradient(135deg, #6B46FF, #A78BFA)", color: "#fff", boxShadow: "0 10px 28px rgba(107,70,255,0.4)" },
     gold: { background: "linear-gradient(135deg, #F7D26B, #F0A500)", color: "#3a2a00", boxShadow: "0 10px 28px rgba(245,197,66,0.38)" },
-    ghost: { background: "rgba(107,70,255,0.09)", color: "#1E1B4B", border: "1px solid rgba(107,70,255,0.2)", boxShadow: "none" },
+    ghost: { background: "rgba(180,76,255,0.16)", color: "#F4F1FF", border: "1px solid rgba(214,170,255,0.3)", boxShadow: "none" },
     pink: { background: "linear-gradient(135deg, #C026D3, #EC4899)", color: "#fff", boxShadow: "0 10px 28px rgba(236,72,153,0.4)" },
   };
   const v = variants[variant];
@@ -281,8 +332,9 @@ export interface DynamicFeast {
 }
 
 export function FeastTabs({
-  feasts, active, onPick, loading = false,
+  feasts, active, onPick, loading = false, theme,
 }: {
+  theme?: FeastTheme;
   feasts: DynamicFeast[];
   active: string;
   onPick: (slug: string) => void;
@@ -298,6 +350,7 @@ export function FeastTabs({
     );
   }
   if (feasts.length === 0) return null;
+  const dark = theme?.pageBg === NEBULA_PAGE_BG;
 
   return (
     <div className="flex gap-2 overflow-x-auto pb-1 mb-4" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
@@ -311,13 +364,13 @@ export function FeastTabs({
             style={{
               fontFamily: "var(--font-poppins), sans-serif",
               border: on ? "none" : "1px solid rgba(107,70,255,0.14)",
-              background: on ? `linear-gradient(135deg, ${f.tint[0]}, ${f.tint[1]})` : "rgba(255,255,255,0.7)",
-              color: on ? "#fff" : "#4B5563",
+              background: on ? `linear-gradient(135deg, ${f.tint[0]}, ${f.tint[1]})` : dark ? "rgba(24,14,60,0.8)" : "rgba(255,255,255,0.7)",
+              color: on ? "#fff" : dark ? "#E4E0FA" : "#4B5563",
               boxShadow: on ? `0 8px 22px ${f.accent}55` : "none",
               whiteSpace: "nowrap",
             }}
           >
-            <FeastIcon name={f.icon} size={14} color={on ? "#fff" : "#8B5CF6"} />
+            <FeastIcon name={f.icon} size={14} color={on ? "#fff" : dark ? "#E08BFF" : "#8B5CF6"} />
             {f.name}
           </button>
         );
@@ -367,6 +420,11 @@ export function FeastNav({ active, onNav, theme }: { active: string; onNav: (id:
   });
 
   const activeItem = items[activeIndex];
+  // Nebula Glass nav (fest_hub): dark glass bar, light labels, neon bubble.
+  const dark = theme.pageBg === NEBULA_PAGE_BG;
+  const inactive = dark ? "#E4E0FA" : FEAST_NAV_INACTIVE_COLOR;
+  const activeColor = dark ? "#FF9AD9" : FEAST_NAV_ACTIVE_COLOR;
+  const exitColor = dark ? "#FF8FA3" : FEAST_NAV_EXIT_COLOR;
 
   return (
     <div className="absolute left-0 right-0 bottom-0 z-40 px-3.5 pb-[22px] pointer-events-none">
@@ -374,8 +432,8 @@ export function FeastNav({ active, onNav, theme }: { active: string; onNav: (id:
         <motion.div
           className="flex justify-around items-center rounded-[26px] py-2.5 px-1.5"
           style={{
-            background: `linear-gradient(135deg, rgba(167,139,250,0.72), rgba(190,24,147,0.4) 45%, rgba(107,70,255,0.8)), ${theme.navBg}`,
-            border: "1px solid rgba(255,255,255,0.45)",
+            background: dark ? theme.navBg : `linear-gradient(135deg, rgba(167,139,250,0.72), rgba(190,24,147,0.4) 45%, rgba(107,70,255,0.8)), ${theme.navBg}`,
+            border: dark ? "1px solid rgba(214,170,255,0.22)" : "1px solid rgba(255,255,255,0.45)",
             boxShadow: "0 12px 34px rgba(107,70,255,0.28), inset 0 1px 1px rgba(255,255,255,0.5)",
             backdropFilter: "blur(8px) saturate(140%)",
             WebkitBackdropFilter: "blur(8px) saturate(140%)",
@@ -391,13 +449,13 @@ export function FeastNav({ active, onNav, theme }: { active: string; onNav: (id:
                 key={n.id}
                 onClick={() => onNav(n.id)}
                 className="border-none bg-none cursor-pointer flex-1 flex flex-col items-center gap-1 py-1"
-                style={{ background: "none", color: on ? FEAST_NAV_ACTIVE_COLOR : isExit ? FEAST_NAV_EXIT_COLOR : FEAST_NAV_INACTIVE_COLOR }}
+                style={{ background: "none", color: on ? activeColor : isExit ? exitColor : inactive }}
               >
                 <div
                   className="flex items-center justify-center transition-opacity duration-200"
                   style={{ height: 32, opacity: on ? 0 : 1 }}
                 >
-                  <FeastIcon name={n.icon} size={20} color={isExit ? FEAST_NAV_EXIT_COLOR : FEAST_NAV_INACTIVE_COLOR} />
+                  <FeastIcon name={n.icon} size={20} color={isExit ? exitColor : inactive} />
                 </div>
                 <span className="text-[12px]" style={{ fontWeight: on ? 800 : 700, fontFamily: "var(--font-poppins), sans-serif" }}>{n.label}</span>
               </button>
@@ -413,7 +471,7 @@ export function FeastNav({ active, onNav, theme }: { active: string; onNav: (id:
             width: FEAST_NAV_BUBBLE_SIZE,
             height: FEAST_NAV_BUBBLE_SIZE,
             borderRadius: "50%",
-            background: `linear-gradient(145deg, ${theme.lavender}, ${theme.purple})`,
+            background: dark ? "linear-gradient(145deg, #FF3FB4, #9B5CFF 55%, #3B82F6)" : `linear-gradient(145deg, ${theme.lavender}, ${theme.purple})`,
             boxShadow: "0 8px 20px rgba(140,100,230,0.45), inset 0 1.5px 2px rgba(255,255,255,0.55)",
           }}
         >

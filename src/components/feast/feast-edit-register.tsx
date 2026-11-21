@@ -21,7 +21,7 @@ function TextField({ label, value, onChange, placeholder, theme, type = "text", 
     <div className="mb-3">
       <label className="block text-[11.5px] font-semibold mb-1.5 tracking-wider" style={{ fontFamily: "var(--font-poppins),sans-serif", color: theme.sub }}>{label}</label>
       <div className="flex items-center gap-2.5 px-3.5 rounded-[14px] transition-all"
-        style={{ background: "rgba(255,255,255,0.72)", border: `1px solid ${focus ? theme.lavender : theme.hairline}`, boxShadow: focus ? `0 0 0 4px ${theme.purple}26` : "none" }}>
+        style={{ background: "rgba(30,18,72,0.72)", border: `1px solid ${focus ? theme.lavender : theme.hairline}`, boxShadow: focus ? `0 0 0 4px ${theme.purple}26` : "none" }}>
         {icon === "user" && <User size={16} color={focus ? theme.lavender : theme.faint} />}
         {icon === "phone" && <Phone size={16} color={focus ? theme.lavender : theme.faint} />}
         <input value={value} onChange={(e) => onChange(e.target.value)} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
@@ -40,7 +40,7 @@ function DateField({ label, value, onChange, theme }: {
     <div className="mb-2">
       <label className="block text-[11.5px] font-semibold mb-1.5 tracking-wider" style={{ fontFamily: "var(--font-poppins),sans-serif", color: theme.sub }}>{label}</label>
       <div className="flex items-center gap-2.5 px-3.5 rounded-[14px] transition-all"
-        style={{ background: "rgba(255,255,255,0.72)", border: `1px solid ${focus ? theme.lavender : theme.hairline}`, boxShadow: focus ? `0 0 0 4px ${theme.purple}26` : "none" }}>
+        style={{ background: "rgba(30,18,72,0.72)", border: `1px solid ${focus ? theme.lavender : theme.hairline}`, boxShadow: focus ? `0 0 0 4px ${theme.purple}26` : "none" }}>
         <Calendar size={16} color={focus ? theme.lavender : theme.faint} />
         <input value={value} onChange={(e) => onChange(e.target.value)} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
           type="date" max={new Date().toISOString().split("T")[0]} min="1940-01-01"
@@ -51,8 +51,8 @@ function DateField({ label, value, onChange, theme }: {
   );
 }
 
-function CategoryPill({ dob, theme }: { dob: string; theme: FeastTheme }) {
-  const slug = getCategorySlug(dob);
+function CategoryPill({ dob, cats, theme }: { dob: string; cats: (string | null | undefined)[]; theme: FeastTheme }) {
+  const slug = getCategorySlug(dob, cats);
   if (!slug) return <div className="mb-3" />;
   const label = CATEGORY_LABELS[slug];
   const color = CATEGORY_COLORS[slug] || theme.lavender;
@@ -76,7 +76,7 @@ function GenderPicker({ value, onChange, theme }: { value: string; onChange: (v:
           return (
             <button key={o.value} onClick={() => onChange(o.value)}
               className="flex-1 py-2.5 rounded-[12px] font-semibold text-[13px] cursor-pointer active:scale-95 transition-transform"
-              style={{ fontFamily: "var(--font-poppins),sans-serif", background: on ? "linear-gradient(135deg,#6B46FF,#A78BFA)" : "rgba(255,255,255,0.72)", color: on ? "#fff" : theme.sub, border: on ? "none" : `1px solid ${theme.hairline}`, boxShadow: on ? "0 6px 16px rgba(107,70,255,0.3)" : "none" }}>
+              style={{ fontFamily: "var(--font-poppins),sans-serif", background: on ? "linear-gradient(135deg,#B44CFF,#A78BFA)" : "rgba(30,18,72,0.72)", color: on ? "#fff" : theme.sub, border: on ? "none" : `1px solid ${theme.hairline}`, boxShadow: on ? "0 6px 16px rgba(180,76,255,0.3)" : "none" }}>
               {o.label}
             </button>
           );
@@ -96,7 +96,7 @@ function StepDots({ step, theme }: { step: number; theme: FeastTheme }) {
           <div key={i} className="contents">
             <div className="flex items-center gap-[7px]">
               <div className="w-[26px] h-[26px] rounded-full flex items-center justify-center flex-shrink-0 font-bold text-[12px]"
-                style={{ fontFamily: "var(--font-poppins),sans-serif", background: done || active ? "linear-gradient(135deg,#6B46FF,#A78BFA)" : theme.fillStrong, color: done || active ? "#fff" : theme.faint, boxShadow: active ? "0 6px 16px rgba(107,70,255,0.4)" : "none" }}>
+                style={{ fontFamily: "var(--font-poppins),sans-serif", background: done || active ? "linear-gradient(135deg,#B44CFF,#A78BFA)" : theme.fillStrong, color: done || active ? "#fff" : theme.faint, boxShadow: active ? "0 6px 16px rgba(180,76,255,0.4)" : "none" }}>
                 {done ? <Check size={14} color="#fff" /> : i + 1}
               </div>
               <span className="text-[11.5px]" style={{ fontWeight: active ? 700 : 500, color: active ? theme.text : theme.faint, fontFamily: "var(--font-poppins),sans-serif" }}>{l}</span>
@@ -213,7 +213,7 @@ export function FeastEditRegister({ slug, participantId, theme, onBack, onDone, 
               <TextField label="Full Name" value={form.name} onChange={(v) => set("name", v)} placeholder="e.g. Ann Maria Joy" theme={theme} icon="user" />
               <TextField label="House Name" value={form.houseName} onChange={(v) => set("houseName", v)} placeholder="e.g. Thekkedath House" theme={theme} />
               <DateField label="Date of Birth" value={form.dob} onChange={(v) => set("dob", v)} theme={theme} />
-              <CategoryPill dob={form.dob} theme={theme} />
+              <CategoryPill dob={form.dob} cats={feast.competitions.map((c) => c.competitionCategorySlug)} theme={theme} />
               <GenderPicker value={form.gender} onChange={(v) => set("gender", v)} theme={theme} />
               <TextField label="Phone (optional)" value={form.phone} onChange={(v) => set("phone", v.replace(/[^\d]/g, "").slice(0, 10))} placeholder="10-digit mobile" theme={theme} type="tel" icon="phone" />
             </GlassPanel>
@@ -228,16 +228,16 @@ export function FeastEditRegister({ slug, participantId, theme, onBack, onDone, 
             {!confirmDelete ? (
               <button data-tour="edit-delete-btn" onClick={() => { setConfirmDelete(true); onTutorialAction?.("delete-tap"); }}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-none cursor-pointer text-[13px] font-semibold"
-                style={{ background: "#fee2e2", color: "#ef4444" }}>
+                style={{ background: "rgba(239,68,68,0.16)", color: "#ef4444" }}>
                 <Trash2 size={15} /> Remove Registration
               </button>
             ) : (
-              <div data-tour="edit-delete-confirm" className="p-4 rounded-2xl text-center" style={{ background: "#fee2e2", border: "1px solid #fca5a5" }}>
-                <p className="text-[13px] font-semibold mb-3" style={{ color: "#b91c1c" }}>Delete this registration permanently?</p>
+              <div data-tour="edit-delete-confirm" className="p-4 rounded-2xl text-center" style={{ background: "rgba(239,68,68,0.16)", border: "1px solid #fca5a5" }}>
+                <p className="text-[13px] font-semibold mb-3" style={{ color: "#FCA5A5" }}>Delete this registration permanently?</p>
                 <div className="flex gap-2">
                   <button onClick={() => setConfirmDelete(false)}
                     className="flex-1 py-2.5 rounded-xl text-[13px] font-medium cursor-pointer border-none"
-                    style={{ background: "rgba(255,255,255,0.8)", color: "#374151" }}>Cancel</button>
+                    style={{ background: "rgba(30,18,72,0.8)", color: "#E4E0FA" }}>Cancel</button>
                   <div data-tour="edit-delete-yes-btn" className="flex-1">
                     <button onClick={handleDelete} disabled={deleting}
                       className="w-full py-2.5 rounded-xl text-[13px] font-semibold cursor-pointer border-none flex items-center justify-center gap-1.5"
@@ -263,7 +263,7 @@ export function FeastEditRegister({ slug, participantId, theme, onBack, onDone, 
           return l;
         };
         const participantGender = normGender(form.gender);
-        const participantCatSlug = getCategorySlug(form.dob);
+        const participantCatSlug = getCategorySlug(form.dob, feast.competitions.map((c) => c.competitionCategorySlug));
         const eligibleComps = feast.competitions.filter((c) => {
           const ng = normGender(c.gender);
           const genderOk = !ng || ng === "open" || ng === "common" || ng === participantGender;
@@ -277,12 +277,12 @@ export function FeastEditRegister({ slug, participantId, theme, onBack, onDone, 
                 Update competitions. Saving replaces all selections.
               </p>
               <span className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ml-2"
-                style={{ background: picked.length >= 2 ? "#fef3c7" : theme.purple + "1a", color: picked.length >= 2 ? "#b45309" : theme.purple }}>
+                style={{ background: picked.length >= 2 ? "rgba(245,197,66,0.18)" : theme.purple + "1a", color: picked.length >= 2 ? "#FCD34D" : theme.purple }}>
                 {picked.length} / 2
               </span>
             </div>
             {picked.length >= 2 && (
-              <div className="mb-3 px-3.5 py-2.5 rounded-[14px] text-[12.5px]" style={{ background: "#fef3c7", color: "#b45309", border: "1px solid #fde68a" }}>
+              <div className="mb-3 px-3.5 py-2.5 rounded-[14px] text-[12.5px]" style={{ background: "rgba(245,197,66,0.18)", color: "#FCD34D", border: "1px solid rgba(253,230,138,0.35)" }}>
                 Maximum 2 competitions allowed. Deselect one to change.
               </div>
             )}
@@ -317,7 +317,7 @@ export function FeastEditRegister({ slug, participantId, theme, onBack, onDone, 
                     </div>
                   </div>
                   <div className="w-6 h-6 rounded-lg flex-shrink-0 flex items-center justify-center"
-                    style={{ background: on ? "linear-gradient(135deg,#6B46FF,#A78BFA)" : "rgba(255,255,255,0.72)", border: on ? "none" : `1px solid ${theme.hairline}` }}>
+                    style={{ background: on ? "linear-gradient(135deg,#B44CFF,#A78BFA)" : "rgba(30,18,72,0.72)", border: on ? "none" : `1px solid ${theme.hairline}` }}>
                     {on && <Check size={15} color="#fff" />}
                   </div>
                 </GlassPanel>
@@ -342,12 +342,12 @@ export function FeastEditRegister({ slug, participantId, theme, onBack, onDone, 
               ["House Name", form.houseName || "—"],
               ["Date of Birth", form.dob],
               ["Gender", form.gender.charAt(0).toUpperCase() + form.gender.slice(1)],
-              ["Category", CATEGORY_LABELS[getCategorySlug(form.dob)] || "—"],
+              ["Category", CATEGORY_LABELS[getCategorySlug(form.dob, feast.competitions.map((c) => c.competitionCategorySlug))] || "—"],
               ...(form.phone ? [["Phone", form.phone]] : []),
             ].map(([k, v]) => (
               <div key={k} className="flex justify-between items-center py-2.5" style={{ borderBottom: `1px solid ${theme.hairline}` }}>
                 <span className="text-[12.5px]" style={{ color: theme.faint }}>{k}</span>
-                <span className="text-[13.5px] font-semibold" style={{ fontFamily: "var(--font-poppins),sans-serif", color: k === "Category" ? (CATEGORY_COLORS[getCategorySlug(form.dob)] || theme.text) : theme.text }}>{v}</span>
+                <span className="text-[13.5px] font-semibold" style={{ fontFamily: "var(--font-poppins),sans-serif", color: k === "Category" ? (CATEGORY_COLORS[getCategorySlug(form.dob, feast.competitions.map((c) => c.competitionCategorySlug))] || theme.text) : theme.text }}>{v}</span>
               </div>
             ))}
             <div className="mt-3">
@@ -363,7 +363,7 @@ export function FeastEditRegister({ slug, participantId, theme, onBack, onDone, 
             </div>
           </GlassPanel>
           {serverError && (
-            <p className="text-center text-[12px] mb-3 px-2 py-2 rounded-xl" style={{ color: "#ef4444", background: "#fee2e2" }}>{serverError}</p>
+            <p className="text-center text-[12px] mb-3 px-2 py-2 rounded-xl" style={{ color: "#ef4444", background: "rgba(239,68,68,0.16)" }}>{serverError}</p>
           )}
           <GlowBtn variant="gold" full size="lg" icon={submitting ? undefined : "Check"} disabled={submitting} onClick={submit}>
             {submitting ? <span className="flex items-center gap-2"><Loader2 size={16} className="animate-spin" />Saving…</span> : "Save Changes"}

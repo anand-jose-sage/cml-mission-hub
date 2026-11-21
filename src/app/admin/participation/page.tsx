@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Loader2, Search, X, ChevronDown, ClipboardCheck, UserX, FileDown, FileStack, Check,
 } from "lucide-react";
+import { openPrintWindow, PRINT_FALLBACK_BUTTON, escHtml } from "@/lib/print-export";
 import { supabase } from "@/lib/supabase";
 import { setParticipation, setChanceNo } from "@/actions/feast";
 import { setTeamParticipation, setTeamChanceNo } from "@/actions/team";
@@ -60,7 +61,7 @@ const FONT_LINK = `<link rel="preconnect" href="https://fonts.googleapis.com"><l
 
 const SHEET_CSS = `
   @page { size: A4 portrait; margin: 16mm 14mm; }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; }
   .sheet { border-left: 6px solid #BE185D; border-right: 6px solid #BE185D; padding-left: 12px; padding-right: 12px; }
   .sheet:not(:last-child) { page-break-after: always; }
@@ -85,14 +86,7 @@ const SHEET_CSS = `
   col.c-tot { width: ${TOT_W}%; }
   td.sl  { font-weight: 700; }
   td.reg { font-family: "Courier New", monospace; font-weight: 700; letter-spacing: .02em; }
-  @media print { .noprint { display: none; } }
-  .noprint { text-align: center; margin: 18px 0; }
-  .noprint button { font-size: 14px; padding: 8px 18px; cursor: pointer; }
 `;
-
-function escHtml(s: string) {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
 
 /** One competition's header + judging table — a full print page. */
 function renderSheetSection(comp: CompOption, feastTitle: string, regNos: string[]): string {
@@ -164,20 +158,6 @@ async function fetchRegNosByComp(
     list.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   }
   return { regNosByComp, error: false };
-}
-
-/** Opens a blank tab, writes the given HTML document, and triggers print. Returns false if the pop-up was blocked. */
-function openPrintWindow(html: string): boolean {
-  const w = window.open("", "_blank");
-  if (!w) return false;
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
-  // Give the new document a tick to lay out, then open the print dialog.
-  // (onload can fire before this handler attaches after document.write, so
-  // use a short timeout; the in-page "Print" button is a manual fallback.)
-  setTimeout(() => { w.focus(); w.print(); }, 350);
-  return true;
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -396,9 +376,8 @@ export default function ParticipationPage() {
     const html = `<!doctype html><html><head><meta charset="utf-8">
 <title>Judge Sheets — ${escHtml(feastTitle)}</title>
 ${FONT_LINK}
-<style>${SHEET_CSS}</style></head><body>
+<style>${SHEET_CSS}</style></head><body>${PRINT_FALLBACK_BUTTON}
   ${sections}
-  <div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
 </body></html>`;
 
     if (!openPrintWindow(html)) {
@@ -426,9 +405,8 @@ ${FONT_LINK}
     const html = `<!doctype html><html><head><meta charset="utf-8">
 <title>Score Sheets — ${escHtml(feastTitle)}</title>
 ${FONT_LINK}
-<style>${SHEET_CSS}</style></head><body>
+<style>${SHEET_CSS}</style></head><body>${PRINT_FALLBACK_BUTTON}
   ${sections}
-  <div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
 </body></html>`;
 
     if (!openPrintWindow(html)) {

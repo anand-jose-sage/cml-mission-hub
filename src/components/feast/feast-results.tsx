@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Loader2, ChevronDown, Trophy, Search, BookOpen, Camera } from "lucide-react";
+import { Loader2, ChevronDown, Trophy, Search, BookOpen, Camera, Church, Award } from "lucide-react";
+import { motion } from "framer-motion";
+import { GradeBadge, Medal, NB, isMedalPos, toneStyle } from "./nebula-ui";
 import { useFeast, useFeasts } from "@/hooks/use-feast";
 import { getPublishedResults, type PublicResultRow } from "@/actions/results";
 import { getPublishedTeamResults } from "@/actions/team-results";
-import { SHAKHA_COLOR_MAP } from "@/lib/feast-data";
 import { CATEGORY_LABELS } from "@/lib/competition-categories";
 import { FeastTopBar, FeastTabs, type FeastTheme } from "./feast-shared";
 import { PosterGeneratorOverlay, type PosterWinner } from "./poster/poster-generator-overlay";
@@ -13,9 +14,11 @@ import { PosterGeneratorOverlay, type PosterWinner } from "./poster/poster-gener
 // ─── Category config ──────────────────────────────────────────────────────────
 
 const CAT_CONFIG = [
+  { slug: "poombatta_1",  label: "Poombatta 1", color: "#FF6FB0" },
+  { slug: "poombatta_2",  label: "Poombatta 2", color: "#FB7185" },
   { slug: "sub_junior",   label: "Sub Jr",  color: "#34D3EE" },
   { slug: "junior",       label: "Junior",  color: "#22C55E" },
-  { slug: "senior",       label: "Senior",  color: "#6B46FF" },
+  { slug: "senior",       label: "Senior",  color: "#B44CFF" },
   { slug: "super_senior", label: "Super Sr",color: "#F5A742" },
   { slug: "elder",        label: "Elder",   color: "#9D99BC" },
 ] as const;
@@ -23,54 +26,6 @@ type CatSlug = typeof CAT_CONFIG[number]["slug"];
 
 const TEAM_TAB = { slug: "team", label: "Team", color: "#EC4899" } as const;
 type TabSlug = CatSlug | "team";
-
-// ─── Position styling ─────────────────────────────────────────────────────────
-
-const POS_STYLE: Record<number, {
-  bg: string; border: string; text: string;
-  disc: string; numBg: string; numText: string;
-}> = {
-  1: { bg: "#FFFBEB", border: "#F5C542", text: "#92400E", disc: "#F5C542", numBg: "#6B5200", numText: "#FFF6C8" },
-  2: { bg: "#F9FAFB", border: "#9CA3AF", text: "#374151", disc: "#B9C2CC", numBg: "#475260", numText: "#FFFFFF" },
-  3: { bg: "#FFF7ED", border: "#E0936A", text: "#7C2D12", disc: "#D98E5F", numBg: "#5A2C14", numText: "#FDE3C9" },
-};
-
-const MEDAL_EMOJI = ["🥇", "🥈", "🥉"] as const;
-
-function MedalBadge({ pos }: { pos: number }) {
-  const m = POS_STYLE[pos];
-  if (!m) return null;
-  return (
-    <div
-      className="shrink-0 rounded-full flex items-center justify-center"
-      style={{
-        width: 34, height: 34, fontSize: 17,
-        background: `linear-gradient(135deg, ${m.disc}, ${m.disc}88)`,
-        boxShadow: `0 0 0 3px ${m.bg}, 0 4px 10px ${m.disc}66`,
-      }}
-    >
-      {MEDAL_EMOJI[pos - 1]}
-    </div>
-  );
-}
-
-// ─── Grade badge ──────────────────────────────────────────────────────────────
-
-const GRADE_STYLE: Record<string, { bg: string }> = {
-  A: { bg: "#16A34A" }, B: { bg: "#D97706" }, C: { bg: "#6B46FF" },
-};
-
-function GradeChip({ grade }: { grade: "A" | "B" | "C" }) {
-  const bg = GRADE_STYLE[grade]?.bg ?? "#9CA3AF";
-  return (
-    <span
-      className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[15px] font-black text-white shrink-0"
-      style={{ background: bg, boxShadow: `0 2px 6px ${bg}55` }}
-    >
-      {grade}
-    </span>
-  );
-}
 
 // ─── Sort rows ────────────────────────────────────────────────────────────────
 
@@ -87,34 +42,31 @@ function sortResults(rows: PublicResultRow[]): PublicResultRow[] {
   });
 }
 
-// ─── Result row ───────────────────────────────────────────────────────────────
+// ─── Result row (fest_hub ResultRow, shakha only) ─────────────────────────────
 
-function PosterButton({ onClick }: { onClick: () => void }) {
+function ShakhaTag({ shakha, color }: { shakha: string; color: string }) {
+  const tint = (pct: number) => `color-mix(in srgb, ${color} ${pct}%, transparent)`;
   return (
-    <button
-      onClick={onClick}
-      className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center border-none cursor-pointer active:scale-95 transition-transform"
-      style={{ background: "rgba(107,70,255,0.1)" }}
-      aria-label="Generate social poster"
+    <span
+      className="flex w-fit max-w-full items-center justify-center gap-1.5 rounded-full px-3 py-1 text-center text-[12px] font-semibold leading-tight break-words"
+      style={{ color, border: `1px solid ${tint(45)}` }}
     >
-      <Camera size={15} color="#6B46FF" />
-    </button>
+      <Church className="h-[13px] w-[13px] shrink-0" aria-hidden="true" />
+      {shakha}
+    </span>
   );
 }
 
-function ResultRow({ row, index, last, showMedal, isTeam, competitionName, categoryLabel, feastName, onGeneratePoster }: {
-  row: PublicResultRow; index: number; last: boolean; showMedal: boolean; isTeam: boolean;
+function ResultRow({ row, isTeam, competitionName, categoryLabel, feastName, onGeneratePoster, delay }: {
+  row: PublicResultRow; isTeam: boolean; delay: number;
   competitionName: string; categoryLabel: string; feastName: string; onGeneratePoster: (winner: PosterWinner) => void;
 }) {
-  const anek: React.CSSProperties = { fontFamily: "var(--font-anek), sans-serif", fontWeight: 700 };
-  const pos = row.position !== null && row.position <= 3 ? POS_STYLE[row.position] : null;
-  const sc = SHAKHA_COLOR_MAP[row.shakha] ?? "#A78BFA";
-  const zebra = index % 2 === 1;
-  const rowBg = pos ? `${pos.border}1A` : zebra ? "rgba(255,255,255,0.4)" : "transparent";
+  const pos = isMedalPos(row.position) ? row.position : null;
+  const sc = NB.link;
   const openPoster = () => {
-    if (!row.position || row.position > 3) return;
+    if (!pos) return;
     onGeneratePoster({
-      rank: row.position as 1 | 2 | 3,
+      rank: pos,
       winnerName: row.name,
       houseName: row.houseName,
       shakhaName: row.shakha,
@@ -124,94 +76,46 @@ function ResultRow({ row, index, last, showMedal, isTeam, competitionName, categ
     });
   };
 
-  if (isTeam) {
-    const anekRegular: React.CSSProperties = { fontFamily: "var(--font-anek), sans-serif" };
-    const members = row.houseName ? row.houseName.split(", ") : [];
-    return (
-      <div
-        style={{
-          border: "1.5px solid rgba(107,70,255,0.38)",
-          borderRadius: 12,
-          overflow: "hidden",
-          marginTop: index === 0 ? 0 : 8,
-          marginBottom: last ? 0 : 2,
-        }}
-      >
-        {/* Top tier — rank, team name, grade */}
-        <div className="flex items-center gap-3 px-3.5 py-3" style={{ background: rowBg }}>
-          {showMedal && (
-            <div className="shrink-0 w-8 flex justify-center">
-              {pos ? <MedalBadge pos={row.position!} /> : null}
-            </div>
-          )}
-          <p className="flex-1 min-w-0 text-[15px] leading-tight truncate" style={{ color: "#1E1B4B", ...anek }}>{row.name}</p>
-          <div className="shrink-0 flex flex-col items-center gap-0.5">
-            {row.grade
-              ? <GradeChip grade={row.grade} />
-              : <span className="w-8 h-8 flex items-center justify-center text-[14px] text-gray-300">—</span>}
-            <span className="text-[10px] font-semibold" style={{ color: "#9CA3AF", ...anekRegular }}>{row.totalPoints} pts</span>
-          </div>
-        </div>
-        {/* Bottom tier — members + shakha */}
-        <div className="flex items-center justify-between gap-3 px-3.5 py-2 flex-wrap" style={{ background: "rgba(107,70,255,0.05)" }}>
-          <p className="text-[12.5px] min-w-0" style={{ color: "#6B7280", ...anekRegular }}>
-            <span style={{ color: "#9CA3AF" }}>Members </span>
-            {members.length > 0 ? members.join(", ") : "—"}
-          </p>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-[15px] leading-none" aria-hidden="true">⛪</span>
-            <span className="text-[16px] leading-none" style={{ color: sc, ...anek }}>{row.shakha}</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div
-      className="flex items-center gap-3 px-3.5 py-3"
-      style={{
-        background: rowBg,
-        border: "1.5px solid rgba(107,70,255,0.38)",
-        borderRadius: 12,
-        marginTop: index === 0 ? 0 : 8,
-        marginBottom: last ? 0 : 2,
-      }}
+    <motion.li
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay }}
+      className="flex items-center gap-3 rounded-[14px] px-3 py-[11px]"
+      style={pos === 1 ? toneStyle(1) : { background: NB.surface3, border: `1px solid ${NB.line}` }}
     >
-      {/* Medal badge (podium only) */}
-      {showMedal && (
-        <div className="shrink-0 w-8 flex justify-center">
-          {pos ? <MedalBadge pos={row.position!} /> : null}
-        </div>
+      {pos ? (
+        <Medal pos={pos} size={32} />
+      ) : (
+        <span className="w-8 shrink-0 text-center text-[15px] font-extrabold tabular-nums" style={{ color: NB.faint, fontFamily: NB.num }}>
+          {row.position ?? "–"}
+        </span>
       )}
-
-      {/* Participant — name | house (line 1) · shakha (line 2) */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-1.5 min-w-0">
-          <p className="text-[15px] leading-tight truncate" style={{ color: "#1E1B4B", ...anek }}>{row.name}</p>
-          {row.houseName && (
-            <span className="inline-flex items-baseline gap-1.5 text-[13.5px] truncate" style={{ color: "#7C3AED", ...anek }}>
-              <span style={{ color: "#DDD6FE" }}>|</span>
-              {row.houseName}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5 mt-1 min-w-0">
-          <span className="text-[15px] shrink-0 leading-none" aria-hidden="true">⛪</span>
-          <span className="text-[16px] leading-none truncate" style={{ color: sc, ...anek }}>{row.shakha}</span>
-        </div>
-      </div>
-
-      {/* Grade (right) */}
-      <div className="shrink-0 flex flex-col items-center gap-0.5">
-        {row.grade
-          ? <GradeChip grade={row.grade} />
-          : <span className="w-8 h-8 flex items-center justify-center text-[14px] text-gray-300">—</span>}
-        <span className="text-[10px] font-semibold" style={{ color: "#9CA3AF", fontFamily: "var(--font-anek), sans-serif" }}>{row.totalPoints} pts</span>
-      </div>
-
-      {pos && <PosterButton onClick={openPoster} />}
-    </div>
+      <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
+        <span className="text-[17px] font-black leading-tight" style={{ color: NB.text, fontFamily: NB.ml }}>{row.name}</span>
+        <span className="flex min-w-0 flex-col items-start gap-1.5 text-[12.5px] font-semibold" style={{ color: NB.sub }}>
+          {row.houseName && !isTeam && <span style={{ fontFamily: NB.ml }}>{row.houseName}</span>}
+          <ShakhaTag shakha={row.shakha} color={sc} />
+        </span>
+        {isTeam && row.houseName && (
+          <span className="text-[12px] font-semibold" style={{ color: NB.sub, fontFamily: NB.ml }}>
+            <span className="font-extrabold">Members:</span> {row.houseName}
+          </span>
+        )}
+      </span>
+      {pos && !isTeam && (
+        <button
+          type="button"
+          onClick={openPoster}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full cursor-pointer"
+          style={{ background: "rgba(37,211,102,0.14)", border: "1px solid rgba(37,211,102,0.45)", color: "#25D366" }}
+          aria-label="Generate social poster"
+        >
+          <Camera size={17} />
+        </button>
+      )}
+      <GradeBadge grade={row.grade} size={34} />
+    </motion.li>
   );
 }
 
@@ -220,26 +124,103 @@ function ResultTable({ title, accent, rows, isTeam, competitionName, categoryLab
   competitionName: string; categoryLabel: string; feastName: string; onGeneratePoster: (winner: PosterWinner) => void;
 }) {
   if (rows.length === 0) return null;
-  const showMedal = rows.some((r) => r.position !== null && r.position <= 3);
   return (
-    <div
-      className="mb-2.5 rounded-xl overflow-hidden"
-      style={{ border: "1px solid rgba(107,70,255,0.13)", background: "rgba(255,255,255,0.55)", boxShadow: "0 1px 8px rgba(107,70,255,0.05)" }}
-    >
-      {/* Section title bar */}
-      <div className="flex items-center gap-1.5 px-3 py-2" style={{ background: `${accent}14` }}>
-        <span className="w-1.5 h-1.5 rounded-full" style={{ background: accent }} />
-        <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: accent }}>{title}</span>
-      </div>
-
-      {/* Rows */}
-      {rows.map((r, i) => (
-        <ResultRow
-          key={r.registrationId} row={r} index={i} last={i === rows.length - 1} showMedal={showMedal} isTeam={isTeam}
-          competitionName={competitionName} categoryLabel={categoryLabel} feastName={feastName} onGeneratePoster={onGeneratePoster}
-        />
-      ))}
+    <div className="mt-3">
+      <p className="mb-2 px-1 text-[10.5px] font-extrabold uppercase tracking-[0.16em]" style={{ color: accent }}>{title}</p>
+      <ol className="m-0 flex list-none flex-col gap-1.5 p-0">
+        {rows.map((r, i) => (
+          <ResultRow
+            key={r.registrationId} row={r} isTeam={isTeam} delay={Math.min(i, 8) * 0.05}
+            competitionName={competitionName} categoryLabel={categoryLabel} feastName={feastName} onGeneratePoster={onGeneratePoster}
+          />
+        ))}
+      </ol>
     </div>
+  );
+}
+
+// ─── Award card: 1st–3rd (fest_hub AwardCard, Nebula Glass orchid board) ─────
+
+const PLACE_PASTEL: Record<1 | 2 | 3, { bg: string; line: string; glow?: string }> = {
+  1: { bg: "linear-gradient(120deg, #FFF5D6 0%, #FCE29B 100%)", line: "#EBC45E", glow: "0 10px 24px rgba(245,197,66,.28)" },
+  2: { bg: "linear-gradient(120deg, #F2F7FC 0%, #C2D0E2 100%)", line: "#8DA2BE", glow: "0 8px 20px rgba(110,130,160,.22)" },
+  3: { bg: "linear-gradient(120deg, #FDEDE1 0%, #F4D0B4 100%)", line: "#DDAB86" },
+};
+const AWARD = { ink: "#1E1B4B", sub: "#55517E", link: "#4B31B3", goldInk: "#8A5800" };
+
+function AwardCard({ rows, accent, isTeam, onPoster }: {
+  rows: PublicResultRow[]; accent: string; isTeam: boolean; onPoster: (row: PublicResultRow) => void;
+}) {
+  return (
+    <article
+      className="overflow-hidden rounded-[24px]"
+      style={{
+        background: "linear-gradient(165deg, #F1E6FF 0%, #E2CEFF 50%, #F6DAF2 100%)",
+        color: AWARD.ink,
+        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.6), inset 0 1px 0 #FFFFFF, 0 26px 60px rgba(3,1,14,0.6), 0 0 44px rgba(180,76,255,0.32)",
+      }}
+    >
+      <div aria-hidden="true" className="h-[5px]" style={{ background: `linear-gradient(90deg, ${accent}, #F5C542)` }} />
+      <div className="flex items-center gap-1.5 px-4 pb-1 pt-3.5 text-[11px] font-extrabold uppercase tracking-[0.14em]" style={{ color: "#5A1FB8" }}>
+        <Award className="h-[13px] w-[13px]" aria-hidden="true" />
+        Final results
+      </div>
+      <ol className="m-0 flex list-none flex-col gap-[7px] px-2.5 pb-2.5 pt-2.5">
+        {rows.map((w, i) => {
+          const pos = isMedalPos(w.position) ? w.position : null;
+          const first = pos === 1;
+          return (
+            <motion.li
+              key={w.registrationId}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.1 + Math.min(i, 4) * 0.08 }}
+              className="relative flex items-center gap-3 overflow-hidden rounded-[18px]"
+              style={{
+                padding: first ? "16px 12px" : "12px 12px 12px 14px",
+                background: pos ? PLACE_PASTEL[pos].bg : "rgba(255,255,255,0.6)",
+                border: `1px solid ${pos ? PLACE_PASTEL[pos].line : "rgba(90,31,184,0.16)"}`,
+                boxShadow: pos ? PLACE_PASTEL[pos].glow : undefined,
+              }}
+            >
+              {first && (
+                <motion.span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-0 left-0 w-[30%]"
+                  style={{ background: "linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.7), rgba(255,255,255,0))", skewX: -18 }}
+                  initial={{ x: "-160%" }}
+                  animate={{ x: "420%" }}
+                  transition={{ duration: 1.6, delay: 0.6, repeat: Infinity, repeatDelay: 3.5, ease: "easeInOut" }}
+                />
+              )}
+              {pos ? <Medal pos={pos} size={first ? 48 : 40} /> : <span className="w-10" />}
+              <span className="relative flex min-w-0 flex-1 flex-col gap-[3px]">
+                {first && <span className="text-[9.5px] font-extrabold uppercase tracking-[0.2em]" style={{ color: AWARD.goldInk }}>Winner</span>}
+                <span className="font-extrabold leading-tight" style={{ fontSize: first ? 19 : 16.5, color: AWARD.ink, fontFamily: NB.ml }}>{w.name}</span>
+                {w.houseName && !isTeam && <span className="text-[13px] font-semibold" style={{ color: AWARD.sub, fontFamily: NB.ml }}>{w.houseName}</span>}
+                {isTeam && w.houseName && <span className="line-clamp-2 text-[12.5px] font-semibold" style={{ color: AWARD.sub, fontFamily: NB.ml }}>{w.houseName}</span>}
+                <span className="mt-1 self-start"><ShakhaTag shakha={w.shakha} color={AWARD.link} /></span>
+              </span>
+              {pos && !isTeam && (
+                <button
+                  type="button"
+                  onClick={() => onPoster(w)}
+                  className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full cursor-pointer"
+                  style={{ background: "#FFFFFF", border: "1px solid rgba(37,211,102,0.55)", color: "#1FAF55", boxShadow: "0 4px 12px rgba(37,211,102,0.22)" }}
+                  aria-label={`Make ${w.name}'s poster`}
+                >
+                  <Camera size={18} />
+                </button>
+              )}
+              <span className="relative flex flex-col items-center gap-[5px]">
+                <GradeBadge grade={w.grade} size={first ? 44 : 36} variant="award" />
+                <span className="text-[9.5px] font-extrabold uppercase tracking-[0.14em]" style={{ color: AWARD.sub }}>Grade</span>
+              </span>
+            </motion.li>
+          );
+        })}
+      </ol>
+    </article>
   );
 }
 
@@ -288,22 +269,22 @@ function CompCard({
     <div
       className="relative overflow-hidden mb-2.5"
       style={{
-        background: "rgba(255,255,255,0.52)", backdropFilter: "blur(16px)",
+        background: "rgba(30,18,72,0.52)", backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)", borderRadius: 16,
-        border: "1px solid rgba(255,255,255,0.7)", boxShadow: "0 2px 12px rgba(107,70,255,0.06)",
+        border: "1px solid rgba(30,18,72,0.7)", boxShadow: "0 2px 12px rgba(180,76,255,0.06)",
       }}
     >
       <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-[16px]" style={{ background: catColor }} />
       <button onClick={toggle} className="w-full text-left border-none bg-transparent pl-4 pr-3 pt-2.5 pb-2.5 cursor-pointer">
         <div className="flex items-start justify-between gap-2">
-          <p className="text-[18px] leading-tight flex-1" style={{ color: "#1E1B4B", ...anek }}>{comp.name}</p>
+          <p className="text-[18px] leading-tight flex-1" style={{ color: "#F4F1FF", ...anek }}>{comp.name}</p>
           <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
             {isPublished
-              ? <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(107,70,255,0.14)", color: "#6B46FF" }}><Trophy size={9} className="inline -mt-0.5 mr-0.5" />Results</span>
-              : <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(156,163,175,0.15)", color: "#9CA3AF" }}>Pending</span>}
+              ? <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(180,76,255,0.14)", color: "#B44CFF" }}><Trophy size={9} className="inline -mt-0.5 mr-0.5" />Results</span>
+              : <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(156,163,175,0.15)", color: "#B8B2E2" }}>Pending</span>}
             <span className="w-6 h-6 rounded-full flex items-center justify-center"
-              style={{ background: "rgba(107,70,255,0.1)", transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.3s" }}>
-              <ChevronDown size={14} color="#6B46FF" />
+              style={{ background: "rgba(180,76,255,0.1)", transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.3s" }}>
+              <ChevronDown size={14} color="#B44CFF" />
             </span>
           </div>
         </div>
@@ -318,17 +299,19 @@ function CompCard({
           {loading ? (
             <div className="flex justify-center py-6"><Loader2 size={18} className="animate-spin" style={{ color: catColor }} /></div>
           ) : !isPublished ? (
-            <div className="text-center py-5 rounded-xl text-[13px]" style={{ background: `${catColor}10`, color: "#9CA3AF" }}>Results not yet published</div>
+            <div className="text-center py-5 rounded-xl text-[13px]" style={{ background: `${catColor}10`, color: "#B8B2E2" }}>Results not yet published</div>
           ) : sorted.length === 0 ? (
-            <div className="text-center py-5 rounded-xl text-[13px]" style={{ background: `${catColor}10`, color: "#9CA3AF" }}>No results recorded</div>
+            <div className="text-center py-5 rounded-xl text-[13px]" style={{ background: `${catColor}10`, color: "#B8B2E2" }}>No results recorded</div>
           ) : (
             <>
+              {sorted.some(r => isMedalPos(r.position)) && (
+                <AwardCard
+                  rows={sorted.filter(r => isMedalPos(r.position))} accent={catColor} isTeam={comp.cat === "Team"}
+                  onPoster={(r) => onGeneratePoster({ rank: r.position as 1 | 2 | 3, winnerName: r.name, houseName: r.houseName, shakhaName: r.shakha, competitionName: comp.name, categoryLabel, feastName })}
+                />
+              )}
               <ResultTable
-                title="Positions" accent={catColor} rows={sorted.filter(r => r.position !== null)} isTeam={comp.cat === "Team"}
-                competitionName={comp.name} categoryLabel={categoryLabel} feastName={feastName} onGeneratePoster={onGeneratePoster}
-              />
-              <ResultTable
-                title="Grades" accent={catColor} rows={sorted.filter(r => r.position === null && r.grade !== null)} isTeam={comp.cat === "Team"}
+                title="Graded entries" accent="#E4E0FA" rows={sorted.filter(r => !isMedalPos(r.position) && (r.grade !== null || r.position !== null))} isTeam={comp.cat === "Team"}
                 competitionName={comp.name} categoryLabel={categoryLabel} feastName={feastName} onGeneratePoster={onGeneratePoster}
               />
             </>
@@ -365,36 +348,53 @@ function ResultsTabs({ competitions, feastName, onGeneratePoster }: {
   const activeCat = available.find(c => c.slug === resolved);
 
   if (available.length === 0) {
-    return <p className="text-[15px] text-center py-8" style={{ color: "#6B7280" }}>No competitions yet.</p>;
+    return <p className="text-[15px] text-center py-8" style={{ color: "#B8B2E2" }}>No competitions yet.</p>;
   }
 
   return (
     <div>
-      <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
+      {/* Category tiles (fest_hub): published / total, big label, progress bar */}
+      <div role="group" aria-label="Category" className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-2 pt-1" style={{ scrollbarWidth: "none" }}>
         {available.map(cat => {
           const on = cat.slug === resolved;
+          const list = cat.slug === "team"
+            ? competitions.filter(c => c.cat === "Team")
+            : competitions.filter(c => c.competitionCategorySlug === cat.slug && c.cat !== "Team");
+          const done = list.filter(c => c.compStatus === "published").length;
+          const pct = list.length ? Math.round((done / list.length) * 100) : 0;
+          const deep = `color-mix(in srgb, ${cat.color} 45%, #120933)`;
           return (
-            <button key={cat.slug} onClick={() => setActiveTab(cat.slug)}
-              className="flex items-center gap-1.5 shrink-0 border-none cursor-pointer active:scale-[0.96] transition-transform"
+            <button
+              key={cat.slug}
+              type="button"
+              onClick={() => setActiveTab(cat.slug)}
+              aria-pressed={on}
+              className="flex h-[88px] shrink-0 flex-col items-start justify-between rounded-[20px] px-3.5 py-3 text-left cursor-pointer transition-[min-width,background,box-shadow] duration-300"
               style={{
-                padding: "9px 16px", borderRadius: 13, fontWeight: 800, fontSize: 16,
-                background: on ? "linear-gradient(135deg,#6B46FF,#A78BFA)" : "rgba(255,255,255,0.45)",
-                color: on ? "#fff" : "#4B5563",
-                border: on ? "1.5px solid transparent" : "1.5px solid rgba(107,70,255,0.15)",
-                boxShadow: on ? "0 4px 14px rgba(107,70,255,0.35)" : "0 1px 4px rgba(0,0,0,0.05)",
+                minWidth: on ? 158 : 118,
+                background: on ? `linear-gradient(150deg, ${cat.color} 0%, ${deep} 100%)` : "rgba(24,14,60,0.8)",
+                color: on ? "#FFFFFF" : NB.text,
+                border: `1px solid ${on ? "rgba(255,255,255,.3)" : "rgba(214,170,255,0.24)"}`,
+                boxShadow: on ? `0 14px 30px color-mix(in srgb, ${cat.color} 40%, transparent)` : undefined,
               }}
             >
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: on ? "rgba(255,255,255,0.7)" : cat.color }} />
-              {cat.label}
+              <span className="flex items-center gap-1.5 text-[11px] font-extrabold tracking-[0.04em] tabular-nums">
+                <span className="h-[7px] w-[7px] rounded-full" style={{ background: on ? "currentColor" : cat.color }} />
+                {done} / {list.length}
+              </span>
+              <span className="whitespace-nowrap font-black uppercase leading-[0.92] transition-[font-size] duration-300" style={{ fontSize: on ? 24 : 18, fontFamily: NB.num, letterSpacing: "0.005em" }}>{cat.label}</span>
+              <span className="block h-[3px] w-full rounded-full" style={{ background: on ? "rgba(0,0,0,.16)" : NB.track }}>
+                <span className="block h-full rounded-full" style={{ width: `${pct}%`, background: on ? "currentColor" : cat.color }} />
+              </span>
             </button>
           );
         })}
       </div>
       <div className="mt-3">
         {filtered.length === 0
-          ? <p className="text-[15px] text-center py-6" style={{ color: "#9CA3AF" }}>No competitions in this category.</p>
+          ? <p className="text-[15px] text-center py-6" style={{ color: "#B8B2E2" }}>No competitions in this category.</p>
           : filtered.map(comp => (
-            <CompCard key={comp.id} comp={comp} catColor={activeCat?.color ?? "#6B46FF"} feastName={feastName} onGeneratePoster={onGeneratePoster} />
+            <CompCard key={comp.id} comp={comp} catColor={activeCat?.color ?? "#B44CFF"} feastName={feastName} onGeneratePoster={onGeneratePoster} />
           ))}
       </div>
     </div>
@@ -415,7 +415,7 @@ function FeastContent({ slug, theme, onGeneratePoster }: { slug: string; theme: 
 
   return (
     <div className="rounded-[20px] p-3 relative overflow-hidden"
-      style={{ background: "linear-gradient(145deg,#ede9fe,#f5f3ff,#faf5ff,#ede9fe)", border: "1px solid rgba(107,70,255,0.12)" }}>
+      style={{ background: "linear-gradient(145deg,#1E1048,#1A0E40,#1A0E40,#1E1048)", border: "1px solid rgba(180,76,255,0.12)" }}>
       <div className="absolute pointer-events-none"
         style={{ top: -40, right: -30, width: 140, height: 140, borderRadius: "50%", background: "radial-gradient(circle,rgba(167,139,250,0.25) 0%,transparent 70%)", filter: "blur(20px)" }} />
       <div className="absolute pointer-events-none"
@@ -458,27 +458,27 @@ export function FeastResults({ slug, theme, onBack, onExit, onSearchNav, setFeas
       <FeastTopBar title="Results" onBack={onBack} onExit={onExit} theme={theme} />
 
       {/* Feast selector from DB */}
-      <FeastTabs feasts={feasts} active={activeSlug} onPick={handlePick} loading={feastsLoading} />
+      <FeastTabs theme={theme} feasts={feasts} active={activeSlug} onPick={handlePick} loading={feastsLoading} />
 
       {/* Search shortcut button */}
       <button
         onClick={onSearchNav}
         className="w-full flex items-center gap-2.5 px-4 py-3 mb-4 rounded-[14px] border-none cursor-pointer active:scale-[0.98] transition-transform"
         style={{
-          background: "rgba(255,255,255,0.72)",
-          border: "1.5px solid rgba(107,70,255,0.14)",
+          background: "rgba(30,18,72,0.72)",
+          border: "1.5px solid rgba(180,76,255,0.14)",
           backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
         }}
       >
-        <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "rgba(107,70,255,0.1)" }}>
-          <Search size={15} color="#8B5CF6" />
+        <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "rgba(180,76,255,0.1)" }}>
+          <Search size={15} color="#B44CFF" />
         </div>
         <div className="flex-1 text-left">
-          <p className="text-[14px] font-bold" style={{ color: "#1E1B4B", fontFamily: "var(--font-anek),sans-serif" }}>Search Participants</p>
-          <p className="text-[11px]" style={{ color: "#9CA3AF" }}>Find a participant and see their results</p>
+          <p className="text-[14px] font-bold" style={{ color: "#F4F1FF", fontFamily: "var(--font-anek),sans-serif" }}>Search Participants</p>
+          <p className="text-[11px]" style={{ color: "#B8B2E2" }}>Find a participant and see their results</p>
         </div>
-        <ChevronDown size={14} color="#C4B5FD" style={{ transform: "rotate(-90deg)" }} />
+        <ChevronDown size={14} color="rgba(214,170,255,0.35)" style={{ transform: "rotate(-90deg)" }} />
       </button>
 
       {/* Competition results for selected feast. FeastContent mounts immediately

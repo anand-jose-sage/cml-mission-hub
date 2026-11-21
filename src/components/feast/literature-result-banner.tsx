@@ -14,11 +14,11 @@ export function LiteratureResultBanner({ onClick }: { onClick: () => void }) {
         }}
       >
         {/* Decorative glow + sparkle confetti, echoing the candy-banner reference */}
-        <div className="absolute -top-[26px] -right-[6px] w-[120px] h-[120px] rounded-full" style={{ background: "rgba(255,255,255,0.22)", filter: "blur(24px)" }} />
+        <div className="absolute -top-[26px] -right-[6px] w-[120px] h-[120px] rounded-full" style={{ background: "rgba(30,18,72,0.22)", filter: "blur(24px)" }} />
         <span className="absolute top-[14px] left-[62%] w-[5px] h-[5px] rounded-full" style={{ background: "#FFE9A8" }} />
-        <span className="absolute top-[34px] left-[54%] w-[3px] h-[3px] rounded-full bg-white/70" />
-        <span className="absolute bottom-[12px] left-[68%] w-[3px] h-[3px] rounded-full bg-white/60" />
-        <span className="absolute top-[10px] right-[14px] w-[4px] h-[4px] rounded-full bg-white/50" />
+        <span className="absolute top-[34px] left-[54%] w-[3px] h-[3px] rounded-full bg-white/5" />
+        <span className="absolute bottom-[12px] left-[68%] w-[3px] h-[3px] rounded-full bg-white/5" />
+        <span className="absolute top-[10px] right-[14px] w-[4px] h-[4px] rounded-full bg-white/5" />
 
         <div className="relative flex items-center gap-3 px-4 py-3.5">
           <div className="flex-1 min-w-0">

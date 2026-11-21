@@ -815,6 +815,9 @@ export async function rebuildStandings(feastId: string, admin: any): Promise<str
     senior: "senior_points",
     super_senior: "super_senior_points",
     elder: "elder_points",
+    // shortcut: Poombatta points count in the sub_junior column; add own columns if they need separate standings.
+    poombatta_1: "sub_junior_points",
+    poombatta_2: "sub_junior_points",
   };
 
   const shakhaNameMap: Record<string, string> = Object.fromEntries(

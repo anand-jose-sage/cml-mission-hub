@@ -136,7 +136,7 @@ export function FeastEditTeam({ slug, teamId, theme, onBack, onDone, onExit }: {
         <label className="block text-[11.5px] font-semibold mb-1.5 tracking-wider" style={{ fontFamily: "var(--font-poppins), sans-serif", color: theme.sub }}>Team Name</label>
         <div
           className="flex items-center gap-2.5 px-3.5 rounded-[14px]"
-          style={{ background: "rgba(255,255,255,0.72)", border: `1px solid ${theme.hairline}` }}
+          style={{ background: "rgba(30,18,72,0.72)", border: `1px solid ${theme.hairline}` }}
         >
           <input
             value={teamName}
@@ -153,7 +153,7 @@ export function FeastEditTeam({ slug, teamId, theme, onBack, onDone, onExit }: {
           Update the team roster. Saving replaces all members.
         </p>
         <span className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ml-2"
-          style={{ background: picked.length >= maxTeamMembers ? "#fef3c7" : theme.purple + "1a", color: picked.length >= maxTeamMembers ? "#b45309" : theme.purple }}>
+          style={{ background: picked.length >= maxTeamMembers ? "rgba(245,197,66,0.18)" : theme.purple + "1a", color: picked.length >= maxTeamMembers ? "#FCD34D" : theme.purple }}>
           {picked.length} / {maxTeamMembers}
         </span>
       </div>
@@ -187,7 +187,7 @@ export function FeastEditTeam({ slug, teamId, theme, onBack, onDone, onExit }: {
             <div
               className="w-6 h-6 rounded-lg flex-shrink-0 flex items-center justify-center"
               style={{
-                background: on ? "linear-gradient(135deg,#C026D3,#EC4899)" : "rgba(255,255,255,0.72)",
+                background: on ? "linear-gradient(135deg,#C026D3,#EC4899)" : "rgba(30,18,72,0.72)",
                 border: on ? "none" : `1px solid ${theme.hairline}`,
               }}
             >
@@ -198,7 +198,7 @@ export function FeastEditTeam({ slug, teamId, theme, onBack, onDone, onExit }: {
       })}
 
       {serverError && (
-        <p className="text-center text-[12px] mt-3 px-2 py-2 rounded-xl" style={{ color: "#ef4444", background: "#fee2e2" }}>{serverError}</p>
+        <p className="text-center text-[12px] mt-3 px-2 py-2 rounded-xl" style={{ color: "#ef4444", background: "rgba(239,68,68,0.16)" }}>{serverError}</p>
       )}
 
       <GlowBtn variant="gold" full size="lg" icon={submitting ? undefined : "Check"} disabled={submitting || !canSave} onClick={submit} style={{ marginTop: 14 }}>
@@ -210,16 +210,16 @@ export function FeastEditTeam({ slug, teamId, theme, onBack, onDone, onExit }: {
         {!confirmDelete ? (
           <button onClick={() => setConfirmDelete(true)}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-none cursor-pointer text-[13px] font-semibold"
-            style={{ background: "#fee2e2", color: "#ef4444" }}>
+            style={{ background: "rgba(239,68,68,0.16)", color: "#ef4444" }}>
             <Trash2 size={15} /> Remove Team Registration
           </button>
         ) : (
-          <div className="p-4 rounded-2xl text-center" style={{ background: "#fee2e2", border: "1px solid #fca5a5" }}>
-            <p className="text-[13px] font-semibold mb-3" style={{ color: "#b91c1c" }}>Delete this team permanently?</p>
+          <div className="p-4 rounded-2xl text-center" style={{ background: "rgba(239,68,68,0.16)", border: "1px solid #fca5a5" }}>
+            <p className="text-[13px] font-semibold mb-3" style={{ color: "#FCA5A5" }}>Delete this team permanently?</p>
             <div className="flex gap-2">
               <button onClick={() => setConfirmDelete(false)}
                 className="flex-1 py-2.5 rounded-xl text-[13px] font-medium cursor-pointer border-none"
-                style={{ background: "rgba(255,255,255,0.8)", color: "#374151" }}>Cancel</button>
+                style={{ background: "rgba(30,18,72,0.8)", color: "#E4E0FA" }}>Cancel</button>
               <button onClick={handleDelete} disabled={deleting}
                 className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold cursor-pointer border-none flex items-center justify-center gap-1.5"
                 style={{ background: "#ef4444", color: "#fff" }}>

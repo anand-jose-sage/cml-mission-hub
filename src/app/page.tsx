@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import { buildTheme } from "@/lib/theme";
 import { TopHeader } from "@/components/home/top-header";
 import { HeroEvent } from "@/components/home/hero-event";
@@ -19,20 +18,19 @@ import { MediaCenter } from "@/components/media/media-center";
 import { ActivitiesScreen } from "@/components/activities/activities-screen";
 import { QuickAccess } from "@/components/home/quick-access";
 import { FeastModule } from "@/components/feast/feast-module";
-import { LentPortalCard } from "@/components/lent/lent-portal-card";
-import { NovenaPortalCard } from "@/components/novena/novena-portal-card";
+import { ThirubalasakhyamBanner, THIRUBALASAKHYAM_SLUG } from "@/components/feast/thirubalasakhyam-banner";
 import { useTutorialPrelude } from "@/app/(tutorial)/help/tutorials/registration/_hooks/use-tutorial-prelude";
 import { useMyRegistrationsTutorial } from "@/app/(tutorial)/help/tutorials/my-registrations/_hooks/use-my-registrations-tutorial";
 import { useEditRegistrationTutorial } from "@/app/(tutorial)/help/tutorials/edit-registration/_hooks/use-edit-registration-tutorial";
 import { useDeleteRegistrationTutorial } from "@/app/(tutorial)/help/tutorials/delete-registration/_hooks/use-delete-registration-tutorial";
 
 export default function HomePage() {
-  const router = useRouter();
   const theme = useMemo(() => buildTheme("aurora-glass", "dusk", 28), []);
   const [tab, setTab] = useState("home");
   const [sel, setSel] = useState<number | null>(null); // null = all week
   const [noticeDetailOpen, setNoticeDetailOpen] = useState(false);
   const [inFeastInternal, setInFeastInternal] = useState(false);
+  const [feastEntrySlug, setFeastEntrySlug] = useState<string | null>(null);
   const tutorial = useTutorialPrelude();
   const myRegTutorial = useMyRegistrationsTutorial();
   const editRegTutorial = useEditRegistrationTutorial();
@@ -84,8 +82,10 @@ export default function HomePage() {
     return (
       <div className="relative h-dvh w-full overflow-hidden max-w-md mx-auto" style={{ background: theme.pageBg }}>
         <FeastModule
-          onExit={() => setInFeast(false)}
+          onExit={() => { setInFeast(false); setFeastEntrySlug(null); }}
           parentTheme={theme}
+          initialScreen={feastEntrySlug ? "details" : undefined}
+          initialSlug={feastEntrySlug ?? undefined}
           tutorialStep={activeTutorial?.feastStep ?? undefined}
           tutorialDetails={activeTutorial?.feastDetails ?? undefined}
           onTutorialAction={onTutorialAction}
@@ -141,9 +141,8 @@ export default function HomePage() {
             <>
               <TopHeader theme={theme} />
               <HeroEvent theme={theme} />
+              <ThirubalasakhyamBanner onEnter={() => { setFeastEntrySlug(THIRUBALASAKHYAM_SLUG); setInFeast(true); }} />
 
-              <NovenaPortalCard onEnter={() => router.push("/novena/st-theresa")} />
-              <LentPortalCard onEnter={() => router.push("/lent")} />
 
               {/* Quick access — soft 3D shortcuts */}
               <QuickAccess

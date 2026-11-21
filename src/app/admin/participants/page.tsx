@@ -97,7 +97,7 @@ function ParticipantPanel({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const catSlug = getCategorySlug(form.dob);
+  const catSlug = getCategorySlug(form.dob, feastComps.map((fc) => fc.competition?.competition_category?.slug));
   const catLabel = catSlug ? CATEGORY_LABELS[catSlug] : null;
 
   const availableComps = feastComps.filter((fc) => {

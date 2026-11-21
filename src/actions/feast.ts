@@ -11,6 +11,23 @@ import { getCategorySlug } from "@/lib/competition-categories";
 // registerTeam() in team.ts and allow up to 7.
 const DEFAULT_MAX_PER_SHAKHA = 2;
 
+// Category slugs of the selected feast competitions — lets getCategorySlug pick
+// feast-specific age bands (e.g. Poombatta).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function selectedCategorySlugs(client: any, feastCompetitionIds: string[]): Promise<string[]> {
+  if (feastCompetitionIds.length === 0) return [];
+  const { data } = await client
+    .from("feast_competitions")
+    .select("competition:competitions(competition_category:competition_categories(slug))")
+    .in("id", feastCompetitionIds);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((r: any) => {
+    const comp = Array.isArray(r.competition) ? r.competition[0] : r.competition;
+    const cat = Array.isArray(comp?.competition_category) ? comp.competition_category[0] : comp?.competition_category;
+    return cat?.slug ?? "";
+  });
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function findFullCompetitionsForShakha(
   client: any,
@@ -107,7 +124,7 @@ export async function registerParticipant(input: RegInput): Promise<RegOutput | 
     }
 
     // Resolve competition category from DOB
-    const catSlug = getCategorySlug(input.dateOfBirth);
+    const catSlug = getCategorySlug(input.dateOfBirth, await selectedCategorySlugs(supabase, input.feastCompetitionIds));
     let competitionCategoryId: string | null = null;
     if (catSlug) {
       const { data: catRow } = await supabase
@@ -192,7 +209,7 @@ export async function createParticipantAdmin(input: AdminRegInput): Promise<{ er
       return { error: "This Shakha has reached the registration limit for one of the selected competitions." };
     }
 
-    const catSlug = getCategorySlug(input.dateOfBirth);
+    const catSlug = getCategorySlug(input.dateOfBirth, await selectedCategorySlugs(admin, input.feastCompetitionIds));
     let competitionCategoryId: string | null = null;
     if (catSlug) {
       const { data: catRow } = await admin
@@ -286,7 +303,7 @@ export async function updateParticipant(input: UpdateInput): Promise<{ error?: s
     }
 
     // Resolve competition category from DOB
-    const catSlug = getCategorySlug(input.dateOfBirth);
+    const catSlug = getCategorySlug(input.dateOfBirth, await selectedCategorySlugs(admin, input.feastCompetitionIds));
     let competitionCategoryId: string | null = null;
     if (catSlug) {
       const { data: catRow } = await admin

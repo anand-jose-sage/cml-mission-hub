@@ -185,7 +185,7 @@ export function FeastRegisterTeam({ slug, theme, onBack, onExit, onDone }: {
                     onClick={() => setCompId(c.id)}
                     className="w-full text-left flex items-center gap-2.5 px-3.5 py-2.5 rounded-[14px] mb-2 transition-all"
                     style={{
-                      background: on ? theme.purple + "1a" : "rgba(255,255,255,0.72)",
+                      background: on ? theme.purple + "1a" : "rgba(30,18,72,0.72)",
                       border: `1px solid ${on ? theme.lavender : theme.hairline}`,
                       opacity: alreadyTaken ? 0.45 : 1,
                       cursor: alreadyTaken ? "not-allowed" : "pointer",
@@ -204,7 +204,7 @@ export function FeastRegisterTeam({ slug, theme, onBack, onExit, onDone }: {
             <label className="block text-[11.5px] font-semibold mb-1.5 tracking-wider" style={{ fontFamily: "var(--font-poppins), sans-serif", color: theme.sub }}>Team Name</label>
             <div
               className="flex items-center gap-2.5 px-3.5 rounded-[14px]"
-              style={{ background: "rgba(255,255,255,0.72)", border: `1px solid ${theme.hairline}` }}
+              style={{ background: "rgba(30,18,72,0.72)", border: `1px solid ${theme.hairline}` }}
             >
               <input
                 value={teamName}
@@ -233,7 +233,7 @@ export function FeastRegisterTeam({ slug, theme, onBack, onExit, onDone }: {
               Pick up to {maxTeamMembers} registered participants from your Shakha.
             </p>
             <span className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ml-2"
-              style={{ background: picked.length >= maxTeamMembers ? "#fef3c7" : theme.purple + "1a", color: picked.length >= maxTeamMembers ? "#b45309" : theme.purple }}>
+              style={{ background: picked.length >= maxTeamMembers ? "rgba(245,197,66,0.18)" : theme.purple + "1a", color: picked.length >= maxTeamMembers ? "#FCD34D" : theme.purple }}>
               {picked.length} / {maxTeamMembers}
             </span>
           </div>
@@ -270,7 +270,7 @@ export function FeastRegisterTeam({ slug, theme, onBack, onExit, onDone }: {
                 <div
                   className="w-6 h-6 rounded-lg flex-shrink-0 flex items-center justify-center"
                   style={{
-                    background: on ? "linear-gradient(135deg,#C026D3,#EC4899)" : "rgba(255,255,255,0.72)",
+                    background: on ? "linear-gradient(135deg,#C026D3,#EC4899)" : "rgba(30,18,72,0.72)",
                     border: on ? "none" : `1px solid ${theme.hairline}`,
                   }}
                 >
@@ -311,7 +311,7 @@ export function FeastRegisterTeam({ slug, theme, onBack, onExit, onDone }: {
             </div>
           </GlassPanel>
           {serverError && (
-            <p className="text-center text-[12px] mb-3 px-2 py-2 rounded-xl" style={{ color: "#ef4444", background: "#fee2e2" }}>{serverError}</p>
+            <p className="text-center text-[12px] mb-3 px-2 py-2 rounded-xl" style={{ color: "#ef4444", background: "rgba(239,68,68,0.16)" }}>{serverError}</p>
           )}
           <GlowBtn variant="gold" full size="lg" icon={submitting ? undefined : "Check"} disabled={submitting} onClick={submit}>
             {submitting ? (

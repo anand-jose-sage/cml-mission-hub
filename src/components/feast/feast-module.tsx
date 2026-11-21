@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import type { CMLTheme } from "@/lib/theme";
 import { Blobs } from "@/components/home/blobs";
 import { useAuth } from "@/lib/auth-context";
-import { buildFeastTheme, FeastNav } from "./feast-shared";
+import { buildFeastTheme, FeastNav, nebulaTheme } from "./feast-shared";
 import type { FeastDetailsTutorial } from "./feast-details";
 import type { RegResult } from "./feast-register";
 
@@ -43,7 +43,8 @@ export function FeastModule({
   initialScreen?: Screen;
   initialSlug?: string;
 }) {
-  const theme = buildFeastTheme(parentTheme);
+  // Whole Feast Portal uses the Nebula Glass theme (fest_hub).
+  const theme = nebulaTheme(buildFeastTheme(parentTheme));
   const tutorialScreen: Screen | null = tutorialStep === "landing" ? "landing"
     : tutorialStep === "details" || tutorialStep === "login" || tutorialStep === "register-home" || tutorialStep === "my-registrations-details" ? "details"
     : tutorialStep === "my-registrations" ? "registrations"
@@ -130,10 +131,12 @@ export function FeastModule({
       break;
   }
 
+  const shellTheme = theme;
+
   return (
-    <div className="absolute inset-0 overflow-hidden">
-      <div className="absolute inset-0" style={{ background: theme.pageBg }}>
-        <Blobs mode={theme.blobs} />
+    <div className="absolute inset-0 overflow-hidden" style={{ colorScheme: "dark" }}>
+      <div className="absolute inset-0" style={{ background: shellTheme.pageBg }}>
+        <Blobs mode={shellTheme.blobs} />
       </div>
       <main
         ref={scrollRef}
@@ -141,7 +144,7 @@ export function FeastModule({
       >
         {body}
       </main>
-      <FeastNav active={navActive} onNav={onNav} theme={theme} />
+      <FeastNav active={navActive} onNav={onNav} theme={shellTheme} />
     </div>
   );
 }

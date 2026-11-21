@@ -49,6 +49,8 @@ const CAT_COLOR: Record<string, string> = {
   senior: "#3fe7ff",
   super_senior: "#e84ad6",
   elder: "#f97316",
+  poombatta_1: "#ec4899",
+  poombatta_2: "#f43f5e",
 };
 
 const REFRESH_MS = 20_000;

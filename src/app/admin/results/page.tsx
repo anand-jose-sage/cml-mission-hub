@@ -19,6 +19,7 @@ import {
   DEFAULT_GRADE_POINTS, DEFAULT_POSITION_POINTS, GROUP_GRADE_POINTS, GROUP_POSITION_POINTS,
   type Grade,
 } from "@/lib/result-calculator";
+import { openPrintWindow, PRINT_FALLBACK_BUTTON, PRINT_PAGE_CSS, PRINT_PAGINATE_SCRIPT, wrapPrintPages, escHtml } from "@/lib/print-export";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -179,10 +180,6 @@ function PublishConfirm({
 // Print-to-PDF, same pattern as the participation/participants admin pages
 // (open a blank tab, write a standalone HTML document, trigger window.print()).
 
-function escHtml(s: string) {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
 function genderLabel(g: string | null): string {
   const lower = (g ?? "").toLowerCase();
   if (lower.startsWith("boy") || lower === "male") return "Boys";
@@ -214,84 +211,93 @@ function sortPdfRows(rows: PdfRow[]): PdfRow[] {
   });
 }
 
+// Printed results sheet, ported from fest_hub: position and grade are drawn as
+// small illustrations (ribbon medal for 1st–3rd, round seal for A/B/C), top-3
+// rows get a medal-coloured tint, violet header bar + chip row.
+const PDF_MEDALS: Record<number, { fill: string; stroke: string; num: string; tint: string }> = {
+  1: { fill: "#F5C542", stroke: "#B7791F", num: "#7A4B00", tint: "#FFF8E1" },
+  2: { fill: "#D5DAE1", stroke: "#8A94A3", num: "#4B5563", tint: "#F3F4F6" },
+  3: { fill: "#E0A06A", stroke: "#A0522D", num: "#6B2F0D", tint: "#FDF1E7" },
+};
+
+function pdfMedalSvg(pos: number): string {
+  const m = PDF_MEDALS[pos];
+  return `<svg class="medal" viewBox="0 0 32 40" width="22" height="28" aria-hidden="true"><path d="M8 0h6l4 15h-8z" fill="#6B46FF"/><path d="M24 0h-6l-4 15h8z" fill="#4C1D95"/><circle cx="16" cy="26" r="12" fill="${m.fill}" stroke="${m.stroke}" stroke-width="2"/><circle cx="16" cy="26" r="8.6" fill="none" stroke="${m.stroke}" stroke-width="1" opacity=".55"/><text x="16" y="31" text-anchor="middle" font-size="13" font-weight="800" fill="${m.num}" font-family="Arial, sans-serif">${pos}</text></svg>`;
+}
+
 function pdfGradeCell(grade: Grade, pts: number): string {
   if (!grade) return `<span class="none">—</span>`;
   const { bg } = GRADE_SOLID[grade];
-  return `<span class="pill" style="background:${bg}">Grade ${grade}<b>+${pts} pts</b></span>`;
+  return `<span class="gwrap"><span class="gseal" style="--c:${bg}">${grade}</span>${pts > 0 ? `<span class="pts">+${pts}</span>` : ""}</span>`;
 }
 
 function pdfPosCell(pos: number | null, pts: number): string {
-  if (!pos) return `<span class="none">—</span>`;
-  const { bg } = POS_COLORS[pos] ?? { bg: "#374151", pts: "#1F2937" };
-  const emoji = POS_EMOJI[pos] ?? "";
-  return `<span class="pill" style="background:${bg}">${emoji} ${positionLabel(pos)}${pts > 0 ? `<b>+${pts} pts</b>` : ""}</span>`;
+  if (!pos || !PDF_MEDALS[pos]) return `<span class="none">—</span>`;
+  return `<span class="pwrap">${pdfMedalSvg(pos)}<span class="ptxt"><b>${positionLabel(pos)}</b>${pts > 0 ? `<span class="pts">+${pts} pts</span>` : ""}</span></span>`;
 }
 
 const PDF_CSS = `
-  @page { size: A4 portrait; margin: 16mm 14mm; }
+  @page { size: A4 portrait; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #1e1b4b; margin: 0; }
-  .sheet { border-left: 6px solid #6B46FF; border-right: 6px solid #6B46FF; padding: 0 16px 18px; margin-bottom: 18px; }
-  .hdr { text-align: center; margin-bottom: 14px; break-after: avoid; page-break-after: avoid; }
-  .hdr .org1 { font-size: 19px; font-weight: 800; margin: 0; }
-  .hdr .org2 { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #6B46FF; margin: 2px 0 12px; }
-  .hdr .comp { font-size: 18px; font-weight: 800; margin: 4px 0 2px; }
-  .hdr .cat { font-size: 12.5px; font-weight: 600; color: #4B5563; margin: 0; }
-  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  body { font-family: 'Poppins', Arial, sans-serif; color: #1e1b4b; margin: 0; }
+  .sheet { margin-bottom: 22px; }
+  .hdr { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding-bottom: 10px; margin-bottom: 12px; border-bottom: 3px solid #7C3AED; break-after: avoid; page-break-after: avoid; }
+  .hdr p { margin: 0; }
+  .hdr .org1 { font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: #6B7280; }
+  .hdr .comp { font-size: 24px; font-weight: 800; line-height: 1.15; margin: 3px 0 8px; }
+  .chip.result { background: #7C3AED; color: #fff; }
+  table { width: 100%; border-collapse: collapse; }
   thead { display: table-header-group; }
-  thead tr { background: linear-gradient(90deg,#ede9fe,#f5f3ff); }
-  th { border: 1px solid #c4b5fd; padding: 7px 6px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; color: #1e1b4b; text-align: left; }
-  th.c-pos, th.c-grade { text-align: center; }
-  td { border: 1px solid #e5e7eb; padding: 7px 6px; font-size: 12.5px; vertical-align: middle; }
+  th { background: #4C1D95; color: #fff; padding: 8px 8px; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; text-align: left; }
+  th.c-pos, th.c-grade, th.c-total, th.c-sl { text-align: center; }
+  td { padding: 6px 8px; font-size: 12.5px; vertical-align: middle; border-top: 1px solid #E9E5FF; }
   tbody tr { break-inside: avoid; page-break-inside: avoid; }
-  tbody tr:nth-child(even) { background: #f8f7ff; }
-  td.pos, td.grade { text-align: center; width: 17%; }
+  tbody tr:nth-child(even) td { background: #FAF8FF; }
+  tbody tr.w1 td { background: ${PDF_MEDALS[1].tint}; }
+  tbody tr.w2 td { background: ${PDF_MEDALS[2].tint}; }
+  tbody tr.w3 td { background: ${PDF_MEDALS[3].tint}; }
+  tbody tr.w1 td:first-child { box-shadow: inset 4px 0 0 ${PDF_MEDALS[1].stroke}; }
+  tbody tr.w2 td:first-child { box-shadow: inset 4px 0 0 ${PDF_MEDALS[2].stroke}; }
+  tbody tr.w3 td:first-child { box-shadow: inset 4px 0 0 ${PDF_MEDALS[3].stroke}; }
+  td.sl { width: 30px; text-align: center; font-weight: 700; color: #6B7280; }
+  td.pos, td.grade, td.total { text-align: center; }
   td.name { font-weight: 700; }
-  td.house { color: #7C3AED; font-weight: 600; }
-  td.shakha { color: #4B5563; font-weight: 600; }
-  .pill { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; color: #fff; font-weight: 800; font-size: 10.5px; padding: 4px 8px; border-radius: 6px; line-height: 1.3; }
-  .pill b { font-size: 9px; font-weight: 800; }
-  .none { color: #9CA3AF; font-weight: 700; }
+  td.house { color: #4B5563; }
+  td.total { font-size: 15px; font-weight: 800; color: #4C1D95; }
+  .pwrap, .gwrap { display: inline-flex; align-items: center; gap: 6px; }
+  .medal { display: block; flex-shrink: 0; }
+  .ptxt { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.2; text-align: left; }
+  .ptxt b { font-size: 12.5px; font-weight: 800; }
+  .pts { font-size: 10px; font-weight: 700; color: #6B7280; white-space: nowrap; }
+  .gseal { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: var(--c); color: #fff; font-size: 13px; font-weight: 800; box-shadow: inset 0 0 0 2px rgba(255,255,255,.55), 0 0 0 1.5px var(--c); }
+  .none { color: #C4C4CC; font-weight: 700; }
   .empty { text-align: center; color: #9CA3AF; padding: 22px; font-size: 13px; }
-  @media print { .noprint { display: none; } }
-  .noprint { text-align: center; margin: 18px 0; }
-  .noprint button { font-size: 14px; padding: 8px 18px; cursor: pointer; background: #6B46FF; color: #fff; border: none; border-radius: 8px; font-weight: 600; }
+  ${PRINT_PAGE_CSS}
 `;
 
-function renderResultSection(compName: string, catLine: string, rows: PdfRow[]): string {
-  const bodyRows = rows.map((r) => `<tr>
-      <td class="pos">${pdfPosCell(r.position, r.positionPoints)}</td>
-      <td class="name">${escHtml(r.name)}</td>
-      <td class="house">${escHtml(r.houseName ?? "—")}</td>
-      <td class="shakha">${escHtml(r.shakhaName)}</td>
-      <td class="grade">${pdfGradeCell(r.grade, r.gradePoints)}</td>
-    </tr>`).join("");
+const PDF_FONT = `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">`;
 
-  return `<section class="sheet">
-    <div class="hdr">
-      <p class="org1">Cherupushpa Mission League</p>
-      <p class="org2">Kalpetta Meghala</p>
-      <p class="comp">${escHtml(compName)}</p>
-      ${catLine ? `<p class="cat">${escHtml(catLine)}</p>` : ""}
-    </div>
-    <table>
-      <thead><tr>
-        <th class="c-pos">Position</th><th>Name</th><th>House Name</th><th>Shakha</th><th class="c-grade">Grade</th>
-      </tr></thead>
-      <tbody>${bodyRows || `<tr><td colspan="5" class="empty">No graded results yet</td></tr>`}</tbody>
-    </table>
-  </section>`;
+function renderResultSection(compName: string, catLine: string, rows: PdfRow[]): string {
+  const bodyRows = rows.map((r, i) => {
+    const cls = r.position && PDF_MEDALS[r.position] ? ` class="w${r.position}"` : "";
+    return `<tr${cls}><td class="sl">${i + 1}</td><td class="name">${escHtml(r.name)}</td><td class="house">${escHtml(r.houseName ?? "—")}</td><td class="loc"><div class="l1">${escHtml(r.shakhaName)}</div></td><td class="grade">${pdfGradeCell(r.grade, r.gradePoints)}</td><td class="pos">${pdfPosCell(r.position, r.positionPoints)}</td><td class="total">${r.gradePoints + r.positionPoints}</td></tr>`;
+  }).join("");
+
+  return `<div class="sheet">
+    <div class="hdr"><div>
+      <p class="org1">Cherupushpa Mission League · Kalpetta Meghala</p>
+      <p class="comp">${escHtml(compName)}${catLine ? ` – ${escHtml(catLine)}` : ""}</p>
+      <div class="chips"><span class="chip result">Results</span></div>
+    </div></div>
+    <div class="tbl"><table>
+      <thead><tr><th class="c-sl">#</th><th>Name</th><th>House Name</th><th>Shakha</th><th class="c-grade">Grade</th><th class="c-pos">Position</th><th class="c-total">Total</th></tr></thead>
+      <tbody>${bodyRows || `<tr><td colspan="7" class="empty">No graded results yet</td></tr>`}</tbody>
+    </table></div>
+  </div>`;
 }
 
-/** Opens a blank tab, writes the given HTML document, and triggers print. Returns false if the pop-up was blocked. */
-function openPrintWindow(html: string): boolean {
-  const w = window.open("", "_blank");
-  if (!w) return false;
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
-  setTimeout(() => { w.focus(); w.print(); }, 350);
-  return true;
+function buildResultsHtml(title: string, sections: string): string {
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Results — ${escHtml(title)}</title>${PDF_FONT}<style>${PDF_CSS}</style></head><body>${PRINT_FALLBACK_BUTTON}${wrapPrintPages(sections)}${PRINT_PAGINATE_SCRIPT}</body></html>`;
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -587,12 +593,7 @@ export default function ResultsAdminPage() {
     });
     const catLine = [selectedComp.catName, genderLabel(selectedComp.gender), shakhaName].filter(Boolean).join(" | ");
     const section = renderResultSection(selectedComp.compName, catLine, sortPdfRows(rows.filter((r) => r.grade !== null || r.position !== null)));
-    const html = `<!doctype html><html><head><meta charset="utf-8">
-<title>Results — ${escHtml(selectedComp.compName)}${shakhaName ? ` — ${escHtml(shakhaName)}` : ""}</title>
-<style>${PDF_CSS}</style></head><body>
-  ${section}
-  <div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
-</body></html>`;
+    const html = buildResultsHtml(`${selectedComp.compName}${shakhaName ? ` — ${shakhaName}` : ""}`, section);
     if (!openPrintWindow(html)) {
       setMsg({ type: "err", text: "Allow pop-ups to export the results PDF." });
       setTimeout(() => setMsg(null), 3000);
@@ -734,12 +735,7 @@ export default function ResultsAdminPage() {
 
     const feast = feasts.find((f) => f.id === feastId);
     const feastTitle = feast ? `${feast.name} ${feast.year}` : "Results";
-    const html = `<!doctype html><html><head><meta charset="utf-8">
-<title>Results — ${escHtml(feastTitle)}${shakhaName ? ` — ${escHtml(shakhaName)}` : ""}</title>
-<style>${PDF_CSS}</style></head><body>
-  ${sections}
-  <div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
-</body></html>`;
+    const html = buildResultsHtml(`${feastTitle}${shakhaName ? ` — ${shakhaName}` : ""}`, sections);
 
     if (!openPrintWindow(html)) {
       setMsg({ type: "err", text: "Allow pop-ups to export the results PDF." });

@@ -61,7 +61,7 @@ const esc = (s: string) =>
 
 const GENDER_STYLE: Record<string, { label: string; bg: string; color: string }> = {
   boys:   { label: "Boys",   bg: "#dbeafe", color: "#1d4ed8" },
-  girls:  { label: "Girls",  bg: "#fce7f3", color: "#be185d" },
+  girls:  { label: "Girls",  bg: "rgba(255,63,180,0.14)", color: "#be185d" },
   common: { label: "Common", bg: "#f0fdf4", color: "#15803d" },
 };
 
@@ -100,7 +100,7 @@ function AccordionRow({
 
   // Alternate gradient colours for the left icon block
   const ICON_GRADS = [
-    ["#7C3AED", "#A855F7"],
+    ["#E08BFF", "#A855F7"],
     ["#EC4899", "#F472B6"],
     ["#F59E0B", "#FCD34D"],
     ["#10B981", "#34D399"],
@@ -208,24 +208,24 @@ function AccordionRow({
                         className="relative inline-flex items-center text-[13px] px-2.5 py-1 tracking-wide"
                         style={{
                           background: "#FCD34D",
-                          color: "#451A03",
+                          color: "#FDE68A",
                           fontFamily: "var(--font-anek), sans-serif",
                           fontWeight: 800,
-                          WebkitTextStroke: "0.3px #451A03",
+                          WebkitTextStroke: "0.3px #FDE68A",
                           borderRadius: "5px",
-                          border: "1px dashed rgba(120,53,15,0.4)",
-                          boxShadow: "0 1px 3px rgba(120,53,15,0.25)",
+                          border: "1px dashed rgba(253,230,138,0.4)",
+                          boxShadow: "0 1px 3px rgba(253,230,138,0.25)",
                         }}
                       >
                         <span
                           className="absolute -left-[5px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full"
-                          style={{ background: "rgba(255,255,255,0.9)", boxShadow: "0 0 0 1px rgba(120,53,15,0.2)" }}
+                          style={{ background: "rgba(30,18,72,0.9)", boxShadow: "0 0 0 1px rgba(253,230,138,0.2)" }}
                           aria-hidden="true"
                         />
                         {p.registration_number}
                         <span
                           className="absolute -right-[5px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full"
-                          style={{ background: "rgba(255,255,255,0.9)", boxShadow: "0 0 0 1px rgba(120,53,15,0.2)" }}
+                          style={{ background: "rgba(30,18,72,0.9)", boxShadow: "0 0 0 1px rgba(253,230,138,0.2)" }}
                           aria-hidden="true"
                         />
                       </span>
@@ -270,7 +270,7 @@ function TeamAccordionRow({
   const count = team ? 1 : 0;
 
   const ICON_GRADS = [
-    ["#7C3AED", "#A855F7"],
+    ["#E08BFF", "#A855F7"],
     ["#EC4899", "#F472B6"],
     ["#F59E0B", "#FCD34D"],
     ["#10B981", "#34D399"],
@@ -610,9 +610,9 @@ export function FeastRegistrations({ slug, theme, onBack, onExit, onEdit, onEdit
 <style>
   @page { size: A4 portrait; margin: 16mm 14mm; }
   * { box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; border-left: 3px solid #6B46FF; border-right: 3px solid #6B46FF; padding: 0 12px; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; border-left: 3px solid #B44CFF; border-right: 3px solid #B44CFF; padding: 0 12px; }
   .hdr { text-align: center; margin-bottom: 16px; }
-  .hdr .org { font-size: 15px; letter-spacing: .08em; text-transform: uppercase; color: #6B46FF; margin: 0 0 8px; font-weight: 800; padding-bottom: 8px; border-bottom: 2px solid #6B46FF; }
+  .hdr .org { font-size: 15px; letter-spacing: .08em; text-transform: uppercase; color: #B44CFF; margin: 0 0 8px; font-weight: 800; padding-bottom: 8px; border-bottom: 2px solid #B44CFF; }
   .hdr .feast { font-size: 24px; font-weight: 900; color: #4C1D95; margin: 10px 0 4px; letter-spacing: .01em; }
   .hdr .shakha { font-size: 14px; font-weight: 700; color: #333; margin: 0; display: inline-block; background: #f0edff; padding: 4px 12px; border-radius: 12px; }
   table { width: 100%; border-collapse: collapse; margin-top: 12px; }

@@ -23,25 +23,26 @@ function feastKind(f: FeastUI): FeastKind | null {
 }
 
 const KIND_GRAD: Record<FeastKind, string> = {
-  literature: "linear-gradient(135deg,#6B46FF,#A78BFA)",
+  literature: "linear-gradient(135deg,#B44CFF,#A78BFA)",
   arts: "linear-gradient(135deg,#A855F7,#EC4899)",
 };
 const KIND_COLOR: Record<FeastKind, string> = {
-  literature: "#7C3AED",
+  literature: "#E08BFF",
   arts: "#C026D3",
 };
 
 // ─── Grade / position helpers ─────────────────────────────────────────────────
 
 const POS_STYLE: Record<number, { bg: string; border: string; text: string; emoji: string }> = {
-  1: { bg: "#FFFBEB", border: "#F5C542", text: "#92400E", emoji: "🥇" },
-  2: { bg: "#F9FAFB", border: "#9CA3AF", text: "#374151", emoji: "🥈" },
-  3: { bg: "#FFF7ED", border: "#E0936A", text: "#7C2D12", emoji: "🥉" },
+  1: { bg: "rgba(245,197,66,0.14)", border: "#F5C542", text: "#FFD66B", emoji: "🥇" },
+  2: { bg: "#1A0E40", border: "#B8B2E2", text: "#E4E0FA", emoji: "🥈" },
+  3: { bg: "rgba(224,147,106,0.16)", border: "#E0936A", text: "#F4B98A", emoji: "🥉" },
 };
-const GRADE_BG: Record<string, string> = { A: "#16A34A", B: "#D97706", C: "#6B46FF" };
+const GRADE_BG: Record<string, string> = { A: "#16A34A", B: "#D97706", C: "#B44CFF" };
 const CAT_LABEL: Record<string, string> = {
   sub_junior: "Sub Junior", junior: "Junior", senior: "Senior",
   super_senior: "Super Senior", elder: "Elder",
+  poombatta_1: "പൂമ്പാറ്റ 1", poombatta_2: "പൂമ്പാറ്റ 2",
 };
 
 function PosBadge({ pos }: { pos: number }) {
@@ -77,12 +78,12 @@ function ParticipantCard({ row }: { row: ParticipantSearchRow }) {
     <div
       className="relative mb-2.5 overflow-hidden"
       style={{
-        background: "rgba(255,255,255,0.72)",
+        background: "rgba(30,18,72,0.72)",
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
         borderRadius: 16,
-        border: open ? `1.5px solid ${sc}44` : "1px solid rgba(255,255,255,0.8)",
-        boxShadow: open ? `0 6px 22px ${sc}18` : "0 2px 10px rgba(107,70,255,0.05)",
+        border: open ? `1.5px solid ${sc}44` : "1px solid rgba(30,18,72,0.8)",
+        boxShadow: open ? `0 6px 22px ${sc}18` : "0 2px 10px rgba(180,76,255,0.05)",
         transition: "border-color 0.25s,box-shadow 0.25s",
       }}
     >
@@ -93,10 +94,10 @@ function ParticipantCard({ row }: { row: ParticipantSearchRow }) {
           <div className="flex-1 min-w-0">
             {/* Line 1 — name | house name */}
             <div className="flex items-baseline gap-2 min-w-0 flex-wrap">
-              <p className="text-[16px] leading-tight" style={{ color: "#1E1B4B", ...anek }}>{row.name}</p>
+              <p className="text-[16px] leading-tight" style={{ color: "#F4F1FF", ...anek }}>{row.name}</p>
               {row.houseName && (
-                <span className="inline-flex items-baseline gap-2 text-[13.5px] leading-tight" style={{ color: "#7C3AED", ...anek }}>
-                  <span style={{ color: "#DDD6FE" }}>|</span>
+                <span className="inline-flex items-baseline gap-2 text-[13.5px] leading-tight" style={{ color: "#E08BFF", ...anek }}>
+                  <span style={{ color: "rgba(214,170,255,0.35)" }}>|</span>
                   {row.houseName}
                 </span>
               )}
@@ -123,37 +124,37 @@ function ParticipantCard({ row }: { row: ParticipantSearchRow }) {
                 className="relative inline-flex items-center text-[15px] px-3.5 py-1.5 tracking-wide"
                 style={{
                   background: "#FCD34D",
-                  color: "#451A03",
+                  color: "#FDE68A",
                   fontFamily: "var(--font-anek), sans-serif",
                   fontWeight: 800,
-                  WebkitTextStroke: "0.3px #451A03",
+                  WebkitTextStroke: "0.3px #FDE68A",
                   borderRadius: "5px",
-                  border: "1px dashed rgba(120,53,15,0.4)",
-                  boxShadow: "0 1px 3px rgba(120,53,15,0.25)",
+                  border: "1px dashed rgba(253,230,138,0.4)",
+                  boxShadow: "0 1px 3px rgba(253,230,138,0.25)",
                 }}
               >
                 <span
                   className="absolute -left-[5px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full"
-                  style={{ background: "rgba(255,255,255,0.9)", boxShadow: "0 0 0 1px rgba(120,53,15,0.2)" }}
+                  style={{ background: "rgba(30,18,72,0.9)", boxShadow: "0 0 0 1px rgba(253,230,138,0.2)" }}
                   aria-hidden="true"
                 />
                 {row.regNo}
                 <span
                   className="absolute -right-[5px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full"
-                  style={{ background: "rgba(255,255,255,0.9)", boxShadow: "0 0 0 1px rgba(120,53,15,0.2)" }}
+                  style={{ background: "rgba(30,18,72,0.9)", boxShadow: "0 0 0 1px rgba(253,230,138,0.2)" }}
                   aria-hidden="true"
                 />
               </span>
             )}
             {totalPts > 0 && (
-              <span className="text-[11px]" style={{ color: "#7C3AED", ...anek }}>{totalPts} pts</span>
+              <span className="text-[11px]" style={{ color: "#E08BFF", ...anek }}>{totalPts} pts</span>
             )}
           </div>
         </div>
 
         {/* Summary row */}
         <div className="flex items-center gap-3 mt-2">
-          <span className="text-[11px] font-semibold" style={{ color: "#9CA3AF" }}>
+          <span className="text-[11px] font-semibold" style={{ color: "#B8B2E2" }}>
             {row.results.length} competition{row.results.length !== 1 ? "s" : ""}
           </span>
           <div className="flex gap-1">
@@ -177,17 +178,17 @@ function ParticipantCard({ row }: { row: ParticipantSearchRow }) {
       {/* Drill-down */}
       <div className="overflow-hidden" style={{ maxHeight: open ? 800 : 0, transition: "max-height 0.32s cubic-bezier(.2,.8,.2,1)" }}>
         <div className="mx-3 mb-3 rounded-xl overflow-hidden"
-          style={{ background: "rgba(107,70,255,0.04)", border: "1px solid rgba(107,70,255,0.08)" }}>
+          style={{ background: "rgba(180,76,255,0.04)", border: "1px solid rgba(180,76,255,0.08)" }}>
           {row.results.length === 0 ? (
-            <p className="text-center py-5 text-[13px]" style={{ color: "#9CA3AF" }}>No competitions registered</p>
+            <p className="text-center py-5 text-[13px]" style={{ color: "#B8B2E2" }}>No competitions registered</p>
           ) : (
-            <div className="divide-y" style={{ borderColor: "rgba(107,70,255,0.07)" }}>
+            <div className="divide-y" style={{ borderColor: "rgba(180,76,255,0.07)" }}>
               {row.results.map((item, i) => (
                 <div key={i} className="flex items-center gap-2.5 px-3 py-2.5">
                   <div className="flex-1 min-w-0">
-                    <p className="text-[14px] leading-tight" style={{ color: "#1E1B4B", ...anek }}>{item.competitionName}</p>
+                    <p className="text-[14px] leading-tight" style={{ color: "#F4F1FF", ...anek }}>{item.competitionName}</p>
                     {!item.isPublished && (
-                      <p className="text-[11px] mt-0.5" style={{ color: "#9CA3AF" }}>Results pending</p>
+                      <p className="text-[11px] mt-0.5" style={{ color: "#B8B2E2" }}>Results pending</p>
                     )}
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
@@ -197,14 +198,14 @@ function ParticipantCard({ row }: { row: ParticipantSearchRow }) {
                         {item.grade && <GradeBadge grade={item.grade} />}
                         {!item.grade && !item.position && (
                           <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                            style={{ background: "rgba(107,70,255,0.1)", color: "#8B5CF6" }}>
+                            style={{ background: "rgba(180,76,255,0.1)", color: "#8B5CF6" }}>
                             {item.totalPoints > 0 ? `${item.totalPoints} pts` : "—"}
                           </span>
                         )}
                       </>
                     ) : (
                       <span className="text-[11px] px-2 py-0.5 rounded-full font-medium"
-                        style={{ background: "rgba(156,163,175,0.15)", color: "#9CA3AF" }}>Pending</span>
+                        style={{ background: "rgba(156,163,175,0.15)", color: "#B8B2E2" }}>Pending</span>
                     )}
                   </div>
                 </div>
@@ -289,10 +290,10 @@ export function FeastParticipants({ slug, theme, onBack, onExit }: {
                 className="shrink-0 border-none cursor-pointer active:scale-95 transition-transform"
                 style={{
                   padding: "7px 14px", borderRadius: 11, fontWeight: 700, fontSize: 13,
-                  background: on ? (k ? KIND_GRAD[k] : "linear-gradient(135deg,#6B46FF,#A78BFA)") : "rgba(255,255,255,0.7)",
-                  color: on ? "#fff" : "#4B5563",
-                  border: on ? "none" : "1px solid rgba(107,70,255,0.12)",
-                  boxShadow: on ? `0 4px 14px ${k ? KIND_COLOR[k] : "#6B46FF"}44` : "none",
+                  background: on ? (k ? KIND_GRAD[k] : "linear-gradient(135deg,#B44CFF,#A78BFA)") : "rgba(30,18,72,0.7)",
+                  color: on ? "#fff" : "#E4E0FA",
+                  border: on ? "none" : "1px solid rgba(180,76,255,0.12)",
+                  boxShadow: on ? `0 4px 14px ${k ? KIND_COLOR[k] : "#B44CFF"}44` : "none",
                 }}
               >
                 {f.name}
@@ -306,11 +307,11 @@ export function FeastParticipants({ slug, theme, onBack, onExit }: {
       <div
         className="flex items-center gap-2.5 px-3.5 py-2.5 mb-4 rounded-[14px] transition-all"
         style={{
-          background: "rgba(255,255,255,0.82)",
-          border: `1.5px solid ${focus ? "rgba(107,70,255,0.45)" : "rgba(107,70,255,0.18)"}`,
+          background: "rgba(30,18,72,0.82)",
+          border: `1.5px solid ${focus ? "rgba(180,76,255,0.45)" : "rgba(180,76,255,0.18)"}`,
           backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
-          boxShadow: focus ? "0 0 0 4px rgba(107,70,255,0.1)" : "none",
+          boxShadow: focus ? "0 0 0 4px rgba(180,76,255,0.1)" : "none",
         }}
       >
         <Search size={16} color="#A78BFA" />
@@ -322,11 +323,11 @@ export function FeastParticipants({ slug, theme, onBack, onExit }: {
           onBlur={() => setFocus(false)}
           placeholder="Search participant name…"
           className="flex-1 border-none outline-none bg-transparent text-[15px] py-1"
-          style={{ fontFamily: "var(--font-anek), sans-serif", fontWeight: 600, color: "#1E1B4B" }}
+          style={{ fontFamily: "var(--font-anek), sans-serif", fontWeight: 600, color: "#F4F1FF" }}
         />
         {query && (
           <button onClick={clearQuery} className="p-0.5 rounded-full cursor-pointer border-none bg-transparent">
-            <X size={14} color="#9CA3AF" />
+            <X size={14} color="#B8B2E2" />
           </button>
         )}
       </div>
@@ -352,11 +353,11 @@ export function FeastParticipants({ slug, theme, onBack, onExit }: {
         <div className="flex flex-col items-center py-12 gap-3">
           <div
             className="w-16 h-16 rounded-full flex items-center justify-center"
-            style={{ background: "rgba(107,70,255,0.08)" }}
+            style={{ background: "rgba(180,76,255,0.08)" }}
           >
             <Search size={28} color="#A78BFA" />
           </div>
-          <p className="text-[15px] font-semibold" style={{ color: "#1E1B4B", fontFamily: "var(--font-anek),sans-serif" }}>
+          <p className="text-[15px] font-semibold" style={{ color: "#F4F1FF", fontFamily: "var(--font-anek),sans-serif" }}>
             Search Participants
           </p>
           <p className="text-[13px] text-center max-w-[220px]" style={{ color: theme.sub }}>
