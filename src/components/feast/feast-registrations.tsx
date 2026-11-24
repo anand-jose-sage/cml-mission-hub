@@ -31,9 +31,17 @@ interface TeamRow {
   memberNames: string[];
 }
 
-// Edit registrations locked after Aug 27 2026 5:00 PM IST (11:30 AM UTC)
-const EDIT_DEADLINE = new Date("2026-08-27T11:30:00Z");
-const isEditLocked = () => new Date() >= EDIT_DEADLINE;
+// Per-feast edit deadlines; feasts not listed stay editable.
+// literature-feast-2026: locked after Aug 27 2026 5:00 PM IST (11:30 AM UTC)
+const EDIT_DEADLINES: Record<string, Date> = {
+  "literature-feast-2026": new Date("2026-08-27T11:30:00Z"),
+  // thirubalasakhyam-2026: locked after Sat Nov 28 2026 4:00 PM IST (10:30 AM UTC)
+  "thirubalasakhyam-2026": new Date("2026-11-28T10:30:00Z"),
+};
+const isEditLocked = (slug: string) => {
+  const d = EDIT_DEADLINES[slug];
+  return !!d && new Date() >= d;
+};
 
 // ---------- helpers ----------
 
@@ -79,7 +87,7 @@ function Badge({ label, bg, color, border }: { label: string; bg: string; color:
 }
 
 function AccordionRow({
-  compName, gender, catSlug, regs, idx, theme, accent, onEdit, isFirstWithRegistrations,
+  compName, gender, catSlug, regs, idx, theme, accent, onEdit, isFirstWithRegistrations, editLocked,
 }: {
   compName: string;
   gender: string | null | undefined;
@@ -90,6 +98,7 @@ function AccordionRow({
   accent: string;
   onEdit: (participantId: string) => void;
   isFirstWithRegistrations?: boolean;
+  editLocked: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ng = normGender(gender);
@@ -230,7 +239,7 @@ function AccordionRow({
                         />
                       </span>
                     )}
-                    {!isEditLocked() && (
+                    {!editLocked && (
                       <button
                         data-tour={isFirstWithRegistrations && ri === 0 ? "edit-existing-registration-edit-btn" : undefined}
                         onClick={(e) => { e.stopPropagation(); onEdit(p.id); }}
@@ -252,7 +261,7 @@ function AccordionRow({
 }
 
 function TeamAccordionRow({
-  compName, gender, catSlug, team, idx, theme, onEditTeam,
+  compName, gender, catSlug, team, idx, theme, onEditTeam, editLocked,
 }: {
   compName: string;
   gender: string | null | undefined;
@@ -261,6 +270,7 @@ function TeamAccordionRow({
   idx: number;
   theme: FeastTheme;
   onEditTeam: (teamId: string) => void;
+  editLocked: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ng = normGender(gender);
@@ -347,7 +357,7 @@ function TeamAccordionRow({
                   {team.memberNames.join(", ") || "No members yet"}
                 </p>
               </div>
-              {!isEditLocked() && (
+              {!editLocked && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onEditTeam(team.id); }}
                   className="w-7 h-7 rounded-full flex items-center justify-center border-none cursor-pointer active:scale-95 transition-transform shrink-0"
@@ -716,6 +726,7 @@ export function FeastRegistrations({ slug, theme, onBack, onExit, onEdit, onEdit
             idx={i}
             theme={theme}
             onEditTeam={onEditTeam}
+            editLocked={isEditLocked(slug)}
           />
         ) : (
           <AccordionRow
@@ -729,6 +740,7 @@ export function FeastRegistrations({ slug, theme, onBack, onExit, onEdit, onEdit
             accent={feast.accent}
             onEdit={onEdit}
             isFirstWithRegistrations={i === firstNonEmptyIdx}
+            editLocked={isEditLocked(slug)}
           />
         )
       )}
