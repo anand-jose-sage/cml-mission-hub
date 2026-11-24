@@ -29,6 +29,7 @@ interface TeamRow {
   feast_competition_id: string;
   team_name: string;
   memberNames: string[];
+  members: ParticipantRow[];
 }
 
 // Per-feast edit deadlines; feasts not listed stay editable.
@@ -62,7 +63,7 @@ function genderLetter(g: string | null | undefined) {
   return "";
 }
 
-const CATEGORY_ORDER = ["sub_junior", "junior", "senior", "super_senior", "elder"] as const;
+const CATEGORY_ORDER = ["poombatta_1", "poombatta_2", "sub_junior", "junior", "senior", "super_senior", "elder"] as const;
 
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -446,7 +447,10 @@ export function FeastRegistrations({ slug, theme, onBack, onExit, onEdit, onEdit
               .from("team_registrations")
               .select(`
                 id, feast_competition_id, team_name,
-                members:team_registration_members(participant:participants(name))
+                members:team_registration_members(participant:participants(
+                  id, name, house_name, shakha_id, registration_number, gender,
+                  shakha:shakhas(name)
+                ))
               `)
               .eq("shakha_id", myShakhaId)
               .in("feast_competition_id", teamIds)
@@ -471,17 +475,20 @@ export function FeastRegistrations({ slug, theme, onBack, onExit, onEdit, onEdit
         const teams = (teamData ?? []).map((row) => {
           const t = row as Record<string, unknown>;
           const members = (Array.isArray(t.members) ? t.members : []) as Record<string, unknown>[];
-          const memberNames = members
+          const memberRows = members
             .map((m) => {
-              const p = (Array.isArray(m.participant) ? (m.participant as unknown[])[0] : m.participant) as { name: string } | null;
-              return p?.name ?? null;
+              const p = (Array.isArray(m.participant) ? (m.participant as unknown[])[0] : m.participant) as Record<string, unknown> | null;
+              if (!p) return null;
+              p.shakha = Array.isArray(p.shakha) ? (p.shakha[0] ?? null) : p.shakha;
+              return p as unknown as ParticipantRow;
             })
-            .filter((n): n is string => !!n);
+            .filter((p): p is ParticipantRow => !!p);
           return {
             id: t.id as string,
             feast_competition_id: t.feast_competition_id as string,
             team_name: t.team_name as string,
-            memberNames,
+            memberNames: memberRows.map((p) => p.name),
+            members: memberRows,
           };
         });
         setTeamRegs(teams);
@@ -576,91 +583,85 @@ export function FeastRegistrations({ slug, theme, onBack, onExit, onEdit, onEdit
   const firstNonEmptyIdx = feast.competitions.findIndex((c) => (regsByComp[c.id]?.length ?? 0) > 0);
 
   const downloadRegistrationsPDF = () => {
-    if (totalRegs === 0) return;
+    if (totalRegs === 0 && teamRegs.length === 0) return;
 
     const compById: Record<string, { name: string; catSlug: string | null }> = {};
     for (const c of feast.competitions) {
       compById[c.id] = { name: c.name, catSlug: c.competitionCategorySlug ?? null };
     }
 
+    // Unknown category slugs fall into "other" so no row is ever dropped
+    const known = new Set<string>(CATEGORY_ORDER);
     const buckets: Record<string, RegRow[]> = {};
     for (const r of regs) {
       if (!r.participant) continue;
-      const catSlug = compById[r.feast_competition_id]?.catSlug ?? "other";
-      if (!buckets[catSlug]) buckets[catSlug] = [];
-      buckets[catSlug].push(r);
+      const slug = compById[r.feast_competition_id]?.catSlug;
+      const key = slug && known.has(slug) ? slug : "other";
+      (buckets[key] ??= []).push(r);
     }
 
     let sl = 0;
     const sectionsHtml = [...CATEGORY_ORDER, "other"]
-      .filter((slug) => buckets[slug]?.length)
-      .map((slug) => {
-        const label = slug === "other" ? "Other" : (CATEGORY_LABELS[slug] ?? slug);
-        const rows = buckets[slug]
+      .filter((s) => buckets[s]?.length)
+      .map((s) => {
+        const label = s === "other" ? "Other" : CATEGORY_LABELS[s] ?? s;
+        const rows = buckets[s]
           .map((r) => {
             const p = r.participant!;
             sl += 1;
             const compName = compById[r.feast_competition_id]?.name ?? "";
-            return `<tr>
-              <td class="sl">${sl}</td>
-              <td class="reg">${esc(p.registration_number ?? "—")}</td>
-              <td class="name">${esc(p.name)}</td>
-              <td class="house">${esc(p.house_name ?? "—")}</td>
-              <td class="bg">${esc(genderLetter(p.gender))}</td>
-              <td class="comp">${esc(compName)}</td>
-            </tr>`;
+            return `<tr><td class="sl">${sl}</td><td class="reg">${esc(p.registration_number ?? "—")}</td><td class="name">${esc(p.name)}</td><td class="house">${esc(p.house_name ?? "—")}</td><td class="bg">${esc(genderLetter(p.gender))}</td><td class="comp">${esc(compName)}</td></tr>`;
           })
           .join("");
         return `<tr class="cat-head"><td colspan="6">${esc(label)}</td></tr>${rows}`;
       })
       .join("");
 
-    const html = `<!doctype html><html><head><meta charset="utf-8">
-<title>Registrations — ${esc(shakhaLabel)}</title>
-<style>
-  @page { size: A4 portrait; margin: 16mm 14mm; }
-  * { box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; border-left: 3px solid #B44CFF; border-right: 3px solid #B44CFF; padding: 0 12px; }
-  .hdr { text-align: center; margin-bottom: 16px; }
-  .hdr .org { font-size: 15px; letter-spacing: .08em; text-transform: uppercase; color: #B44CFF; margin: 0 0 8px; font-weight: 800; padding-bottom: 8px; border-bottom: 2px solid #B44CFF; }
-  .hdr .feast { font-size: 24px; font-weight: 900; color: #4C1D95; margin: 10px 0 4px; letter-spacing: .01em; }
-  .hdr .shakha { font-size: 14px; font-weight: 700; color: #333; margin: 0; display: inline-block; background: #f0edff; padding: 4px 12px; border-radius: 12px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-  th, td { border: 1px solid #333; padding: 5px 6px; text-align: left; font-size: 12.5px; }
-  thead th { background: #f0f0f0; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
-  col.c-sl   { width: 7%; }
-  col.c-reg  { width: 15%; }
-  col.c-name { width: 26%; }
-  col.c-house{ width: 18%; }
-  col.c-bg   { width: 8%; }
-  col.c-comp { width: 26%; }
-  td.sl, td.bg { text-align: center; font-weight: 700; }
-  td.reg { font-family: "Courier New", monospace; font-weight: 700; }
-  tr.cat-head td { background: #e5e0ff; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; font-size: 12px; }
-  @media print { .noprint { display: none; } }
-  .noprint { text-align: center; margin: 18px 0; }
-  .noprint button { font-size: 14px; padding: 8px 18px; cursor: pointer; }
-</style></head><body>
-  <div class="hdr">
-    <p class="org">Cherupushpa Mission League Kalpetta</p>
-    <p class="feast">${esc(feast.name)}</p>
-    <p class="shakha">Registration of shakha ${esc(shakhaLabel)}</p>
-  </div>
-  <table>
-    <colgroup>
-      <col class="c-sl"><col class="c-reg"><col class="c-name">
-      <col class="c-house"><col class="c-bg"><col class="c-comp">
-    </colgroup>
-    <thead>
-      <tr>
-        <th>SL</th><th>Reg No</th><th>Participant Name</th>
-        <th>House Name</th><th>B/G</th><th>Competition</th>
-      </tr>
-    </thead>
-    <tbody>${sectionsHtml}</tbody>
-  </table>
-  <div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
-</body></html>`;
+    // Team competitions: one section per competition (feast order), each team
+    // as a sub-heading followed by its members.
+    const teamSectionsHtml = feast.competitions
+      .filter((c) => teamByComp[c.id])
+      .map((c) => {
+        const t = teamByComp[c.id];
+        const ng = normGender(c.gender);
+        const detail = [c.competitionCategorySlug ? CATEGORY_LABELS[c.competitionCategorySlug] : null, ng ? GENDER_STYLE[ng].label : null].filter(Boolean).join(" · ");
+        const head = `<tr class="cat-head"><td colspan="6">${esc(c.name)} — Team${detail ? ` <span class="detail">(${esc(detail)})</span>` : ""}</td></tr>`;
+        const teamHead = `<tr class="team-head"><td colspan="6">${esc(t.team_name)} <span class="detail">· ${t.members.length} member${t.members.length === 1 ? "" : "s"}</span></td></tr>`;
+        const rows = t.members.length === 0
+          ? `<tr><td colspan="6" class="empty">No members yet</td></tr>`
+          : t.members
+              .map((p, i) => `<tr><td class="sl">${i + 1}</td><td class="reg">${esc(p.registration_number ?? "—")}</td><td class="name">${esc(p.name)}</td><td class="house">${esc(p.house_name ?? "—")}</td><td class="bg">${esc(genderLetter(p.gender))}</td><td>${esc(p.shakha?.name ?? "—")}</td></tr>`)
+              .join("");
+        return head + teamHead + rows;
+      })
+      .join("");
+
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Registrations — ${esc(shakhaLabel)}</title><style>
+      @page { size: A4 portrait; margin: 16mm 14mm; }
+      * { box-sizing: border-box; }
+      body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; border-left: 3px solid #6B46FF; border-right: 3px solid #6B46FF; padding: 0 12px; }
+      .hdr { text-align: center; margin-bottom: 16px; }
+      .hdr .feast { font-size: 24px; font-weight: 900; color: #4C1D95; margin: 10px 0 4px; }
+      .hdr .shakha { font-size: 14px; font-weight: 700; color: #333; display: inline-block; background: #f0edff; padding: 4px 12px; border-radius: 12px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+      th, td { border: 1px solid #333; padding: 5px 6px; text-align: left; font-size: 12.5px; }
+      thead th { background: #f0f0f0; font-size: 11px; text-transform: uppercase; }
+      td.sl, td.bg { text-align: center; font-weight: 700; }
+      td.reg { font-family: "Courier New", monospace; font-weight: 700; }
+      tr.cat-head td { background: #e5e0ff; font-weight: 800; text-transform: uppercase; font-size: 12px; }
+      tr.team-head td { background: #f6f4ff; font-weight: 800; font-size: 12.5px; }
+      .detail { font-weight: 600; color: #555; text-transform: none; }
+      td.empty { text-align: center; color: #777; font-style: italic; }
+      h2.section { font-size: 15px; font-weight: 900; color: #4C1D95; margin: 22px 0 0; text-transform: uppercase; letter-spacing: 0.04em; }
+      tbody { break-inside: auto; } tr { break-inside: avoid; }
+      @media print { .noprint { display: none; } }
+      .noprint { text-align: center; margin: 18px 0; }
+      </style></head><body>
+      <div class="hdr"><p class="feast">${esc(feast.name)}</p><p class="shakha">Registrations for ${esc(shakhaLabel)}</p></div>
+      ${sectionsHtml ? `<table><thead><tr><th>SL</th><th>Reg No</th><th>Participant Name</th><th>House Name</th><th>B/G</th><th>Competition</th></tr></thead><tbody>${sectionsHtml}</tbody></table>` : ""}
+      ${teamSectionsHtml ? `${sectionsHtml ? `<h2 class="section">Team Registrations</h2>` : ""}<table><thead><tr><th>SL</th><th>Reg No</th><th>Participant Name</th><th>House Name</th><th>B/G</th><th>Shakha</th></tr></thead><tbody>${teamSectionsHtml}</tbody></table>` : ""}
+      <div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
+      </body></html>`;
 
     const w = window.open("", "_blank");
     if (!w) {
@@ -700,7 +701,7 @@ export function FeastRegistrations({ slug, theme, onBack, onExit, onEdit, onEdit
         <button
           data-tour="download-registrations-btn"
           onClick={downloadRegistrationsPDF}
-          disabled={totalRegs === 0}
+          disabled={totalRegs === 0 && teamRegs.length === 0}
           className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-full border-none cursor-pointer active:scale-95 transition-transform shrink-0 disabled:opacity-40"
           style={{ background: `linear-gradient(135deg, ${theme.purple}, ${theme.lavender})`, boxShadow: `0 6px 16px ${theme.purple}44` }}
           aria-label="Download registrations"
