@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { getCategorySlug, CATEGORY_LABELS } from "@/lib/competition-categories";
 import { createParticipantAdmin, updateParticipant, deleteParticipant } from "@/actions/feast";
 import { updateTeam, deleteTeam } from "@/actions/team";
+import { openPrintWindow, PRINT_FALLBACK_BUTTON, PRINT_PAGE_CSS, PRINT_PAGINATE_SCRIPT, wrapPrintPages, escHtml } from "@/lib/print-export";
 
 // A team's roster is capped at 7 members by default, but a competition can override
 // this via competitions.max_team_size. Mirrors DEFAULT_MAX_TEAM_MEMBERS in
@@ -21,6 +22,7 @@ interface ShakhaOption { id: string; name: string; }
 
 interface FeastComp {
   id: string;
+  stage: string | null;
   competition: {
     id: string;
     name: string;
@@ -589,7 +591,7 @@ export default function ParticipantsAdminPage() {
     if (!feastId) return;
     supabase
       .from("feast_competitions")
-      .select("id, competition:competitions(id,name,gender,type,competition_category:competition_categories(id,slug,name),max_team_size)")
+      .select("id, stage, competition:competitions(id,name,gender,type,competition_category:competition_categories(id,slug,name),max_team_size)")
       .eq("feast_id", feastId)
       .order("display_order")
       .then(({ data }) => setFeastComps((data ?? []) as unknown as FeastComp[]));
@@ -758,93 +760,71 @@ export default function ParticipantsAdminPage() {
     a.click();
   };
 
+  // Same sheet as fest_hub's /admin/participants export: one sheet per
+  // competition, paginated with the heading repeated on every page.
   const exportPdf = () => {
-    const esc = (s: string) =>
-      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-    const compLabel = (fc: FeastComp) => {
-      const name = fc.competition?.name ?? "";
-      const cat = fc.competition?.competition_category?.name ?? "";
-      const gender = fc.competition?.gender;
-      const genderLabel = gender ? gender.charAt(0).toUpperCase() + gender.slice(1).toLowerCase() : "";
-      return [name, cat, genderLabel].filter(Boolean).join(" - ");
+    const orgLine = "Cherupushpa Mission League Kalpetta";
+    const genderLabel = (g: string | null | undefined) => {
+      const ng = normGender(g ?? null);
+      return ng === "Boy" ? "Boys" : ng === "Girl" ? "Girls" : null;
     };
-
-    const section = (subtitle: string, rows: ParticipantRow[], first: boolean) => {
-      const bodyRows = rows.map((r, i) => `<tr>
-        <td class="sl">${i + 1}</td>
-        <td class="reg">${esc(r.registration_number ?? "—")}</td>
-        <td class="name">${esc(r.name)}</td>
-        <td class="house">${esc(r.house_name ?? "—")}</td>
-        <td class="shakha">${esc(r.shakha?.name ?? "—")}</td>
-      </tr>`).join("");
-
-      return `<div class="section"${first ? "" : ' style="page-break-before: always;"'}>
-        <div class="hdr">
-          <p class="org">Cherupushpa Mission League Kalpetta</p>
-          <p class="sub">${esc(subtitle)}</p>
-        </div>
-        <table>
-          <thead>
-            <tr><th>SL</th><th>Reg No</th><th>Name</th><th>House Name</th><th>Shakha</th></tr>
-          </thead>
-          <tbody>${bodyRows}</tbody>
-        </table>
+    const header = (title: string, sub: string, stage: string | null) => `<div class="hdr">
+      <div>
+        <div class="org">${escHtml(orgLine)}</div>
+        <div class="comp-name">${escHtml(title)}${sub ? ` – ${escHtml(sub)}` : ""}</div>
+        <div class="chips"></div>
+      </div>
+      ${stage ? `<div class="stagebox"><span>Stage</span><b>${escHtml(stage)}</b></div>` : ""}
+    </div>`;
+    const sheet = (title: string, sub: string, stage: string | null, list: ParticipantRow[]) => {
+      const rowsHtml = list
+        .map((p, i) => `<tr><td class="sl">${i + 1}</td><td class="reg">${escHtml(p.registration_number)}</td><td class="blank"></td><td class="name">${escHtml(p.name)}</td><td>${escHtml(p.house_name)}</td><td>${escHtml(p.shakha?.name)}</td><td class="sign"></td></tr>`)
+        .join("");
+      return `<div class="sheet">
+        ${header(title, sub, stage)}
+        <div class="tbl"><table><thead><tr><th>SL</th><th>Reg No</th><th>Chance No</th><th>Name</th><th>House Name</th><th>Shakha</th><th>Sign</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
       </div>`;
     };
+    const compSheet = (fc: FeastComp, list: ParticipantRow[]) => {
+      const sub = [fc.competition?.competition_category?.name, genderLabel(fc.competition?.gender)].filter(Boolean).join(" · ");
+      return sheet(fc.competition?.name ?? "", sub, fc.stage, list);
+    };
 
-    let sectionsHtml: string;
-    if (compFilter) {
-      const comp = feastComps.find((fc) => fc.id === compFilter);
-      const subtitle = comp ? compLabel(comp) : "";
-      sectionsHtml = section(subtitle, filtered, true);
-    } else {
-      const groups = feastComps
-        .map((fc) => ({ fc, rows: filtered.filter((r) => r.regCompIds.includes(fc.id)) }))
-        .filter((g) => g.rows.length > 0);
-      sectionsHtml = groups.length > 0
-        ? groups.map((g, i) => section(compLabel(g.fc), g.rows, i === 0)).join("")
-        : section("All Competitions", filtered, true);
-    }
+    const comps = compFilter ? feastComps.filter((fc) => fc.id === compFilter) : feastComps;
+    let sections = comps
+      .map((fc) => ({ fc, list: filtered.filter((r) => r.regCompIds.includes(fc.id)) }))
+      .filter((g) => g.list.length > 0)
+      .map((g) => compSheet(g.fc, g.list));
+    if (sections.length === 0) sections = [sheet("All Competitions", "", null, filtered)];
 
-    const html = `<!doctype html><html><head><meta charset="utf-8">
-<title>Participants</title>
-<style>
-  @page { size: A4 portrait; margin: 14mm 10mm; }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; }
-  .page {
-    min-height: 100vh;
-    border-left: 3px double #7C3AED;
-    border-right: 3px double #7C3AED;
-    padding: 0 14px;
-  }
-  .section { padding-top: 4px; }
-  .hdr { text-align: center; margin-bottom: 16px; }
-  .hdr .org { font-size: 20.8px; font-weight: 800; margin: 0 0 3px; }
-  .hdr .sub { font-size: 15px; font-weight: 600; color: #444; margin: 0; }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { border: 1px solid #333; padding: 6px 8px; font-size: 14.4px; text-align: left; }
-  thead th { background: #f0f0f0; font-size: 12.7px; text-transform: uppercase; letter-spacing: .03em; }
-  td.sl { text-align: center; font-weight: 700; width: 6%; }
-  td.reg { font-family: "Courier New", monospace; font-weight: 900; color: #4C1D95; letter-spacing: .02em; }
-  @media print { .noprint { display: none; } .page { border-left-width: 2px; border-right-width: 2px; } }
-  .noprint { text-align: center; margin: 18px 0; }
-  .noprint button { font-size: 15.4px; padding: 8px 18px; cursor: pointer; }
-</style></head><body>
-  <div class="page">
-    ${sectionsHtml}
-    <div class="noprint"><button onclick="window.print()">Print / Save as PDF</button></div>
-  </div>
-</body></html>`;
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Participants</title>
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+      <style>
+      @page { size: A4 portrait; }
+      * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      body { font-family: 'Poppins', Arial, sans-serif; margin: 0; color: #1e1b4b; }
+      .sheet:not(:last-child) { page-break-before: always; }
+      .hdr { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding-bottom: 10px; margin-bottom: 12px; border-bottom: 3px solid #7C3AED; }
+      .org { font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #6B7280; }
+      .comp-name { font-size: 24px; font-weight: 800; line-height: 1.15; color: #1e1b4b; margin-top: 3px; }
+      .chips { margin-top: 8px; }
+      table { width: 100%; border-collapse: collapse; }
+      thead { display: table-header-group; }
+      tr { page-break-inside: avoid; }
+      th { background: #4C1D95; color: #fff; padding: 8px 8px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; text-align: left; }
+      td { padding: 7px 8px; font-size: 12.5px; text-align: left; vertical-align: middle; border-top: 1px solid #E9E5FF; }
+      tbody tr:nth-child(even) td { background: #FAF8FF; }
+      td.sl { width: 28px; color: #6B7280; font-weight: 600; }
+      td.name { font-weight: 700; color: #1e1b4b; white-space: nowrap; }
+      td.sign { width: 100px; min-width: 100px; border-left: 1px solid #E9E5FF; }
+      td.blank { width: 62px; min-width: 62px; border-left: 1px solid #E9E5FF; border-right: 1px solid #E9E5FF; }
+      .reg { font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 700; color: #4C1D95; white-space: nowrap; }
+      ${PRINT_PAGE_CSS}
+      </style></head><body data-per-page>${PRINT_FALLBACK_BUTTON}${wrapPrintPages(sections.join(""))}${PRINT_PAGINATE_SCRIPT}</body></html>`;
 
-    const w = window.open("", "_blank");
-    if (!w) return;
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
-    setTimeout(() => { w.focus(); w.print(); }, 350);
+    openPrintWindow(html);
   };
 
   const selectCls = "border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-purple-200 bg-white";
